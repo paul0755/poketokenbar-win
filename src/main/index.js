@@ -82,6 +82,14 @@ let save = {
    *   growthPct  성장 속도. 200%면 같은 토큰으로 두 배 빨리 자란다
    *   pricePct   상점 가격에 곱한다
    */
+  /**
+   * 직접 적어 넣은 한도(토큰). { claude: {block, week}, codex: {...} }
+   *
+   * Claude의 공식 한도는 로컬 어디에도 없다 — 로그에도, 캐시에도.
+   * 그래서 지어내는 대신 사용자가 아는 값을 받는다. 비워 두면 %를 내지 않고
+   * 쓴 양만 보여준다.
+   */
+  limits: {},
   growthPct: 100,
   pricePct: 100,
   notifyEnabled: true,
@@ -306,7 +314,7 @@ async function buildStats() {
     charm: Boolean(save.charm),
     shiny: Boolean(save.shiny),
     tree: await buildTree(eff),
-    limits: limits.summarize(u),
+    limits: limits.summarize(u, Date.now(), save.limits || {}),
     rarity: { ...poke.rarityOf(save.lineIndex ?? 0), chance: poke.rollChance(save.lineIndex ?? 0) },
     nature: poke.NATURES[save.natureIndex ?? 0] ?? null,
   };
@@ -601,6 +609,7 @@ let pollTimer = null;
 
 function settingsPayload() {
   return {
+    limits: save.limits || {},
     growthPct: save.growthPct ?? 100,
     pricePct: save.pricePct ?? 100,
     notifyEnabled: save.notifyEnabled,

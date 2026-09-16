@@ -149,7 +149,7 @@ function renderHome(s) {
     $("srcbody").innerHTML = '<div class="note">읽을 로그가 없습니다.</div>';
   }
 
-  renderLimits(s.limits);
+  renderLimits(s.limits, srcPick, cur && cur.label);
 }
 
 /**
@@ -211,84 +211,94 @@ $("srctabs").addEventListener("click", (e) => {
  *
  * opencodex가 캐시를 갱신할 때만 값이 바뀐다. 갱신이 멈추면 우리 숫자는
  * 틀린 게 아니라 오래된 것인데, 화면에서는 구분되지 않는다.
- * 실제로 Codex가 32%일 때 우리가 37%를 보여준 적이 있다 — 4시간 45분 묵은 값이었다.
- * 그래서 나이를 항상 밝힌다.
+ * 실제로 Codex가 32%일 때 앱이 37%를 보여준 적이 있다 — 4시간 45분 묵은 값이었다.
  */
 function quotaAge(q) {
-  if (typeof q.ageMs !== "number") return "제공자가 알려준 값입니다";
+  if (typeof q.ageMs !== "number") return "";
   const m = Math.round(q.ageMs / 60000);
-  if (m < 2) return "방금 갱신된 값입니다";
+  if (m < 2) return "방금 갱신된 값";
   const when = m < 60 ? m + "분 전" : hm(q.ageMs) + " 전";
-  return q.stale
-    ? `⚠️ ${when} 값입니다. 그 뒤로 쓴 만큼은 반영되지 않았습니다`
-    : `${when} 갱신된 값입니다`;
+  return q.stale ? `⚠️ ${when} 값 — 그 뒤 사용분은 미반영` : `${when} 갱신`;
 }
 
-function renderLimits(L) {
-  if (!L) {
-    $("quota").innerHTML = "";
-    $("spans").innerHTML = "";
-    return;
-  }
+const tone = (left) => (left <= 15 ? "hot" : left <= 35 ? "warn" : "");
 
-  /* ── 공식 한도 ── */
-  if (L.codex) {
-    const q = L.codex;
-    const left = Math.max(0, 100 - q.percent);
-    const tone = left <= 15 ? "hot" : left <= 35 ? "warn" : "";
-    $("quota").innerHTML = `
-      <div class="limrow">
-        <div class="top">
-          <span class="k">Codex 주간</span>
-          <span class="t">${hm(q.resetAt - L.now)} 후 리셋</span>
-          <span class="p ${tone}">${left}% 남음</span>
-        </div>
-        <div class="track"><i class="${tone}" style="width:${left}%"></i></div>
-        <div class="note">${quotaAge(q)}</div>
-      </div>`;
-  } else {
-    $("quota").innerHTML =
-      '<div class="note">확인할 수 있는 공식 한도가 없습니다. Codex를 쓰면 주간 사용률이 여기 나옵니다.</div>';
-  }
+/** 남은 비율을 아는 줄 */
+function limitRow(title, sub, leftPct, extra) {
+  const t = tone(leftPct);
+  return `
+    <div class="limrow">
+      <div class="top">
+        <span class="k">${title}</span>
+        <span class="t">${sub}</span>
+        <span class="p ${t}">${leftPct}% 남음</span>
+      </div>
+      <div class="track"><i class="${t}" style="width:${leftPct}%"></i></div>
+      ${extra ? `<div class="note">${extra}</div>` : ""}
+    </div>`;
+}
 
-  /* ── 사용 구간 ── */
+/** 한도를 모를 때 — 쓴 양만 */
+function usageRow(title, sub, value, extra) {
+  return `
+    <div class="limrow">
+      <div class="top">
+        <span class="k">${title}</span>
+        <span class="t">${sub}</span>
+        <span class="p plain">${value}</span>
+      </div>
+      ${extra ? `<div class="note">${extra}</div>` : ""}
+    </div>`;
+}
+
+/**
+ * 고른 도구의 5시간 블록과 주간.
+ *
+ * 전에는 전체 합산 한 덩어리로 보여줬는데, 도구마다 한도가 따로라
+ * "이게 어느 도구 한도인지" 알 수가 없었다. 도구 탭을 따라간다.
+ *
+ * 퍼센트는 한도를 아는 경우에만 그린다 —
+ *   Codex 주간은 제공자가 알려준 값,
+ *   나머지는 설정에 직접 적어 넣은 값.
+ * 둘 다 없으면 쓴 양만 보여준다. 모르는 값으로 %를 만들지 않는다.
+ */
+function renderLimits(L, srcId, srcLabel) {
+  const el = $("spans");
+  if (!L) return void (el.innerHTML = "");
+  $("limSrc").textContent = srcLabel || "";
+
+  const p = (L.perSource || {})[srcId];
+  if (!p) return void (el.innerHTML = '<div class="note">이 도구의 기록이 없습니다.</div>');
+
   const rows = [];
 
-  if (L.block) {
-    const b = L.block;
-    rows.push(`
-      <div class="limrow">
-        <div class="top">
-          <span class="k">지금 5시간 블록</span>
-          <span class="t">${hm(b.remainingMs)} 뒤 새 블록</span>
-          <span class="p plain">${fmt(b.used)}</span>
-        </div>
-        <div class="note">시간당 ${fmt(b.perHour)} · ${b.count}건 · 전체 도구 합산</div>
-      </div>`);
+  /* ── 5시간 블록 ── */
+  const bSub = p.block ? `${hm(p.block.remainingMs)} 뒤 새 블록` : "";
+  if (p.block && p.blockLeftPct != null) {
+    rows.push(limitRow("5시간 블록", bSub, p.blockLeftPct,
+      `${fmt(p.block.used)} / ${fmt(p.blockLimit)} · 시간당 ${fmt(p.block.perHour)}`));
+  } else if (p.block) {
+    rows.push(usageRow("5시간 블록", bSub, fmt(p.block.used),
+      `시간당 ${fmt(p.block.perHour)} · ${p.block.count}건 — 한도값을 설정에 넣으면 남은 %가 나옵니다`));
   } else {
-    rows.push(`
-      <div class="limrow">
-        <div class="top"><span class="k">지금 5시간 블록</span><span class="t"></span><span class="p plain">쉬는 중</span></div>
-        <div class="note">5시간 넘게 요청이 없었습니다</div>
-      </div>`);
+    rows.push(usageRow("5시간 블록", "", "쉬는 중", "5시간 넘게 요청이 없었습니다"));
   }
 
-  if (L.week) {
-    const LABEL = { claude: "Claude Code", codex: "Codex" };
-    const per = (L.week.bySource || [])
-      .map(([id, n]) => `<span>${LABEL[id] || id} <b>${fmt(n)}</b></span>`)
-      .join("");
-    rows.push(`
-      <div class="limrow">
-        <div class="top">
-          <span class="k">최근 7일</span><span class="t"></span>
-          <span class="p plain">${fmt(L.week.used)}</span>
-        </div>
-        <div class="parts">${per}</div>
-      </div>`);
+  /* ── 주간 ── */
+  const q = srcId === "codex" ? L.codex : null;
+  if (q) {
+    // 제공자가 알려준 값이 있으면 그게 우선이다
+    rows.push(limitRow("주간", `${hm(q.resetAt - L.now)} 후 리셋`, Math.max(0, 100 - q.percent),
+      `공식 값 · ${quotaAge(q)}`));
+  } else if (p.weekLeftPct != null) {
+    rows.push(limitRow("주간 (최근 7일)", "", p.weekLeftPct,
+      `${fmt(p.week)} / ${fmt(p.weekLimit)} · 직접 넣은 한도`));
+  } else {
+    rows.push(usageRow("주간 (최근 7일)", "", fmt(p.week),
+      "공식 한도값이 로컬에 없습니다. 설정에 넣으면 남은 %가 나옵니다"));
   }
 
-  $("spans").innerHTML = rows.join("");
+  el.innerHTML = rows.join("");
 }
 
 /* ---------------- 상점 ---------------- */

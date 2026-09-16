@@ -101,17 +101,52 @@ function codexQuota() {
   }
 }
 
-function summarize(usage, now = Date.now()) {
+/**
+ * 도구별 5시간 블록·주간.
+ *
+ * 전체 합산만 보여주면 "이 한도가 어느 도구 것인지" 알 수가 없다.
+ * 도구마다 한도가 따로 있으므로 집계도 따로 내야 한다.
+ *
+ * limits 는 사용자가 설정에 적어 넣은 한도값이다 — 없으면 퍼센트를 내지 않는다.
+ * 우리가 아는 한도는 Codex 주간(제공자 제공)뿐이고, 나머지는 모른다.
+ */
+function perSource(usage, now, limits = {}) {
+  const events = usage.events || [];
+  const ids = [...new Set(events.map((e) => e.src))];
+  const out = {};
+  for (const id of ids) {
+    const mine = events.filter((e) => e.src === id);
+    const block = currentBlock(mine, now);
+    const week = rollingWeek(mine, now).used;
+    const lim = limits[id] || {};
+    out[id] = {
+      block,
+      week,
+      // 한도를 아는 경우에만 남은 비율을 낸다
+      blockLimit: lim.block || null,
+      weekLimit: lim.week || null,
+      blockLeftPct: lim.block && block ? pctLeft(block.used, lim.block) : null,
+      weekLeftPct: lim.week ? pctLeft(week, lim.week) : null,
+    };
+  }
+  return out;
+}
+
+const pctLeft = (used, limit) =>
+  Math.max(0, Math.min(100, Math.round(((limit - used) / limit) * 100)));
+
+function summarize(usage, now = Date.now(), limits = {}) {
   const events = usage.events || [];
   return {
     block: currentBlock(events, now),
     week: rollingWeek(events, now),
     codex: codexQuota(),
+    perSource: perSource(usage, now, limits),
     now,
   };
 }
 
-module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, codexQuota, summarize };
+module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, codexQuota, perSource, summarize };
 
 // node src/main/limits.js 로 확인
 if (require.main === module) {

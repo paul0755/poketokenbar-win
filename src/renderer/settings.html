@@ -58,6 +58,12 @@
   .sw input:checked + span::before { transform: translateX(17px); background: #14151a; }
 
   input[type="range"] { flex: 1; -webkit-app-region: no-drag; accent-color: var(--accent); }
+  input[type="text"] {
+    width: 110px; padding: 5px 9px; font: inherit; font-size: 11px; color: var(--text);
+    background: #23262f; border: 1px solid var(--line); border-radius: 8px;
+    -webkit-app-region: no-drag; text-align: right;
+  }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); }
   .val { font-size: 11px; color: var(--accent); min-width: 48px; text-align: right; }
   .danger { color: #ff8a8a; border-color: #5a2a2a; }
   .danger:hover { background: #2e1c1c; }
@@ -102,6 +108,28 @@
       <span class="val" id="warnPercentVal">80%</span>
     </div>
     <div class="note">Codex 주간 사용률이 이 값을 넘는 순간 한 번 알립니다.</div>
+  </div>
+
+  <h4>한도 (직접 입력)</h4>
+  <div class="row">
+    <div class="note" style="margin:0 0 8px">
+      Claude의 공식 한도값은 로컬 어디에도 없습니다 — 로그에도 캐시에도.
+      아는 값을 넣으면 "몇 % 남음"을 계산해 드립니다. 비워 두면 쓴 양만 보여줍니다.
+      단위는 토큰이고 <b>M</b>(백만) / <b>B</b>(십억)으로 적어도 됩니다.
+    </div>
+    <div class="top" style="margin-bottom:6px">
+      <span class="k">Claude 5시간</span>
+      <input type="text" id="limClaudeBlock" placeholder="예: 300M" />
+    </div>
+    <div class="top" style="margin-bottom:6px">
+      <span class="k">Claude 주간</span>
+      <input type="text" id="limClaudeWeek" placeholder="예: 2B" />
+    </div>
+    <div class="top">
+      <span class="k">Codex 5시간</span>
+      <input type="text" id="limCodexBlock" placeholder="예: 200M" />
+    </div>
+    <div class="note">Codex 주간은 제공자가 알려주므로 입력하지 않아도 됩니다.</div>
   </div>
 
   <h4>트레이</h4>

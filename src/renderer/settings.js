@@ -18,6 +18,10 @@ window.ptb.onSettings((s) => {
   $("warnPercentVal").textContent = s.warnPercent + "%";
   $("petSize").value = s.petSize;
   $("petSizeVal").textContent = s.petSize + "px";
+  const L = s.limits || {};
+  $("limClaudeBlock").value = toUnit((L.claude || {}).block);
+  $("limClaudeWeek").value = toUnit((L.claude || {}).week);
+  $("limCodexBlock").value = toUnit((L.codex || {}).block);
   $("trayIcon").value = s.trayIcon || "logo";
   $("wanderLevel").value = s.wanderLevel;
   $("pollMinutes").value = String(s.pollMinutes);
@@ -48,10 +52,54 @@ function showGrowth(pct) {
     (pct === 100 ? "" : pct > 100 ? "  (기본보다 빠르게)" : "  (기본보다 느리게)");
 }
 
+/**
+ * "300M" · "2B" · "1500000" 을 모두 받는다.
+ * 토큰 수를 자리수 그대로 치게 하면 0을 세다 틀린다.
+ */
+function parseTokens(v) {
+  const t = String(v || "").trim().replace(/,/g, "");
+  if (!t) return null;
+  const m = t.match(/^([d.]+)s*([kmbKMB])?$/);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const mul = { k: 1e3, m: 1e6, b: 1e9 }[(m[2] || "").toLowerCase()] || 1;
+  return Math.round(n * mul);
+}
+
+const toUnit = (n) =>
+  !n ? "" : n >= 1e9 ? +(n / 1e9).toFixed(2) + "B" : n >= 1e6 ? +(n / 1e6).toFixed(1) + "M" : String(n);
+
+/** 입력 셋을 모아 한 덩어리로 보낸다. 부분 저장하면 서로 덮어쓴다. */
+function sendLimits() {
+  const v = {
+    claude: {
+      block: parseTokens($("limClaudeBlock").value),
+      week: parseTokens($("limClaudeWeek").value),
+    },
+    codex: { block: parseTokens($("limCodexBlock").value) },
+  };
+  // 못 읽은 값은 지운다 — 잘못 친 글자가 옛 한도로 남아 있으면 안 된다
+  for (const k of Object.keys(v)) {
+    for (const f of Object.keys(v[k])) if (!v[k][f]) delete v[k][f];
+    if (!Object.keys(v[k]).length) delete v[k];
+  }
+  send({ limits: v });
+}
+
 const on = (id, ev, fn) => $(id).addEventListener(ev, (e) => ready && fn(e));
 
 on("notifyEnabled", "change", () => send({ notifyEnabled: $("notifyEnabled").checked }));
 on("autoLaunch", "change", () => send({ autoLaunch: $("autoLaunch").checked }));
+for (const id of ["limClaudeBlock", "limClaudeWeek", "limCodexBlock"]) {
+  on(id, "change", () => {
+    sendLimits();
+    // 입력한 값을 정리된 표기로 되돌려 보여준다 (1500000 → 1.5M)
+    const el = $(id);
+    const n = parseTokens(el.value);
+    el.value = n ? toUnit(n) : "";
+  });
+}
 on("trayIcon", "change", () => send({ trayIcon: $("trayIcon").value }));
 on("wanderLevel", "change", () => send({ wanderLevel: $("wanderLevel").value }));
 on("pollMinutes", "change", () => send({ pollMinutes: Number($("pollMinutes").value) }));
