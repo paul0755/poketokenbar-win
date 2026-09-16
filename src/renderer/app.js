@@ -193,40 +193,50 @@ $("srctabs").addEventListener("click", (e) => {
 });
 
 /**
- * 한도.
+ * 한도와 사용 구간.
  *
- * 퍼센트는 한도를 아는 곳에서만 그린다. 5시간 창은 "얼마가 한도인지"를
- * 알 방법이 없어 쓴 양과 남은 시간, 속도만 보여준다 — %를 지어내지 않는다.
- * 남은 비율로 보여주는 건 "얼마 남았나"가 실제로 알고 싶은 값이기 때문이다.
+ * 전에는 셋을 한 목록에 나열했는데("5시간 창 / Codex 주간 / 최근 7일")
+ * 뭐가 제약이고 뭐가 그냥 센 값인지 구분이 안 됐다.
+ * 제목은 "한도"인데 실제 한도가 있는 건 Codex 하나뿐이었다.
+ *
+ * 그래서 둘로 가른다.
+ *   공식 한도 — 제공자가 알려준 값이 있는 것만. 퍼센트를 그린다
+ *   사용 구간 — 한도를 알 수 없는 것. 쓴 양과 속도만 보여준다
+ *
+ * 5시간 블록은 Claude Code가 한도를 재는 단위지만 그 한도값이 로컬에
+ * 없다. 퍼센트를 지어내는 대신 "이 블록에서 이만큼 썼다"만 말한다.
  */
-function renderLimits(L) {
-  if (!L) return void ($("limits").innerHTML = "");
-  const rows = [];
+/**
+ * 쿼터 값이 얼마나 묵었는지.
+ *
+ * opencodex가 캐시를 갱신할 때만 값이 바뀐다. 갱신이 멈추면 우리 숫자는
+ * 틀린 게 아니라 오래된 것인데, 화면에서는 구분되지 않는다.
+ * 실제로 Codex가 32%일 때 우리가 37%를 보여준 적이 있다 — 4시간 45분 묵은 값이었다.
+ * 그래서 나이를 항상 밝힌다.
+ */
+function quotaAge(q) {
+  if (typeof q.ageMs !== "number") return "제공자가 알려준 값입니다";
+  const m = Math.round(q.ageMs / 60000);
+  if (m < 2) return "방금 갱신된 값입니다";
+  const when = m < 60 ? m + "분 전" : hm(q.ageMs) + " 전";
+  return q.stale
+    ? `⚠️ ${when} 값입니다. 그 뒤로 쓴 만큼은 반영되지 않았습니다`
+    : `${when} 갱신된 값입니다`;
+}
 
-  if (L.block) {
-    const b = L.block;
-    rows.push(`
-      <div class="limrow">
-        <div class="top">
-          <span class="k">5시간 창</span>
-          <span class="t">${hm(b.remainingMs)} 남음</span>
-          <span class="p">${fmt(b.used)}</span>
-        </div>
-        <div class="note">시간당 ${fmt(b.perHour)} · ${b.count}건 · 한도값이 로컬에 없어 %는 내지 않습니다</div>
-      </div>`);
-  } else {
-    rows.push(`
-      <div class="limrow">
-        <div class="top"><span class="k">5시간 창</span><span class="t">쉬는 중</span></div>
-        <div class="note">5시간 넘게 요청이 없었습니다</div>
-      </div>`);
+function renderLimits(L) {
+  if (!L) {
+    $("quota").innerHTML = "";
+    $("spans").innerHTML = "";
+    return;
   }
 
+  /* ── 공식 한도 ── */
   if (L.codex) {
     const q = L.codex;
     const left = Math.max(0, 100 - q.percent);
     const tone = left <= 15 ? "hot" : left <= 35 ? "warn" : "";
-    rows.push(`
+    $("quota").innerHTML = `
       <div class="limrow">
         <div class="top">
           <span class="k">Codex 주간</span>
@@ -234,13 +244,36 @@ function renderLimits(L) {
           <span class="p ${tone}">${left}% 남음</span>
         </div>
         <div class="track"><i class="${tone}" style="width:${left}%"></i></div>
-        ${q.stale ? '<div class="note">⚠️ 6시간 넘게 갱신되지 않은 값입니다</div>' : ""}
+        <div class="note">${quotaAge(q)}</div>
+      </div>`;
+  } else {
+    $("quota").innerHTML =
+      '<div class="note">확인할 수 있는 공식 한도가 없습니다. Codex를 쓰면 주간 사용률이 여기 나옵니다.</div>';
+  }
+
+  /* ── 사용 구간 ── */
+  const rows = [];
+
+  if (L.block) {
+    const b = L.block;
+    rows.push(`
+      <div class="limrow">
+        <div class="top">
+          <span class="k">지금 5시간 블록</span>
+          <span class="t">${hm(b.remainingMs)} 뒤 새 블록</span>
+          <span class="p plain">${fmt(b.used)}</span>
+        </div>
+        <div class="note">시간당 ${fmt(b.perHour)} · ${b.count}건 · 전체 도구 합산</div>
+      </div>`);
+  } else {
+    rows.push(`
+      <div class="limrow">
+        <div class="top"><span class="k">지금 5시간 블록</span><span class="t"></span><span class="p plain">쉬는 중</span></div>
+        <div class="note">5시간 넘게 요청이 없었습니다</div>
       </div>`);
   }
 
   if (L.week) {
-    // Claude는 공식 주간 쿼터를 로컬에서 알 수 없다. 대신 실제로 얼마나
-    // 썼는지는 셀 수 있으므로 도구별로 나눠 보여준다. %는 지어내지 않는다.
     const LABEL = { claude: "Claude Code", codex: "Codex" };
     const per = (L.week.bySource || [])
       .map(([id, n]) => `<span>${LABEL[id] || id} <b>${fmt(n)}</b></span>`)
@@ -249,14 +282,13 @@ function renderLimits(L) {
       <div class="limrow">
         <div class="top">
           <span class="k">최근 7일</span><span class="t"></span>
-          <span class="p">${fmt(L.week.used)}</span>
+          <span class="p plain">${fmt(L.week.used)}</span>
         </div>
         <div class="parts">${per}</div>
-        <div class="note">Claude는 공식 주간 한도값이 로컬에 없어 사용량만 보여줍니다</div>
       </div>`);
   }
 
-  $("limits").innerHTML = rows.join("");
+  $("spans").innerHTML = rows.join("");
 }
 
 /* ---------------- 상점 ---------------- */

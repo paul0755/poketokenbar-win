@@ -83,11 +83,18 @@ function codexQuota() {
     const j = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw);
     const q = j.quotas && j.quotas.__main__;
     if (!q || typeof q.weeklyPercent !== "number") return null;
+    const ageMs = Date.now() - q.updatedAt;
     return {
       percent: q.weeklyPercent,
       resetAt: q.weeklyResetAt * 1000, // 파일은 초 단위
       updatedAt: q.updatedAt,
-      stale: Date.now() - q.updatedAt > 6 * 3600000, // 6시간 넘으면 오래된 값
+      ageMs,
+      /*
+       * opencodex가 캐시를 갱신해 줄 때만 값이 바뀐다. 갱신이 멈추면
+       * 우리 숫자는 틀린 게 아니라 오래된 것인데, 화면에서는 구분되지 않는다.
+       * 실제로 4시간 45분 묵은 값이 최신처럼 보인 적이 있어 기준을 1시간으로 낮췄다.
+       */
+      stale: ageMs > 3600000,
     };
   } catch {
     return null; // opencodex를 안 쓰거나 아직 캐시가 없다
