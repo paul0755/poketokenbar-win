@@ -18,6 +18,7 @@ window.ptb.onSettings((s) => {
   $("warnPercentVal").textContent = s.warnPercent + "%";
   $("petSize").value = s.petSize;
   $("petSizeVal").textContent = s.petSize + "px";
+  $("trayIcon").value = s.trayIcon || "logo";
   $("wanderLevel").value = s.wanderLevel;
   $("pollMinutes").value = String(s.pollMinutes);
   $("autoLaunch").checked = s.autoLaunch;
@@ -51,6 +52,7 @@ const on = (id, ev, fn) => $(id).addEventListener(ev, (e) => ready && fn(e));
 
 on("notifyEnabled", "change", () => send({ notifyEnabled: $("notifyEnabled").checked }));
 on("autoLaunch", "change", () => send({ autoLaunch: $("autoLaunch").checked }));
+on("trayIcon", "change", () => send({ trayIcon: $("trayIcon").value }));
 on("wanderLevel", "change", () => send({ wanderLevel: $("wanderLevel").value }));
 on("pollMinutes", "change", () => send({ pollMinutes: Number($("pollMinutes").value) }));
 

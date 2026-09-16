@@ -86,6 +86,14 @@ let save = {
   pricePct: 100,
   notifyEnabled: true,
   warnPercent: 80, // Codex 주간 한도 경고 기준
+  /**
+   * 트레이 아이콘. "logo" | "mon"
+   *
+   * 기본은 로고다. 알림 영역에는 앱이 스무 개쯤 모여 있고, 16px로 줄인
+   * 포켓몬 스프라이트는 뭉개져서 어느 앱인지 알아볼 수가 없다.
+   * 현재 포켓몬을 보고 싶으면 "mon"으로 바꾼다.
+   */
+  trayIcon: "logo",
   petSize: 128,
   pollMinutes: 0.5, // 갱신 주기(분). 0.5 = 30초
   autoLaunch: false,
@@ -292,6 +300,7 @@ async function buildStats() {
     grown,
     refreshedAt: Date.now(),
     growthPct: save.growthPct ?? 100,
+    trayIcon: save.trayIcon ?? "logo",
     petSize: save.petSize,
     candy: candy(u.total),
     charm: Boolean(save.charm),
@@ -319,12 +328,25 @@ async function buildTree(grown) {
   );
 }
 
+/** 앱 로고. 256px 원본에서 줄여야 16px에서 또렷하다. */
+let logoIcon = null;
+function getLogo() {
+  if (logoIcon) return logoIcon;
+  const p = path.join(__dirname, "..", "..", "assets", "icon.png");
+  const img = nativeImage.createFromPath(p);
+  logoIcon = img.isEmpty() ? null : img.resize({ width: 16, height: 16, quality: "best" });
+  return logoIcon;
+}
+
 /** Windows 트레이는 macOS 메뉴바와 달리 글자를 못 띄운다. 숫자는 툴팁으로 간다. */
 function applyTray(s) {
   if (!tray) return;
-  if (s.stillPath) {
+  if (save.trayIcon === "mon" && s.stillPath) {
     const img = nativeImage.createFromPath(s.stillPath).resize({ width: 16, height: 16 });
     if (!img.isEmpty()) tray.setImage(img);
+  } else {
+    const logo = getLogo();
+    if (logo) tray.setImage(logo);
   }
   const p = s.mon.progress;
   const b = s.limits && s.limits.block;
@@ -602,6 +624,7 @@ function applySettings(patch) {
     createPet(); // 여기서 새 크기에 맞게 위치를 화면 안으로 다시 잡는다
     pet.showInactive();
   }
+  if ("trayIcon" in patch && lastStats) applyTray(lastStats);
   if ("pollMinutes" in patch) restartPolling();
   if ("growthPct" in patch || "pricePct" in patch) pushShop();
   if ("autoLaunch" in patch) {
@@ -845,10 +868,7 @@ app.whenReady().then(async () => {
   }
 
   // Windows 트레이는 빈 아이콘을 받으면 아무것도 표시하지 않는다.
-  const fallback = nativeImage
-    .createFromPath(path.join(__dirname, "..", "..", "assets", "pokeball.png"))
-    .resize({ width: 16, height: 16 });
-  tray = new Tray(fallback);
+  tray = new Tray(getLogo() ?? nativeImage.createEmpty());
   tray.setToolTip("PokeTokenBar — 불러오는 중…");
 
   createWindow();
