@@ -17,7 +17,8 @@ window.ptb.onStats((s) => {
     img.classList.toggle("left", s.facing === "left");
     if (!s.mon) return;
   }
-  const url = s.animUrl || s.stillUrl;
+  // 대표로 지정한 아이가 있으면 그쪽을 쓴다. 없으면 키우는 개체.
+  const url = s.petAnimUrl || s.petStillUrl || s.animUrl || s.stillUrl;
   if (url) {
     if (img.getAttribute("src") !== url) img.setAttribute("src", url);
     img.hidden = false;

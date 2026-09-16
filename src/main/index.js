@@ -47,6 +47,13 @@ let save = {
   maxStage: {},
   graduated: [], // 마스터까지 키운 개체들
   graduatedAt: null, // 마지막으로 졸업 처리한 개체의 bornAt (중복 기록 방지)
+  /**
+   * 바탕화면 펫으로 띄울 라인. null이면 지금 키우는 개체를 따라간다.
+   *
+   * 키우는 건 한 마리뿐이지만, 도감에 있는 아이를 대표로 세워두고
+   * 싶을 수 있다. 키우는 개체와 보이는 개체를 분리한다.
+   */
+  petLine: null,
   petVisible: false,
   petPos: null,
   wanderLevel: "rare",
@@ -183,6 +190,22 @@ async function buildStats() {
   const anim = await poke.spriteWithFallback(mon, CACHE, "anim");
   // events는 한도 계산에만 쓴다. 수천 건을 30초마다 IPC로 보낼 이유가 없다.
   const { events, ...slim } = u;
+
+  // 펫은 대표로 지정한 아이를 보여준다. 없으면 키우는 개체 그대로.
+  let petMon = mon;
+  let petStill = still;
+  let petAnim = anim;
+  if (save.petLine != null && save.petLine !== save.lineIndex) {
+    const L = poke.LINES[save.petLine];
+    if (L) {
+      const st = Math.max(1, save.maxStage[save.petLine] ?? 1);
+      const target = { dexId: L.ids[st], isShiny: false };
+      petMon = { name: L.names[st], stage: poke.STAGES[st] };
+      petStill = await poke.spriteWithFallback(target, CACHE, "still");
+      petAnim = await poke.spriteWithFallback(target, CACHE, "anim");
+    }
+  }
+
   return {
     usage: slim,
     mon,
@@ -190,6 +213,10 @@ async function buildStats() {
     // 렌더러에 Windows 경로를 넘기면 역슬래시를 직접 다뤄야 한다. 변환은 Node가 한다.
     stillUrl: still ? pathToFileURL(still).href : null,
     animUrl: anim ? pathToFileURL(anim).href : null,
+    petName: petMon.name,
+    petStillUrl: petStill ? pathToFileURL(petStill).href : null,
+    petAnimUrl: petAnim ? pathToFileURL(petAnim).href : null,
+    petLine: save.petLine,
     dex: {
       seen: save.seen.length,
       total: poke.LINES.length,
@@ -364,6 +391,7 @@ async function buildDex() {
         stars: r.stars,
         label: r.label,
         graduated: gradCount.get(i) ?? 0,
+        isPet: save.petLine == null ? i === save.lineIndex : i === save.petLine,
         url: p ? pathToFileURL(p).href : null,
       };
     }),
@@ -702,6 +730,14 @@ app.whenReady().then(async () => {
   ipcMain.on("open-dex", openDex);
   ipcMain.on("request-dex", pushDex);
   ipcMain.on("close-dex", () => dexWin && !dexWin.isDestroyed() && dexWin.close());
+  ipcMain.on("set-pet-line", (_e, line) => {
+    // 키우는 개체를 고르면 "따라가기"(null)로 되돌린다 — 그게 기본 상태다
+    save.petLine = line === save.lineIndex ? null : line;
+    writeSave();
+    if (save.petVisible && (!pet || pet.isDestroyed())) togglePet(true);
+    refresh();
+    pushDex();
+  });
   ipcMain.on("open-settings", openSettings);
   ipcMain.on("request-settings", pushSettings);
   ipcMain.on("set-settings", (_e, patch) => applySettings(patch || {}));
