@@ -455,7 +455,24 @@ function createWindow() {
   // 최초 refresh가 로드보다 빠르면 그 send는 허공에 사라진다. 로드 후 한 번 더 민다.
   win.webContents.on("did-finish-load", () => (lastStats ? push(win, lastStats) : refresh()));
   win.webContents.on("console-message", logConsole("renderer"));
-  win.on("blur", () => win.hide()); // 팝오버답게 포커스를 잃으면 닫는다
+  /**
+   * 팝오버답게 포커스를 잃으면 닫는다.
+   *
+   * 다만 펫 창을 만들거나 없앨 때도 포커스가 흔들려 blur가 온다.
+   * 그대로 두면 "펫 숨기기"를 눌렀는데 펫이 아니라 이 창이 닫힌다.
+   * 우리 창 때문에 생긴 blur인지 확인하고 넘긴다.
+   */
+  win.on("blur", () => {
+    if (petBusy) return;
+    setTimeout(() => {
+      if (!win || win.isDestroyed() || petBusy) return;
+      // 우리 창(설정 등)이 포커스를 가져갔으면 닫지 않는다
+      const focused = BrowserWindow.getFocusedWindow();
+      if (focused && !focused.isDestroyed() && focused !== win) return;
+      if (win.isFocused()) return;
+      win.hide();
+    }, 120);
+  });
 }
 
 function showNearTray() {
@@ -618,11 +635,13 @@ function applySettings(patch) {
     // 않아 사라진 것처럼 보인다. 위치를 기억해 두고 새로 만든다.
     const p = pet.getPosition();
     save.petPos = { x: p[0], y: p[1] };
+    petBusy = true;
     stopWander();
     pet.destroy();
     pet = null;
     createPet(); // 여기서 새 크기에 맞게 위치를 화면 안으로 다시 잡는다
     pet.showInactive();
+    setTimeout(() => (petBusy = false), 400);
   }
   if ("trayIcon" in patch && lastStats) applyTray(lastStats);
   if ("pollMinutes" in patch) restartPolling();
@@ -636,7 +655,9 @@ function applySettings(patch) {
     }
   }
   pushSettings();
-  refresh();
+  // 합치기 가드를 통과해야 한다. force가 없으면 옛 petSize가 그대로 다시 가서
+  // 창만 커지고 스프라이트는 그대로인 상태가 된다.
+  refresh(true);
 }
 
 function openSettings() {
@@ -687,6 +708,9 @@ function resetProgress() {
 /* ---------------- 데스크톱 펫 ---------------- */
 
 // 펫 크기는 설정에서 바뀐다 (save.petSize)
+/** 펫 창을 만들거나 없애는 중. 그동안의 blur는 무시한다. */
+let petBusy = false;
+
 const petW = () => save.petSize ?? 128;
 
 /**
@@ -806,6 +830,7 @@ function stopWander() {
 function togglePet(on) {
   save.petVisible = on === undefined ? !save.petVisible : on;
   writeSave();
+  petBusy = true;
   if (save.petVisible) {
     if (!pet || pet.isDestroyed()) createPet();
     pet.showInactive();
@@ -814,8 +839,10 @@ function togglePet(on) {
     pet.destroy();
     pet = null;
   }
+  // 창 조작으로 생긴 blur가 도착할 시간을 준 뒤 푼다
+  setTimeout(() => (petBusy = false), 400);
   // 화면에 다시 밀어주지 않으면 버튼 라벨이 "숨기기"에 멈춘다.
-  refresh();
+  refresh(true);
 }
 
 function setWanderLevel(level) {
