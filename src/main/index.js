@@ -640,7 +640,7 @@ function applySettings(patch) {
     pet.destroy();
     pet = null;
     createPet(); // 여기서 새 크기에 맞게 위치를 화면 안으로 다시 잡는다
-    pet.showInactive();
+    if (save.petVisible) pet.showInactive();
     setTimeout(() => (petBusy = false), 400);
   }
   if ("trayIcon" in patch && lastStats) applyTray(lastStats);
@@ -756,6 +756,8 @@ function createPet() {
     height: petW(),
     x: pos.x,
     y: pos.y,
+    // 만들자마자 보여주지 않는다. 숨김 상태에서 크기를 바꿀 때 튀어나오면 안 된다.
+    show: false,
     frame: false,
     transparent: true,
     hasShadow: false,
@@ -827,22 +829,38 @@ function stopWander() {
   wanderTarget = null;
 }
 
+/**
+ * 펫 켜고 끄기.
+ *
+ * 숨길 때 창을 없애지 않는다. 다시 만들려면 BrowserWindow 생성 + HTML 로드 +
+ * 스프라이트 로드를 처음부터 다시 해야 해서 눈에 띄게 느리다.
+ * 감췄다 보이는 것은 즉시 끝난다. 대신 배회는 멈춰 둔다.
+ */
 function togglePet(on) {
   save.petVisible = on === undefined ? !save.petVisible : on;
   writeSave();
   petBusy = true;
+
   if (save.petVisible) {
     if (!pet || pet.isDestroyed()) createPet();
+    else startWander(); // 숨어 있는 동안 멈춰 뒀다
     pet.showInactive();
   } else if (pet && !pet.isDestroyed()) {
     stopWander();
-    pet.destroy();
-    pet = null;
+    pet.hide();
   }
+
   // 창 조작으로 생긴 blur가 도착할 시간을 준 뒤 푼다
-  setTimeout(() => (petBusy = false), 400);
-  // 화면에 다시 밀어주지 않으면 버튼 라벨이 "숨기기"에 멈춘다.
-  refresh(true);
+  setTimeout(() => (petBusy = false), 250);
+
+  /* 버튼 라벨 하나 바꾸자고 로그 103개를 다시 읽을 이유가 없다.
+     마지막 결과에 표시 여부만 갈아 끼워 바로 밀어준다. */
+  if (lastStats) {
+    lastStats = { ...lastStats, petVisible: save.petVisible };
+    push(win, lastStats);
+  } else {
+    refresh(true);
+  }
 }
 
 function setWanderLevel(level) {
