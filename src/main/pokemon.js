@@ -1,0 +1,163 @@
+"use strict";
+/**
+ * 토큰 → 포켓몬 진화 단계.
+ *
+ * 임계값은 실제 사용량을 보고 정했다. 하루 5천만~1억 토큰을 쓰는 사람에게
+ * "1억에 부화"는 너무 멀고, "100만에 최종진화"는 하루 만에 끝난다.
+ * 첫날 부화하고, 한 주 열심히 쓰면 최종 진화하는 감각을 목표로 했다.
+ */
+const fs = require("node:fs");
+const path = require("node:path");
+
+const STAGES = [
+  { key: "egg", at: 0, label: "알" },
+  { key: "baby", at: 5_000_000, label: "부화" },
+  { key: "mid", at: 80_000_000, label: "1차 진화" },
+  { key: "final", at: 400_000_000, label: "최종 진화" },
+  { key: "master", at: 1_500_000_000, label: "마스터" },
+];
+
+/**
+ * 진화 라인. ids/names는 STAGES와 같은 길이로 맞춘다.
+ * 마스터는 최종 진화와 같은 종이지만 이로치(shiny)로 보여준다 — 보상.
+ *
+ * 손으로 적지 않는다 — 도감 번호도 한국어 이름도 반드시 틀린다.
+ * scripts/build-lines.mjs 가 PokéAPI에서 받아 생성한다:
+ *
+ *   node scripts/build-lines.mjs
+ *
+ * 생성물을 커밋해두므로 앱 실행 시에는 네트워크를 타지 않는다.
+ */
+const LINES = require("./lines.json");
+
+/**
+ * 뽑기. 지금 키우는 것과 다른 라인이 나오게 한다 —
+ * 뽑았는데 같은 게 또 나오면 뽑은 것 같지가 않다.
+ */
+function roll(exclude = null) {
+  if (LINES.length < 2) return 0;
+  let i;
+  do {
+    i = Math.floor(Math.random() * LINES.length);
+  } while (i === exclude);
+  return i;
+}
+
+function stageFor(total) {
+  let i = 0;
+  for (let k = 0; k < STAGES.length; k++) if (total >= STAGES[k].at) i = k;
+  return i;
+}
+
+/** 다음 단계까지 얼마나 남았나 (마스터면 next: null) */
+function progress(total) {
+  const i = stageFor(total);
+  const next = STAGES[i + 1];
+  if (!next) return { ratio: 1, remaining: 0, next: null };
+  const from = STAGES[i].at;
+  return {
+    ratio: Math.min(1, (total - from) / (next.at - from)),
+    remaining: next.at - total,
+    next: next.label,
+  };
+}
+
+function describe(total, lineIndex = 0) {
+  const L = LINES[lineIndex % LINES.length];
+  const i = stageFor(total);
+  return {
+    line: L.line,
+    name: L.names[i],
+    stageIndex: i,
+    stage: STAGES[i],
+    dexId: L.ids[i],
+    isEgg: STAGES[i].key === "egg",
+    isShiny: STAGES[i].key === "master",
+    progress: progress(total),
+  };
+}
+
+/**
+ * 진화 트리. 같은 종이 연속으로 나오는 칸은 합친다.
+ *
+ * 2단 진화 라인은 '1차'와 '최종'이 같은 종이라 그대로 그리면
+ * 같은 그림이 두 번 나온다. 종이 바뀌는 지점만 노드로 만든다.
+ * 마스터는 종이 같아도 이로치라 항상 따로 세운다.
+ */
+function evolutionTree(lineIndex, total) {
+  const L = LINES[lineIndex % LINES.length];
+  const now = stageFor(total);
+  const nodes = [];
+
+  for (let i = 1; i < STAGES.length; i++) {
+    const dexId = L.ids[i];
+    const isShiny = STAGES[i].key === "master";
+    const prev = nodes[nodes.length - 1];
+    if (prev && prev.dexId === dexId && !isShiny) {
+      // 같은 종이 이어진다 — 노드를 늘리지 않고 도달 여부만 갱신한다
+      prev.reached = prev.reached || total >= STAGES[i].at;
+      continue;
+    }
+    nodes.push({
+      name: L.names[i],
+      dexId,
+      isShiny,
+      at: STAGES[i].at,
+      stageIndex: i,
+      reached: total >= STAGES[i].at,
+      current: i === now,
+    });
+  }
+
+  // 합쳐진 칸 때문에 current가 사라질 수 있다. 도달한 마지막 노드를 현재로 본다.
+  if (!nodes.some((n) => n.current)) {
+    const last = [...nodes].reverse().find((n) => n.reached);
+    if (last) last.current = true;
+  }
+  return nodes;
+}
+
+const BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
+
+/**
+ * 스프라이트를 받아 디스크에 캐시한다. 오프라인에서도 떠야 한다.
+ *
+ * kind "still" — 정적 PNG. 트레이 아이콘용(nativeImage는 GIF를 움직이지 못한다)
+ * kind "anim"  — 5세대 흑백 애니메이션 GIF. 팝오버·펫용
+ */
+async function spritePath(dexId, cacheDir, { kind = "still", shiny = false } = {}) {
+  if (!dexId) return null;
+  fs.mkdirSync(cacheDir, { recursive: true });
+  const name = `${dexId}${shiny ? "-shiny" : ""}.${kind === "anim" ? "gif" : "png"}`;
+  const file = path.join(cacheDir, kind === "anim" ? `anim-${name}` : name);
+  if (fs.existsSync(file) && fs.statSync(file).size > 0) return file;
+
+  const url =
+    kind === "anim"
+      ? `${BASE}/versions/generation-v/black-white/animated/${shiny ? "shiny/" : ""}${dexId}.gif`
+      : `${BASE}/${shiny ? "shiny/" : ""}${dexId}.png`;
+
+  // 타임아웃이 없으면 네트워크가 먹통일 때 호출부가 영영 resolve되지 않는다.
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`스프라이트 실패 ${url}: HTTP ${res.status}`);
+  fs.writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+  return file;
+}
+
+/**
+ * 이로치가 없는 종도 있다. 실패하면 일반 스프라이트로 떨어진다.
+ *
+ * 실패를 조용히 삼키면 안 된다 — GIF가 안 받아지는데도 앱은 멀쩡해 보이고,
+ * 정적 이미지가 뜨는 이유를 아무도 알 수 없게 된다.
+ */
+async function spriteWithFallback(mon, cacheDir, kind) {
+  if (!mon.dexId) return null;
+  if (mon.isShiny) {
+    try { return await spritePath(mon.dexId, cacheDir, { kind, shiny: true }); }
+    catch (e) { console.error("[sprite] 이로치 실패 " + mon.dexId + " " + kind + ": " + e.message); }
+  }
+  try { return await spritePath(mon.dexId, cacheDir, { kind }); }
+  catch (e) { console.error("[sprite] 실패 " + mon.dexId + " " + kind + ": " + e.message); return null; }
+}
+
+module.exports = { STAGES, LINES, roll, stageFor, progress, describe, evolutionTree, spritePath, spriteWithFallback };

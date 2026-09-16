@@ -1,0 +1,57 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>pet</title>
+<style>
+  /* 투명 창이라 배경을 절대 칠하지 않는다. 칠하면 검은 사각형이 남는다. */
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+  }
+  body {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
+  }
+  /* -webkit-app-region: drag 를 쓰지 않는다.
+     그걸 쓰면 창은 끌리지만 클릭 이벤트가 JS로 오지 않아
+     "눌러서 팝오버 열기"를 만들 수 없다. 드래그는 직접 구현한다. */
+  body.dragging {
+    cursor: grabbing;
+  }
+  #pet {
+    image-rendering: pixelated;
+    max-width: 112px;
+    max-height: 112px;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
+    transition: transform 0.2s ease;
+    animation: bob 2.6s ease-in-out infinite;
+    pointer-events: none; /* 이미지가 마우스 이벤트를 먹지 않게 */
+  }
+  /* GIF 자체도 움직이지만, 위아래로 살짝 떠 있으면 살아있는 느낌이 커진다 */
+  @keyframes bob {
+    0%,
+    100% {
+      translate: 0 0;
+    }
+    50% {
+      translate: 0 -5px;
+    }
+  }
+  #pet.left {
+    transform: scaleX(-1);
+  }
+  #egg {
+    font-size: 72px;
+    animation: bob 2.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+</style>
+<img id="pet" alt="" hidden />
+<div id="egg">🥚</div>
+<script src="pet.js"></script>

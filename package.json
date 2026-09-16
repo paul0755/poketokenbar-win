@@ -1,0 +1,15 @@
+{
+  "name": "poketokenbar-win",
+  "version": "0.1.0",
+  "description": "토큰을 써서 포켓몬을 키우는 Windows 트레이 앱 + 데스크톱 펫",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "probe": "node src/main/usage.js",
+    "lines": "node scripts/build-lines.mjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

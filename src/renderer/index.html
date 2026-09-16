@@ -1,0 +1,96 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>PokeTokenBar</title>
+<style>
+  :root {
+    --bg: #14151a; --card: #1e2027; --line: #2c2f38;
+    --text: #f2f3f5; --muted: #9aa0ab; --accent: #ffcb05; --accent2: #3b6ec6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 13px/1.5 "Malgun Gothic", "Segoe UI", system-ui, sans-serif;
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+  }
+  header { padding: 14px 16px 10px; }
+  .line { font-size: 11px; color: var(--muted); }
+  .stage { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  .sprite-wrap {
+    display: flex; align-items: center; justify-content: center;
+    height: 132px; margin: 2px 16px 8px; border-radius: 12px;
+    background: radial-gradient(70% 70% at 50% 35%, #2a2d36 0%, #191b21 100%);
+  }
+  .sprite { width: 112px; height: 112px; image-rendering: pixelated; }
+  .egg { font-size: 68px; animation: wobble 2.4s ease-in-out infinite; }
+  @keyframes wobble { 0%,100%{transform:rotate(-5deg)} 50%{transform:rotate(5deg)} }
+  .bar { height: 7px; background: #262933; border-radius: 99px; margin: 0 16px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 99px; transition: width .4s ease; }
+  .next { margin: 6px 16px 0; font-size: 11px; color: var(--muted); text-align: center; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 16px 6px; }
+  .cell { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; }
+  .cell b { display: block; font-size: 17px; font-weight: 700; }
+  .cell span { font-size: 10px; color: var(--muted); }
+  .days { padding: 2px 16px 10px; }
+  .days h4 { margin: 6px 0 6px; font-size: 10px; color: var(--muted); font-weight: 600; }
+  .day { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; font-size: 10px; color: var(--muted); }
+  .day .track { flex: 1; height: 5px; background: #23262f; border-radius: 99px; overflow: hidden; }
+  .day .track > i { display: block; height: 100%; background: var(--accent2); }
+  .day .n { width: 44px; text-align: right; color: var(--text); }
+  footer { display: flex; gap: 6px; padding: 0 16px 14px; }
+  button {
+    flex: 1; padding: 7px; font: inherit; font-size: 11px; color: var(--text);
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+  }
+  button:hover { background: #262a33; }
+  button:active { transform: scale(.97); }
+
+  /* ---- 진화 트리 ---- */
+  .tree { padding: 4px 16px 2px; }
+  .tree h4 { margin: 8px 0 7px; font-size: 10px; color: var(--muted); font-weight: 600; }
+  .chain { display: flex; align-items: stretch; gap: 3px; }
+  .node {
+    flex: 1; min-width: 0; text-align: center; padding: 7px 2px 6px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    /* 아직 도달하지 않은 단계는 실루엣으로 — 뭐가 나올지는 보이되 아직 내 것은 아니다 */
+    opacity: .38; filter: grayscale(1);
+  }
+  .node.reached { opacity: 1; filter: none; }
+  .node.current { border-color: var(--accent); background: #2a2016; opacity: 1; filter: none; }
+  .node img { width: 40px; height: 40px; image-rendering: pixelated; display: block; margin: 0 auto; }
+  .node .nm {
+    margin-top: 2px; font-size: 9.5px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .node .at { font-size: 8.5px; color: var(--muted); }
+  .node.current .at { color: var(--accent); }
+  .arrow { align-self: center; font-size: 10px; color: var(--text-dim); flex: 0 0 auto; }
+</style>
+
+<header>
+  <div class="line" id="line">불러오는 중…</div>
+  <div class="stage" id="stage">&nbsp;</div>
+</header>
+
+<div class="sprite-wrap" id="spriteWrap"><div class="egg">🥚</div></div>
+<div class="bar"><i id="bar" style="width:0%"></i></div>
+<div class="next" id="next">&nbsp;</div>
+<div class="next" id="dex" style="margin-top:2px"></div>
+
+<div class="tree"><h4>진화 트리</h4><div class="chain" id="chain"></div></div>
+
+<div class="grid">
+  <div class="cell"><b id="today">–</b><span>오늘</span></div>
+  <div class="cell"><b id="total">–</b><span>누적</span></div>
+</div>
+
+<div class="days"><h4>최근 기록</h4><div id="dayList"></div></div>
+
+<footer>
+  <button id="pet">바탕화면 펫</button>
+  <button id="swap">🎲 다시 뽑기</button>
+  <button id="refresh">새로고침</button>
+  <button id="quit">종료</button>
+</footer>
+
+<script src="app.js"></script>
