@@ -92,6 +92,16 @@
   .chart .b.today { background: var(--blue); }
   .axis { display: flex; justify-content: space-between; margin-top: 3px; font-size: 9.5px; color: var(--dim); }
   .peak { float: right; font-size: 10px; color: var(--dim); font-weight: 400; }
+  .chart .b { cursor: pointer; }
+  .chart .b:hover { background: #4a4e5a; }
+  .chart .b.sel { background: var(--accent); }
+  .daypick {
+    margin-top: 7px; padding: 8px 10px; border-radius: 9px;
+    background: var(--card); border: 1px solid var(--line);
+    font-size: 11px; color: var(--muted);
+  }
+  .daypick b { color: var(--text); font-weight: 700; }
+  .daypick .hint { color: var(--dim); }
 
   /* 도구 탭 */
   .srctabs { display: flex; gap: 4px; margin: 14px 0 10px; }
@@ -212,7 +222,7 @@
       <button id="petToggle">띄우기</button>
     </div>
 
-    <h4>오늘 쓴 토큰</h4>
+    <h4>오늘 쓴 토큰<span class="peak" id="refreshedAt"></span></h4>
     <div class="big"><span class="n" id="today">–</span><span class="raw" id="todayRaw"></span></div>
     <div class="wm">
       <span>이번 주 <b id="week">–</b></span>
@@ -222,6 +232,7 @@
     <h4>이번 달 일별<span class="peak" id="peak"></span></h4>
     <div class="chart" id="chart"></div>
     <div class="axis" id="axis"></div>
+    <div class="daypick" id="daypick"></div>
 
     <div class="srctabs" id="srctabs"></div>
     <div class="srcbody" id="srcbody"></div>

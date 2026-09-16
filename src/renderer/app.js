@@ -44,6 +44,7 @@ for (const b of document.querySelectorAll("nav button[data-tab]")) {
 /* ---------------- 홈 ---------------- */
 
 let srcPick = null; // 고른 도구 탭
+let pickedDay = null; // 차트에서 고른 날. null이면 오늘
 let lastStats = null;
 
 /** 단계에 맞는 한 줄. 숫자만 있으면 키우는 느낌이 안 난다. */
@@ -98,6 +99,12 @@ function renderHome(s) {
   pt.classList.toggle("on", Boolean(s.petVisible));
 
   // 숫자
+  if (s.refreshedAt) {
+    const t = new Date(s.refreshedAt);
+    $("refreshedAt").textContent =
+      "갱신 " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0") +
+      ":" + String(t.getSeconds()).padStart(2, "0");
+  }
   $("today").textContent = fmt(usage.today);
   $("todayRaw").textContent = usage.today.toLocaleString();
   $("week").textContent = fmt(usage.week ?? 0);
@@ -111,12 +118,13 @@ function renderHome(s) {
   $("chart").innerHTML = md
     .map(
       (d) =>
-        `<span class="b${d.day === todayDay ? " today" : ""}" style="height:${Math.max(2, Math.round((d.n / peak) * 46))}px" title="${d.day}일 ${fmt(d.n)}"></span>`,
+        `<span class="b${d.day === todayDay ? " today" : ""}${d.day === pickedDay ? " sel" : ""}" data-day="${d.day}" style="height:${Math.max(2, Math.round((d.n / peak) * 46))}px" title="${d.day}일 ${fmt(d.n)}"></span>`,
     )
     .join("");
   $("axis").innerHTML = md.length
     ? `<span>1</span><span>${Math.round(md.length / 2)}</span><span>${md.length}</span>`
     : "";
+  renderDayPick(md, todayDay);
 
   // 도구 탭
   const srcs = usage.sources || [];
@@ -143,6 +151,39 @@ function renderHome(s) {
 
   renderLimits(s.limits);
 }
+
+/**
+ * 고른 날의 사용량.
+ *
+ * 호버 툴팁만 있으면 마우스를 떼는 순간 사라져서 다른 날과 비교할 수가 없다.
+ * 눌러서 고정하고, 같은 막대를 다시 누르면 오늘로 돌아온다.
+ */
+function renderDayPick(md, todayDay) {
+  const el = $("daypick");
+  if (!md.length) return void (el.innerHTML = "");
+  const day = pickedDay ?? todayDay;
+  const d = md.find((x) => x.day === day);
+  if (!d) return void (el.innerHTML = "");
+
+  const rank = [...md].filter((x) => x.n > 0).sort((a, b) => b.n - a.n).findIndex((x) => x.day === day) + 1;
+  const used = md.filter((x) => x.n > 0).length;
+  const dow = ["일", "월", "화", "수", "목", "금", "토"][new Date(d.key + "T00:00:00").getDay()];
+
+  el.innerHTML =
+    `<b>${d.day}일 (${dow})</b>  ${fmt(d.n)}` +
+    (d.n ? `  ·  쓴 날 중 ${rank}위 / ${used}일` : "  ·  기록 없음") +
+    (pickedDay == null
+      ? '  <span class="hint">— 막대를 눌러 다른 날도 볼 수 있습니다</span>'
+      : '  <span class="hint">— 다시 누르면 오늘로</span>');
+}
+
+$("chart").addEventListener("click", (e) => {
+  const b = e.target.closest(".b[data-day]");
+  if (!b) return;
+  const day = Number(b.dataset.day);
+  pickedDay = pickedDay === day ? null : day; // 같은 막대를 다시 누르면 해제
+  if (lastStats) renderHome(lastStats);
+});
 
 $("srctabs").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-src]");
@@ -198,9 +239,20 @@ function renderLimits(L) {
   }
 
   if (L.week) {
+    // Claude는 공식 주간 쿼터를 로컬에서 알 수 없다. 대신 실제로 얼마나
+    // 썼는지는 셀 수 있으므로 도구별로 나눠 보여준다. %는 지어내지 않는다.
+    const LABEL = { claude: "Claude Code", codex: "Codex" };
+    const per = (L.week.bySource || [])
+      .map(([id, n]) => `<span>${LABEL[id] || id} <b>${fmt(n)}</b></span>`)
+      .join("");
     rows.push(`
       <div class="limrow">
-        <div class="top"><span class="k">최근 7일</span><span class="t"></span><span class="p">${fmt(L.week.used)}</span></div>
+        <div class="top">
+          <span class="k">최근 7일</span><span class="t"></span>
+          <span class="p">${fmt(L.week.used)}</span>
+        </div>
+        <div class="parts">${per}</div>
+        <div class="note">Claude는 공식 주간 한도값이 로컬에 없어 사용량만 보여줍니다</div>
       </div>`);
   }
 

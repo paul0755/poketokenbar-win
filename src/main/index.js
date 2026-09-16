@@ -198,7 +198,7 @@ function buy(itemId) {
   } else if (itemId === "charm") { save.charm = true; msg = "이로치 확률이 2배가 됩니다"; }
 
   writeSave();
-  refresh();
+  refresh(true);
   pushDex();
   pushShop();
   return { ok: true, message: msg, shiny: itemId.startsWith("egg") && save.shiny };
@@ -290,6 +290,7 @@ async function buildStats() {
       graduated: save.graduated.length,
     },
     grown,
+    refreshedAt: Date.now(),
     growthPct: save.growthPct ?? 100,
     petSize: save.petSize,
     candy: candy(u.total),
@@ -367,7 +368,26 @@ function sendNotifications(s) {
   prevSnap = cur;
 }
 
-async function refresh() {
+let refreshing = false;
+let lastScanAt = 0;
+
+/**
+ * 로그 다시 읽기.
+ *
+ * 기동할 때 여러 경로가 동시에 부른다 — 최초 1회, 펫 띄우기, 렌더러의 요청,
+ * did-finish-load, 창 열기. 그대로 두면 10초 안에 로그 103개를 네 번 훑는다.
+ * 이미 도는 중이면 건너뛰고, 방금 읽었으면 그 결과를 다시 쓴다.
+ * force=true 면(구매·뽑기처럼 값이 바뀐 직후) 무조건 다시 읽는다.
+ */
+async function refresh(force = false) {
+  if (refreshing) return;
+  if (!force && lastStats && Date.now() - lastScanAt < 3000) {
+    // 최근 결과를 그대로 다시 밀어준다. 화면은 갱신되고 디스크는 안 건드린다.
+    push(win, lastStats);
+    push(pet, lastStats);
+    return;
+  }
+  refreshing = true;
   try {
     const s = await buildStats();
     lastStats = s;
@@ -381,6 +401,9 @@ async function refresh() {
     }
   } catch (e) {
     console.error("[refresh 실패]", e && e.stack ? e.stack : e);
+  } finally {
+    refreshing = false;
+    lastScanAt = Date.now();
   }
 }
 
@@ -424,6 +447,8 @@ function showNearTray() {
   win.setPosition(x, Math.min(Math.max(area.y, y), area.y + area.height - h));
   win.show();
   win.focus();
+  // 숨어 있는 동안 갱신이 밀렸을 수 있다. 열자마자 다시 읽는다.
+  refresh();
 }
 
 /* ---------------- 도감 ---------------- */
@@ -557,7 +582,8 @@ function pushSettings() {
 function restartPolling() {
   if (pollTimer) clearInterval(pollTimer);
   const ms = Math.max(10_000, (save.pollMinutes ?? 0.5) * 60_000);
-  pollTimer = setInterval(refresh, ms);
+  // setInterval은 콜백에 인자를 넘기므로 감싸지 않으면 force로 오해된다
+  pollTimer = setInterval(() => refresh(true), ms);
 }
 
 function applySettings(patch) {
@@ -566,8 +592,15 @@ function applySettings(patch) {
 
   if ("wanderLevel" in patch && pet && !pet.isDestroyed()) startWander();
   if ("petSize" in patch && pet && !pet.isDestroyed()) {
-    pet.setSize(save.petSize, save.petSize);
-    push(pet, { petSize: save.petSize });
+    // 투명 창은 setSize로 크기가 제대로 안 바뀐다 — 내용이 다시 그려지지
+    // 않아 사라진 것처럼 보인다. 위치를 기억해 두고 새로 만든다.
+    const p = pet.getPosition();
+    save.petPos = { x: p[0], y: p[1] };
+    stopWander();
+    pet.destroy();
+    pet = null;
+    createPet(); // 여기서 새 크기에 맞게 위치를 화면 안으로 다시 잡는다
+    pet.showInactive();
   }
   if ("pollMinutes" in patch) restartPolling();
   if ("growthPct" in patch || "pricePct" in patch) pushShop();
@@ -623,7 +656,7 @@ function resetProgress() {
   save.graduatedAt = null;
   prevSnap = null; // 초기화 직후 "진화했습니다"가 뜨지 않게
   writeSave();
-  refresh();
+  refresh(true);
   pushDex();
 }
 
@@ -662,9 +695,14 @@ let selfPos = null;
 
 function createPet() {
   const area = screen.getPrimaryDisplay().workArea;
-  const pos = save.petPos || {
+  const want = save.petPos || {
     x: area.x + area.width - petW() - 40,
     y: area.y + area.height - petW() - 60,
+  };
+  // 크기를 키우면 전에 있던 자리가 화면 밖으로 밀려날 수 있다. 다시 가둔다.
+  const pos = {
+    x: Math.min(Math.max(area.x, want.x), area.x + area.width - petW()),
+    y: Math.min(Math.max(area.y, want.y), area.y + area.height - petW()),
   };
   pet = new BrowserWindow({
     width: petW(),
@@ -753,6 +791,8 @@ function togglePet(on) {
     pet.destroy();
     pet = null;
   }
+  // 화면에 다시 밀어주지 않으면 버튼 라벨이 "숨기기"에 멈춘다.
+  refresh();
 }
 
 function setWanderLevel(level) {
@@ -780,7 +820,7 @@ function buildMenu() {
     { label: "🍬 상점 (사탕 " + candy().left + ")", click: openShop },
     { label: "📖 도감 열기", click: openDex },
     { label: "⚙️ 설정", click: openSettings },
-    { label: "새로고침", click: refresh },
+    { label: "새로고침", click: () => refresh(true) },
     { type: "separator" },
     { label: "종료", click: () => app.quit() },
   ]);
@@ -815,15 +855,16 @@ app.whenReady().then(async () => {
   tray.on("click", () => (win.isVisible() ? win.hide() : showNearTray()));
   tray.on("right-click", () => tray.popUpContextMenu(buildMenu()));
 
-  ipcMain.on("request-stats", refresh);
+  // on 핸들러는 event 객체를 첫 인자로 넘긴다. 그대로 두면 force=truthy가 된다.
+  ipcMain.on("request-stats", () => refresh());
   ipcMain.on("quit", () => app.quit());
   ipcMain.on("hide-popover", () => win && !win.isDestroyed() && win.hide());
   ipcMain.on("toggle-pet", () => togglePet());
   ipcMain.on("open-shop", openShop);
-  ipcMain.on("request-shop", pushShop);
+  ipcMain.on("request-shop", () => pushShop());
   ipcMain.handle("buy", (_e, id) => buy(id));
   ipcMain.on("open-dex", openDex);
-  ipcMain.on("request-dex", pushDex);
+  ipcMain.on("request-dex", () => pushDex());
   ipcMain.on("set-pet-line", (_e, line) => {
     // 보유하지 않은 아이는 세울 수 없다. 렌더러가 보낸 값을 그대로 믿지 않는다.
     if (line != null && !ownedLines().has(line)) return;
@@ -835,7 +876,7 @@ app.whenReady().then(async () => {
     pushDex();
   });
   ipcMain.on("open-settings", openSettings);
-  ipcMain.on("request-settings", pushSettings);
+  ipcMain.on("request-settings", () => pushSettings());
   ipcMain.on("set-settings", (_e, patch) => applySettings(patch || {}));
   ipcMain.on("close-settings", () => setWin && !setWin.isDestroyed() && setWin.close());
   ipcMain.on("open-data-folder", () => shell.openPath(app.getPath("userData")));
