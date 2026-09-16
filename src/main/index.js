@@ -133,6 +133,8 @@ function rollLine() {
   save.lineIndex = poke.roll(save.lineIndex);
   save.natureIndex = poke.rollNature();
   save.bornAt = lastTotal; // 새 개체는 지금부터 0에서 자란다
+  // 떠나보낸 아이를 계속 펫으로 세워둘 수는 없다
+  if (save.petLine != null && !ownedLines().has(save.petLine)) save.petLine = null;
   save.graduatedAt = null;
   if (!save.seen.includes(save.lineIndex)) save.seen.push(save.lineIndex);
   writeSave();
@@ -366,7 +368,21 @@ let dexWin = null;
  * 가리면 개발자 도구로 다 보인다. 모으는 재미가 거기서 끝난다.
  * 스프라이트도 만난 것만 받는다. 221개를 미리 받을 이유가 없다.
  */
+/**
+ * 보유한 라인.
+ *
+ * 도감에 있다고 가진 게 아니다 — 도감은 "만난 적 있다"는 기록이다.
+ * 실제로 가진 건 지금 키우는 아이와, 마스터까지 키워 졸업시킨 아이들이다.
+ * 뽑기로 갈아치운 아이는 떠나보낸 것이므로 보유가 아니다.
+ */
+function ownedLines() {
+  const set = new Set(save.graduated.map((g) => g.line));
+  if (save.lineIndex != null) set.add(save.lineIndex);
+  return set;
+}
+
 async function buildDex() {
+  const owned = ownedLines();
   const gradCount = new Map();
   for (const g of save.graduated) gradCount.set(g.line, (gradCount.get(g.line) ?? 0) + 1);
 
@@ -391,6 +407,7 @@ async function buildDex() {
         stars: r.stars,
         label: r.label,
         graduated: gradCount.get(i) ?? 0,
+        owned: owned.has(i),
         isPet: save.petLine == null ? i === save.lineIndex : i === save.petLine,
         url: p ? pathToFileURL(p).href : null,
       };
@@ -731,6 +748,8 @@ app.whenReady().then(async () => {
   ipcMain.on("request-dex", pushDex);
   ipcMain.on("close-dex", () => dexWin && !dexWin.isDestroyed() && dexWin.close());
   ipcMain.on("set-pet-line", (_e, line) => {
+    // 보유하지 않은 아이는 세울 수 없다. 렌더러가 보낸 값을 그대로 믿지 않는다.
+    if (line != null && !ownedLines().has(line)) return;
     // 키우는 개체를 고르면 "따라가기"(null)로 되돌린다 — 그게 기본 상태다
     save.petLine = line === save.lineIndex ? null : line;
     writeSave();

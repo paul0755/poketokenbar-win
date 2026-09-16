@@ -2,14 +2,17 @@
 const $ = (id) => document.getElementById(id);
 
 let entries = [];
-let onlyGot = false;
+let filter = "all"; // all | owned | got
 
 function stars(n) {
   return "★".repeat(n) + `<span class="off">${"★".repeat(5 - n)}</span>`;
 }
 
 function render() {
-  const list = onlyGot ? entries.filter((e) => e.seen) : entries;
+  const list =
+    filter === "owned" ? entries.filter((e) => e.owned)
+    : filter === "got" ? entries.filter((e) => e.seen)
+    : entries;
   if (!list.length) {
     $("grid").innerHTML = '<div class="empty">아직 모은 포켓몬이 없습니다</div>';
     return;
@@ -30,9 +33,13 @@ function render() {
         : e.complete
           ? ""
           : `<div class="wip">${e.stage}</div>`; // 아직 최종 진화를 못 본 라인
-      const cls = ["cell", e.graduated ? "grad" : "", e.isPet ? "pet" : ""].join(" ");
-      return `<div class="${cls}" data-line="${e.index}" title="${e.name} · ${e.label}
-클릭하면 바탕화면 펫으로 지정합니다">
+      const cls = ["cell", e.graduated ? "grad" : "", e.isPet ? "pet" : "", e.owned ? "owned" : "seenonly"].join(" ");
+      const tip = e.owned
+        ? `${e.name} · ${e.label}
+클릭하면 바탕화면 펫이 됩니다`
+        : `${e.name} · ${e.label}
+만난 기록입니다. 보유 중이 아니라 펫으로 세울 수 없습니다`;
+      return `<div class="${cls}"${e.owned ? ` data-line="${e.index}"` : ""} title="${tip}">
           ${e.isPet ? '<div class="pin">바탕화면</div>' : ""}
           ${pic}<div class="nm">${e.name}</div>
           <div class="st">${stars(e.stars)}</div>${grad}
@@ -43,8 +50,10 @@ function render() {
 
 window.ptb.onDex((d) => {
   entries = d.entries;
+  const owned = entries.filter((e) => e.owned).length;
   $("count").innerHTML =
-    `<b>${d.seen}</b> / ${d.total}` + (d.graduated ? `  ·  졸업 ${d.graduated}마리` : "");
+    `<b>${d.seen}</b> / ${d.total}  ·  보유 ${owned}` +
+    (d.graduated ? `  ·  졸업 ${d.graduated}` : "");
   render();
 });
 
@@ -55,18 +64,16 @@ $("grid").addEventListener("click", (e) => {
   window.ptb.setPetLine(Number(cell.dataset.line));
 });
 
-$("fAll").onclick = () => {
-  onlyGot = false;
-  $("fAll").classList.add("on");
-  $("fGot").classList.remove("on");
+function setFilter(name) {
+  filter = name;
+  for (const [k, id] of [["all", "fAll"], ["owned", "fOwned"], ["got", "fGot"]]) {
+    $(id).classList.toggle("on", filter === k);
+  }
   render();
-};
-$("fGot").onclick = () => {
-  onlyGot = true;
-  $("fGot").classList.add("on");
-  $("fAll").classList.remove("on");
-  render();
-};
+}
+$("fAll").onclick = () => setFilter("all");
+$("fOwned").onclick = () => setFilter("owned");
+$("fGot").onclick = () => setFilter("got");
 $("close").onclick = () => window.ptb.closeDex();
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") window.ptb.closeDex();
