@@ -47,11 +47,13 @@
     transform: scaleX(-1);
   }
   #egg {
-    font-size: 72px;
     animation: bob 2.6s ease-in-out infinite;
     pointer-events: none;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .45));
   }
+  #egg svg { display: block; }
 </style>
 <img id="pet" alt="" hidden />
-<div id="egg">🥚</div>
+<div id="egg"></div>
+<script src="egg.js"></script>
 <script src="pet.js"></script>

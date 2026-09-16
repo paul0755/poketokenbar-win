@@ -118,6 +118,7 @@ src/main/natures.json  성격 25종                 ⚠️ 자동 생성물
 src/main/index.js      트레이 · 팝오버 · 펫 · 배회 · 폴링
 src/main/preload.js    contextBridge (렌더러는 파일시스템에 안 닿음)
 src/renderer/          팝오버(index) · 펫(pet) · 도감(dex) · 설정(settings)
+src/renderer/egg.js    알 그림 (SVG). PokéAPI에 쓸 만한 알이 없어 직접 그렸다
 scripts/build-lines.mjs  PokéAPI → lines.json
 ```
 

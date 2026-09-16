@@ -50,7 +50,7 @@
     background: radial-gradient(70% 70% at 50% 35%, #2a2d36 0%, #191b21 100%);
   }
   .sprite { width: 112px; height: 112px; image-rendering: pixelated; }
-  .egg { font-size: 68px; animation: wobble 2.4s ease-in-out infinite; }
+  .eggsvg { animation: wobble 2.4s ease-in-out infinite; transform-origin: 50% 90%; }
   @keyframes wobble { 0%,100%{transform:rotate(-5deg)} 50%{transform:rotate(5deg)} }
   .bar { height: 7px; background: #262933; border-radius: 99px; margin: 0 16px; overflow: hidden; }
   .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 99px; transition: width .4s ease; }
@@ -132,7 +132,7 @@
   <div class="traits" id="traits"></div>
 </header>
 
-<div class="sprite-wrap" id="spriteWrap"><div class="egg">🥚</div></div>
+<div class="sprite-wrap" id="spriteWrap"></div>
 <div class="bar"><i id="bar" style="width:0%"></i></div>
 <div class="next" id="next">&nbsp;</div>
 <div class="next" id="dex" style="margin-top:2px"></div>
@@ -161,4 +161,5 @@
   <button id="quit">종료</button>
 </footer>
 
+<script src="egg.js"></script>
 <script src="app.js"></script>

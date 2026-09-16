@@ -36,7 +36,7 @@ window.ptb.onStats((s) => {
   const url = s.animUrl || s.stillUrl;
   $("spriteWrap").innerHTML = url
     ? `<img class="sprite" src="${url}" alt="">`
-    : `<div class="egg">🥚</div>`;
+    : window.eggSvg(112);
 
   const p = mon.progress;
   $("bar").style.width = Math.round(p.ratio * 100) + "%";
