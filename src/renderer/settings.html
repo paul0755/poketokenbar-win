@@ -69,6 +69,24 @@
 </header>
 
 <div class="scroll">
+  <h4>난이도</h4>
+  <div class="row">
+    <div class="top">
+      <span class="k">성장 속도</span>
+      <input type="range" id="growthPct" min="10" max="200" step="10" />
+      <span class="val" id="growthPctVal">100%</span>
+    </div>
+    <div class="note" id="growthNote"></div>
+  </div>
+  <div class="row">
+    <div class="top">
+      <span class="k">상점 가격</span>
+      <input type="range" id="pricePct" min="10" max="200" step="10" />
+      <span class="val" id="pricePctVal">100%</span>
+    </div>
+    <div class="note">사탕이 들어오는 속도는 그대로입니다. 값만 바뀝니다.</div>
+  </div>
+
   <h4>알림</h4>
   <div class="row">
     <div class="top">
@@ -140,7 +158,7 @@
       <button id="reset" class="danger">초기화</button>
     </div>
     <div class="note">
-      도감 · 졸업 기록 · 뽑기권을 모두 지우고 새 알부터 시작합니다.
+      도감 · 졸업 기록 · 사탕을 모두 지우고 새 알부터 시작합니다.
       토큰 기록 자체는 로그에서 다시 읽으므로 지워지지 않습니다.
     </div>
   </div>

@@ -77,6 +77,13 @@ let save = {
   wanderLevel: "rare",
 
   /* ---- 설정 ---- */
+  /**
+   * 난이도. 둘 다 100%가 기본이다.
+   *   growthPct  진화에 필요한 토큰에 곱한다. 200%면 두 배를 써야 한다
+   *   pricePct   상점 가격에 곱한다
+   */
+  growthPct: 100,
+  pricePct: 100,
   notifyEnabled: true,
   warnPercent: 80, // Codex 주간 한도 경고 기준
   petSize: 128,
@@ -129,7 +136,12 @@ const hm = (ms) => {
   return h ? h + "시간 " + m + "분" : m + "분";
 };
 
-let lastTotal = 0; // 마지막으로 읽은 누적 토큰. 뽑기 비용 계산에 쓴다.
+let lastTotal = 0; // 마지막으로 읽은 누적 토큰. 사탕 계산에 쓴다.
+
+/** 성장 배수. 200%면 2 — 두 배를 써야 같은 단계에 간다. */
+const growthScale = () => Math.max(0.1, (save.growthPct ?? 100) / 100);
+/** 난이도를 반영한 상점 가격. 공짜가 되지는 않게 최소 1개. */
+const priceOf = (cost) => Math.max(1, Math.round((cost * (save.pricePct ?? 100)) / 100));
 
 /** 이상한사탕 현황 */
 function candy(total = lastTotal) {
@@ -167,9 +179,10 @@ function buy(itemId) {
   if (!item) return { ok: false, reason: "없는 물건" };
   if (item.once && save.charm) return { ok: false, reason: "이미 가지고 있습니다" };
   const c = candy();
-  if (c.left < item.cost) return { ok: false, reason: "사탕이 모자랍니다" };
+  const cost = priceOf(item.cost);
+  if (c.left < cost) return { ok: false, reason: "사탕이 모자랍니다" };
 
-  save.candySpent = (save.candySpent ?? 0) + item.cost;
+  save.candySpent = (save.candySpent ?? 0) + cost;
   let msg = "";
   if (itemId === "egg") { hatch(0); msg = "새 알을 받았습니다"; }
   else if (itemId === "egg-super") { hatch(3); msg = "슈퍼 알 — ★3 이상"; }
@@ -227,9 +240,12 @@ async function buildStats() {
   lastTotal = u.total;
   // 성장은 이 개체를 받은 뒤 쓴 토큰으로만 잰다.
   const grown = Math.max(0, u.total - (save.bornAt ?? 0));
-  recordStage(grown);
-  checkGraduation(grown);
-  const mon = poke.describe(grown, save.lineIndex ?? 0);
+  // 난이도는 임계값을 올리는 대신 성장량을 나눠서 적용한다. 결과는 같고,
+  // STAGES를 원본 그대로 둘 수 있어 난이도를 되돌리면 값이 정확히 복원된다.
+  const eff = grown / growthScale();
+  recordStage(eff);
+  checkGraduation(eff);
+  const mon = poke.describe(eff, save.lineIndex ?? 0, { shiny: save.shiny });
   // 트레이는 정적 PNG(nativeImage는 GIF를 움직이지 못한다), 화면은 애니메이션 GIF.
   const still = await poke.spriteWithFallback(mon, CACHE, "still");
   const anim = await poke.spriteWithFallback(mon, CACHE, "anim");
@@ -268,11 +284,12 @@ async function buildStats() {
       graduated: save.graduated.length,
     },
     grown,
+    growthPct: save.growthPct ?? 100,
     petSize: save.petSize,
     candy: candy(u.total),
     charm: Boolean(save.charm),
     shiny: Boolean(save.shiny),
-    tree: await buildTree(grown),
+    tree: await buildTree(eff),
     limits: limits.summarize(u),
     rarity: { ...poke.rarityOf(save.lineIndex ?? 0), chance: poke.rollChance(save.lineIndex ?? 0) },
     nature: poke.NATURES[save.natureIndex ?? 0] ?? null,
@@ -289,7 +306,8 @@ async function buildTree(grown) {
         CACHE,
         "still",
       );
-      return { ...n, url: p ? pathToFileURL(p).href : null };
+      // at은 원본 임계값이다. 화면에는 난이도를 곱한 실제 필요량을 보여준다.
+      return { ...n, at: Math.round(n.at * growthScale()), url: p ? pathToFileURL(p).href : null };
     }),
   );
 }
@@ -512,8 +530,9 @@ function pushShop() {
     charm: Boolean(save.charm),
     items: SHOP.map((x) => ({
       ...x,
+      cost: priceOf(x.cost),
       owned: x.once ? Boolean(save.charm) : false,
-      afford: c.left >= x.cost,
+      afford: c.left >= priceOf(x.cost),
     })),
   });
 }
@@ -548,6 +567,8 @@ let pollTimer = null;
 
 function settingsPayload() {
   return {
+    growthPct: save.growthPct ?? 100,
+    pricePct: save.pricePct ?? 100,
     notifyEnabled: save.notifyEnabled,
     warnPercent: save.warnPercent,
     petSize: save.petSize,
@@ -579,6 +600,7 @@ function applySettings(patch) {
     push(pet, { petSize: save.petSize });
   }
   if ("pollMinutes" in patch) restartPolling();
+  if ("growthPct" in patch || "pricePct" in patch) pushShop();
   if ("autoLaunch" in patch) {
     // 패키징 전(개발 중 electron.exe 실행)에는 등록해도 의미가 없다.
     try {
