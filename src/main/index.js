@@ -6,6 +6,7 @@ const { pathToFileURL } = require("node:url");
 const usage = require("./usage");
 const poke = require("./pokemon");
 const limits = require("./limits");
+const claudeQuota = require("./claude-limits");
 const notify = require("./notify");
 
 const CACHE = path.join(app.getPath("userData"), "sprites");
@@ -94,6 +95,11 @@ let save = {
   pricePct: 100,
   notifyEnabled: true,
   warnPercent: 80, // Codex 주간 한도 경고 기준
+  /**
+   * 새로고침 버튼으로 가져온 Claude 공식 한도.
+   * 퍼센트와 리셋 시각만 남긴다 — 토큰은 여기 들어오지 않는다.
+   */
+  claudeQuota: null,
   /**
    * 트레이 아이콘. "logo" | "mon"
    *
@@ -314,7 +320,11 @@ async function buildStats() {
     charm: Boolean(save.charm),
     shiny: Boolean(save.shiny),
     tree: await buildTree(eff),
-    limits: limits.summarize(u, Date.now(), save.limits || {}),
+    limits: {
+      ...limits.summarize(u, Date.now(), save.limits || {}),
+      // 마지막으로 눌러서 가져온 값. 누른 적이 없으면 null이고 화면은 버튼만 보여준다.
+      claude: save.claudeQuota || null,
+    },
     rarity: { ...poke.rarityOf(save.lineIndex ?? 0), chance: poke.rollChance(save.lineIndex ?? 0) },
     nature: poke.NATURES[save.natureIndex ?? 0] ?? null,
   };
@@ -931,6 +941,19 @@ app.whenReady().then(async () => {
 
   // on 핸들러는 event 객체를 첫 인자로 넘긴다. 그대로 두면 force=truthy가 된다.
   ipcMain.on("request-stats", () => refresh());
+  /**
+   * Claude 공식 한도 가져오기 — 버튼을 눌렀을 때만 실행된다.
+   * 타이머에 걸지 않는다. 로그인 정보를 읽는 일은 사용자가 시킬 때만 일어나야 한다.
+   */
+  ipcMain.handle("refresh-claude-quota", async () => {
+    const r = await claudeQuota.fetchQuota();
+    if (r.ok) {
+      save.claudeQuota = { windows: r.windows, fetchedAt: r.fetchedAt };
+      writeSave();
+      refresh(true); // 화면에 바로 반영
+    }
+    return r;
+  });
   ipcMain.on("quit", () => app.quit());
   ipcMain.on("hide-popover", () => win && !win.isDestroyed() && win.hide());
   ipcMain.on("toggle-pet", () => togglePet());

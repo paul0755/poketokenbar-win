@@ -139,6 +139,13 @@
 
   /* 한도 */
   .lim { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 4px; }
+  #quotaBtn {
+    width: 100%; margin: 2px 0 8px; padding: 7px; font: inherit; font-size: 11px; font-weight: 600;
+    color: var(--muted); background: var(--card); border: 1px solid var(--line);
+    border-radius: 9px; cursor: pointer;
+  }
+  #quotaBtn:hover:not(:disabled) { color: var(--text); background: var(--card2); }
+  #quotaBtn:disabled { opacity: .5; cursor: default; }
   .limrow { margin-bottom: 12px; }
   .limrow .top { display: flex; align-items: baseline; gap: 8px; }
   .limrow .k { flex: 1; font-size: 12.5px; font-weight: 700; }
@@ -264,6 +271,7 @@
 
     <div class="lim">
       <h4>한도<span class="peak" id="limSrc"></span></h4>
+      <button id="quotaBtn" hidden>공식 한도 가져오기</button>
       <div id="spans"></div>
     </div>
   </section>
