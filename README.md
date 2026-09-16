@@ -145,6 +145,11 @@ scripts/build-lines.mjs  PokéAPI → lines.json
 `lines.json` 은 **손으로 고치지 마세요.** 도감 번호와 한국어 이름을
 직접 적으면 반드시 틀립니다. `npm run lines` 로 다시 만듭니다.
 
+## 리포트
+
+0.1.0까지의 스택·기능·개발 과정·알려진 문제는
+[docs/REPORT-0.1.0.md](./docs/REPORT-0.1.0.md) 에 정리했습니다.
+
 ## 아직 안 되는 것
 
 원본 대비 빠진 것들입니다. [원본 README](https://github.com/chattymin/PokeTokenBar/blob/main/README.ko.md) 참고.
