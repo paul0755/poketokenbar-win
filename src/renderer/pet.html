@@ -26,8 +26,12 @@
   }
   #pet {
     image-rendering: pixelated;
-    max-width: 112px;
-    max-height: 112px;
+    /* 스프라이트 원본이 96x96이다. max-width로는 그보다 크게 만들 수 없다 —
+       max-*는 줄이기만 하고 늘리지 않는다. 실제 width/height를 준다.
+       object-fit: contain 으로 정사각형이 아닌 스프라이트도 비율을 지킨다. */
+    width: 112px;
+    height: 112px;
+    object-fit: contain;
     filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
     transition: transform 0.2s ease;
     animation: bob 2.6s ease-in-out infinite;

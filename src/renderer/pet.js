@@ -7,8 +7,9 @@ window.ptb.onStats((s) => {
   // 설정에서 크기를 바꾸면 창은 메인이 줄이고, 그림은 여기서 맞춘다.
   if (s.petSize) {
     const px = Math.round(s.petSize * 0.875);
-    img.style.maxWidth = px + "px";
-    img.style.maxHeight = px + "px";
+    // max-*가 아니라 width/height여야 96px 원본이 실제로 커진다.
+    img.style.width = px + "px";
+    img.style.height = px + "px";
     egg.innerHTML = window.eggSvg(Math.round(s.petSize * 0.78));
     if (!s.mon && !s.facing) return;
   }
