@@ -75,6 +75,9 @@
   }
   button:hover { background: #262a33; }
   button:active { transform: scale(.97); }
+  button:disabled { opacity: .45; cursor: default; }
+  button:disabled:hover { background: var(--card); }
+  button:disabled:active { transform: none; }
 
   /* ---- 진화 트리 ---- */
   .tree { padding: 4px 16px 2px; }

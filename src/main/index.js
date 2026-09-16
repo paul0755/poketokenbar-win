@@ -16,15 +16,35 @@ let win = null; // 팝오버
 let pet = null; // 데스크톱 펫
 let lastStats = null;
 
-// lineIndex가 null이면 아직 안 뽑은 것. 첫 실행에 뽑는다.
+/**
+ * 뽑기권 1장의 값. 하루 5천만~1억을 쓰면 하루 1~2장이다.
+ *
+ * 뽑기가 공짜 버튼이면 희귀도가 의미를 잃는다. ★5가 1/739여도
+ * 1초에 한 번 누르면 10분이면 나온다. 화폐는 "실제로 쓴 토큰"이어야 한다.
+ */
+const ROLL_COST = 50_000_000;
+
 let save = {
-  lineIndex: null,
+  lineIndex: null, // null이면 아직 안 뽑은 것. 첫 실행에 뽑는다
   natureIndex: null,
-  seen: [],
+  /**
+   * 이 개체를 받은 시점의 누적 토큰.
+   *
+   * 성장은 (누적 - bornAt)으로 잰다. 누적 전체로 재면 뭘 뽑든
+   * 곧바로 최종 진화라서, 키우는 게임인데 키우는 과정이 없어진다.
+   */
+  bornAt: 0,
+  rollsUsed: 0, // 써버린 뽑기권
+  freeRolls: 0, // 졸업 보상 등 공짜 뽑기
+  seen: [], // 한 번이라도 받아본 라인 (도감 진행도)
+  graduated: [], // 마스터까지 키운 개체들
+  graduatedAt: null, // 마지막으로 졸업 처리한 개체의 bornAt (중복 기록 방지)
   petVisible: false,
   petPos: null,
   wanderLevel: "rare",
 };
+
+let hadSave = false; // 세이브 파일이 원래 있었는가 (첫 실행 vs 이전 버전 이어받기)
 
 function loadSave() {
   try {
@@ -32,11 +52,17 @@ function loadSave() {
     // 그러면 설정이 통째로 기본값으로 떨어지는데, 오류도 안 나서 원인을 찾기 어렵다.
     const raw = fs.readFileSync(SAVE, "utf8");
     const clean = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
-    save = { ...save, ...JSON.parse(clean) };
+    const loaded = JSON.parse(clean);
+    hadSave = true;
+    save = { ...save, ...loaded };
+    // bornAt이 없던 시절의 세이브는 0으로 둔다 —
+    // 지금 키우던 개체가 갑자기 알로 돌아가면 진행을 빼앗는 셈이다.
+    if (typeof loaded.bornAt !== "number") save.bornAt = 0;
   } catch {
     /* 첫 실행 */
   }
   if (!Array.isArray(save.seen)) save.seen = [];
+  if (!Array.isArray(save.graduated)) save.graduated = [];
 }
 
 function writeSave() {
@@ -62,18 +88,69 @@ const hm = (ms) => {
   return h ? h + "시간 " + m + "분" : m + "분";
 };
 
-/** 뽑기. 새 개체이므로 성격도 다시 뽑는다. 뽑은 라인은 도감에 남는다. */
+let lastTotal = 0; // 마지막으로 읽은 누적 토큰. 뽑기 비용 계산에 쓴다.
+
+/** 뽑기권 현황 */
+function credits(total = lastTotal) {
+  const earned = Math.floor(total / ROLL_COST);
+  const left = Math.max(0, earned - (save.rollsUsed ?? 0)) + (save.freeRolls ?? 0);
+  return { earned, used: save.rollsUsed ?? 0, free: save.freeRolls ?? 0, left, cost: ROLL_COST };
+}
+
+/**
+ * 뽑기. 새 개체이므로 성격도 bornAt도 새로 잡는다.
+ * 공짜 뽑기(졸업 보상)가 있으면 그것부터 쓴다.
+ */
 function rollLine() {
+  const c = credits();
+  if (c.left <= 0) return false;
+  if (save.freeRolls > 0) save.freeRolls--;
+  else save.rollsUsed = (save.rollsUsed ?? 0) + 1;
+
   save.lineIndex = poke.roll(save.lineIndex);
   save.natureIndex = poke.rollNature();
+  save.bornAt = lastTotal; // 새 개체는 지금부터 0에서 자란다
+  save.graduatedAt = null;
   if (!save.seen.includes(save.lineIndex)) save.seen.push(save.lineIndex);
   writeSave();
   refresh();
+  return true;
+}
+
+/**
+ * 마스터에 도달했으면 도감에 졸업 기록을 남기고 공짜 뽑기를 준다.
+ *
+ * graduatedAt으로 개체를 특정해 중복 기록을 막는다 —
+ * 30초마다 도는 refresh가 같은 개체를 계속 졸업시키면 안 된다.
+ */
+function checkGraduation(grown) {
+  const idx = poke.stageFor(grown);
+  if (poke.STAGES[idx].key !== "master") return;
+  if (save.graduatedAt === save.bornAt) return; // 이미 처리한 개체
+
+  const mon = poke.describe(grown, save.lineIndex ?? 0);
+  const r = poke.rarityOf(save.lineIndex ?? 0);
+  save.graduated.push({
+    line: save.lineIndex,
+    name: mon.name,
+    dexId: mon.dexId,
+    stars: r.stars,
+    nature: (poke.NATURES[save.natureIndex ?? 0] || {}).name ?? null,
+    grown,
+    at: new Date().toISOString().slice(0, 10),
+  });
+  save.graduatedAt = save.bornAt;
+  save.freeRolls = (save.freeRolls ?? 0) + 1; // 다음 알은 공짜
+  writeSave();
 }
 
 async function buildStats() {
   const u = usage.collect();
-  const mon = poke.describe(u.total, save.lineIndex ?? 0);
+  lastTotal = u.total;
+  // 성장은 이 개체를 받은 뒤 쓴 토큰으로만 잰다.
+  const grown = Math.max(0, u.total - (save.bornAt ?? 0));
+  checkGraduation(grown);
+  const mon = poke.describe(grown, save.lineIndex ?? 0);
   // 트레이는 정적 PNG(nativeImage는 GIF를 움직이지 못한다), 화면은 애니메이션 GIF.
   const still = await poke.spriteWithFallback(mon, CACHE, "still");
   const anim = await poke.spriteWithFallback(mon, CACHE, "anim");
@@ -86,8 +163,14 @@ async function buildStats() {
     // 렌더러에 Windows 경로를 넘기면 역슬래시를 직접 다뤄야 한다. 변환은 Node가 한다.
     stillUrl: still ? pathToFileURL(still).href : null,
     animUrl: anim ? pathToFileURL(anim).href : null,
-    dex: { seen: save.seen.length, total: poke.LINES.length },
-    tree: await buildTree(u.total),
+    dex: {
+      seen: save.seen.length,
+      total: poke.LINES.length,
+      graduated: save.graduated.length,
+    },
+    grown,
+    credits: credits(u.total),
+    tree: await buildTree(grown),
     limits: limits.summarize(u),
     rarity: { ...poke.rarityOf(save.lineIndex ?? 0), chance: poke.rollChance(save.lineIndex ?? 0) },
     nature: poke.NATURES[save.natureIndex ?? 0] ?? null,
@@ -95,8 +178,8 @@ async function buildStats() {
 }
 
 /** 진화 트리에 쓸 작은 정적 스프라이트를 붙인다. 못 받으면 그림 없이 이름만 나온다. */
-async function buildTree(total) {
-  const nodes = poke.evolutionTree(save.lineIndex ?? 0, total);
+async function buildTree(grown) {
+  const nodes = poke.evolutionTree(save.lineIndex ?? 0, grown);
   return Promise.all(
     nodes.map(async (n) => {
       const p = await poke.spriteWithFallback(
@@ -341,7 +424,11 @@ function buildMenu() {
       submenu: [lvl("가만히 있기", "off"), lvl("가끔 (기본)", "rare"), lvl("자주", "often")],
     },
     { type: "separator" },
-    { label: "🎲 다시 뽑기", click: rollLine },
+    {
+      label: credits().left > 0 ? "🎲 다시 뽑기 (" + credits().left + "장)" : "🎲 뽑기권 없음",
+      enabled: credits().left > 0,
+      click: rollLine,
+    },
     { label: "새로고침", click: refresh },
     { type: "separator" },
     { label: "종료", click: () => app.quit() },
@@ -351,10 +438,13 @@ function buildMenu() {
 app.whenReady().then(async () => {
   loadSave();
 
-  // 첫 실행이면 뽑는다. 고정 1번으로 시작하면 누구나 같은 포켓몬을 받는다.
+  // 첫 알은 공짜다. 고정 1번으로 시작하면 누구나 같은 포켓몬을 받는다.
   if (save.lineIndex === null || save.lineIndex === undefined) {
     save.lineIndex = poke.roll(null);
     if (!save.seen.includes(save.lineIndex)) save.seen.push(save.lineIndex);
+    // 새로 설치한 경우엔 지금부터 0에서 키운다. 이미 쌓인 누적 토큰으로
+    // 곧바로 최종 진화가 되면 첫 화면부터 키울 게 없다.
+    if (!hadSave) save.bornAt = usage.collect().total;
     writeSave();
   }
   // 성격은 뒤에 추가된 값이라, 기존 세이브에는 없다. 그때 한 번 뽑아준다.

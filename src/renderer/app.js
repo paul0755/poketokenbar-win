@@ -40,11 +40,31 @@ window.ptb.onStats((s) => {
 
   const p = mon.progress;
   $("bar").style.width = Math.round(p.ratio * 100) + "%";
+  // 진행은 이 개체를 받은 뒤 쓴 토큰 기준이다. 누적 전체가 아니다.
   $("next").textContent = p.next
-    ? `${p.next}까지 ${fmt(p.remaining)} 남음`
-    : "최고 단계에 도달했습니다";
+    ? `${p.next}까지 ${fmt(p.remaining)} 남음  (이 아이로 ${fmt(s.grown ?? 0)} 씀)`
+    : `마스터 달성 — 도감에 졸업했습니다 (이 아이로 ${fmt(s.grown ?? 0)})`;
 
-  if (s.dex) $("dex").textContent = "도감 " + s.dex.seen + " / " + s.dex.total;
+  if (s.dex) {
+    $("dex").textContent =
+      "도감 " + s.dex.seen + " / " + s.dex.total +
+      (s.dex.graduated ? "  ·  졸업 " + s.dex.graduated : "");
+  }
+
+  // 뽑기권. 없으면 버튼을 잠그고 얼마를 더 써야 하는지 알려준다.
+  const c = s.credits;
+  const swap = $("swap");
+  if (c) {
+    swap.disabled = c.left <= 0;
+    if (c.left > 0) {
+      swap.textContent = "🎲 다시 뽑기 " + c.left + "장";
+      swap.title = "뽑기권 " + c.left + "장 남음";
+    } else {
+      const need = c.cost - (usage.total % c.cost);
+      swap.textContent = "🎲 " + fmt(need) + " 더";
+      swap.title = fmt(c.cost) + "을 쓸 때마다 뽑기권 1장이 생깁니다";
+    }
+  }
 
   // 진화 트리. 아직 못 간 단계는 흑백으로 두되 숨기지는 않는다 —
   // 뭐가 나올지 보이는 게 계속 쓰게 만드는 동기다.
