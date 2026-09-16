@@ -17,7 +17,14 @@ let pet = null; // 데스크톱 펫
 let lastStats = null;
 
 // lineIndex가 null이면 아직 안 뽑은 것. 첫 실행에 뽑는다.
-let save = { lineIndex: null, seen: [], petVisible: false, petPos: null, wanderLevel: "rare" };
+let save = {
+  lineIndex: null,
+  natureIndex: null,
+  seen: [],
+  petVisible: false,
+  petPos: null,
+  wanderLevel: "rare",
+};
 
 function loadSave() {
   try {
@@ -55,9 +62,10 @@ const hm = (ms) => {
   return h ? h + "시간 " + m + "분" : m + "분";
 };
 
-/** 뽑기. 뽑은 라인은 도감에 남는다. */
+/** 뽑기. 새 개체이므로 성격도 다시 뽑는다. 뽑은 라인은 도감에 남는다. */
 function rollLine() {
   save.lineIndex = poke.roll(save.lineIndex);
+  save.natureIndex = poke.rollNature();
   if (!save.seen.includes(save.lineIndex)) save.seen.push(save.lineIndex);
   writeSave();
   refresh();
@@ -81,6 +89,8 @@ async function buildStats() {
     dex: { seen: save.seen.length, total: poke.LINES.length },
     tree: await buildTree(u.total),
     limits: limits.summarize(u),
+    rarity: { ...poke.rarityOf(save.lineIndex ?? 0), chance: poke.rollChance(save.lineIndex ?? 0) },
+    nature: poke.NATURES[save.natureIndex ?? 0] ?? null,
   };
 }
 
@@ -110,7 +120,9 @@ function applyTray(s) {
   const b = s.limits && s.limits.block;
   const q = s.limits && s.limits.codex;
   tray.setToolTip(
-    s.mon.name + " · " + s.mon.stage.label + "\n" +
+    s.mon.name + " · " + s.mon.stage.label +
+      (s.rarity ? "  " + "★".repeat(s.rarity.stars) : "") +
+      (s.nature ? "  (" + s.nature.name + ")" : "") + "\n" +
       "오늘 " + fmt(s.usage.today) + " · 누적 " + fmt(s.usage.total) +
       (p.next ? "\n다음(" + p.next + ")까지 " + fmt(p.remaining) : "\n최고 단계입니다") +
       (b ? "\n5시간 창 " + fmt(b.used) + " · " + hm(b.remainingMs) + " 남음" : "") +
@@ -343,6 +355,11 @@ app.whenReady().then(async () => {
   if (save.lineIndex === null || save.lineIndex === undefined) {
     save.lineIndex = poke.roll(null);
     if (!save.seen.includes(save.lineIndex)) save.seen.push(save.lineIndex);
+    writeSave();
+  }
+  // 성격은 뒤에 추가된 값이라, 기존 세이브에는 없다. 그때 한 번 뽑아준다.
+  if (save.natureIndex === null || save.natureIndex === undefined) {
+    save.natureIndex = poke.rollNature();
     writeSave();
   }
 

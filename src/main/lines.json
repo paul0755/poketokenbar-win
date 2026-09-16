@@ -14,7 +14,9 @@
    "이상해풀",
    "이상해꽃",
    "이상해꽃"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "파이리",
@@ -31,7 +33,9 @@
    "리자드",
    "리자몽",
    "리자몽"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "꼬부기",
@@ -48,7 +52,9 @@
    "어니부기",
    "거북왕",
    "거북왕"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "캐터피",
@@ -65,7 +71,9 @@
    "단데기",
    "버터플",
    "버터플"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "뿔충이",
@@ -82,7 +90,9 @@
    "딱충이",
    "독침붕",
    "독침붕"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "구구",
@@ -99,7 +109,9 @@
    "피죤",
    "피죤투",
    "피죤투"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "꼬렛",
@@ -116,7 +128,9 @@
    "레트라",
    "레트라",
    "레트라"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "깨비참",
@@ -133,7 +147,9 @@
    "깨비드릴조",
    "깨비드릴조",
    "깨비드릴조"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "아보",
@@ -150,7 +166,9 @@
    "아보크",
    "아보크",
    "아보크"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "모래두지",
@@ -167,7 +185,9 @@
    "고지",
    "고지",
    "고지"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "니드런♀",
@@ -184,7 +204,9 @@
    "니드리나",
    "니드퀸",
    "니드퀸"
-  ]
+  ],
+  "captureRate": 235,
+  "legendary": false
  },
  {
   "line": "니드런♂",
@@ -201,7 +223,9 @@
    "니드리노",
    "니드킹",
    "니드킹"
-  ]
+  ],
+  "captureRate": 235,
+  "legendary": false
  },
  {
   "line": "식스테일",
@@ -218,7 +242,9 @@
    "나인테일",
    "나인테일",
    "나인테일"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "주뱃",
@@ -235,7 +261,9 @@
    "골뱃",
    "크로뱃",
    "크로뱃"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "뚜벅쵸",
@@ -252,7 +280,9 @@
    "냄새꼬",
    "라플레시아",
    "라플레시아"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "파라스",
@@ -269,7 +299,9 @@
    "파라섹트",
    "파라섹트",
    "파라섹트"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "콘팡",
@@ -286,7 +318,9 @@
    "도나리",
    "도나리",
    "도나리"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "디그다",
@@ -303,7 +337,9 @@
    "닥트리오",
    "닥트리오",
    "닥트리오"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "나옹",
@@ -320,7 +356,9 @@
    "페르시온",
    "페르시온",
    "페르시온"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "고라파덕",
@@ -337,7 +375,9 @@
    "골덕",
    "골덕",
    "골덕"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "가디",
@@ -354,7 +394,9 @@
    "윈디",
    "윈디",
    "윈디"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "발챙이",
@@ -371,7 +413,9 @@
    "슈륙챙이",
    "강챙이",
    "강챙이"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "캐이시",
@@ -388,7 +432,9 @@
    "윤겔라",
    "후딘",
    "후딘"
-  ]
+  ],
+  "captureRate": 200,
+  "legendary": false
  },
  {
   "line": "알통몬",
@@ -405,7 +451,9 @@
    "근육몬",
    "괴력몬",
    "괴력몬"
-  ]
+  ],
+  "captureRate": 180,
+  "legendary": false
  },
  {
   "line": "모다피",
@@ -422,7 +470,9 @@
    "우츠동",
    "우츠보트",
    "우츠보트"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "왕눈해",
@@ -439,7 +489,9 @@
    "독파리",
    "독파리",
    "독파리"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "꼬마돌",
@@ -456,7 +508,9 @@
    "데구리",
    "딱구리",
    "딱구리"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "포니타",
@@ -473,7 +527,9 @@
    "날쌩마",
    "날쌩마",
    "날쌩마"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "야돈",
@@ -490,7 +546,9 @@
    "야도란",
    "야도란",
    "야도란"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "코일",
@@ -507,7 +565,9 @@
    "레어코일",
    "자포코일",
    "자포코일"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "두두",
@@ -524,7 +584,9 @@
    "두트리오",
    "두트리오",
    "두트리오"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "쥬쥬",
@@ -541,7 +603,9 @@
    "쥬레곤",
    "쥬레곤",
    "쥬레곤"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "질퍽이",
@@ -558,7 +622,9 @@
    "질뻐기",
    "질뻐기",
    "질뻐기"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "셀러",
@@ -575,7 +641,9 @@
    "파르셀",
    "파르셀",
    "파르셀"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "고오스",
@@ -592,7 +660,9 @@
    "고우스트",
    "팬텀",
    "팬텀"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "롱스톤",
@@ -609,7 +679,9 @@
    "강철톤",
    "강철톤",
    "강철톤"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "슬리프",
@@ -626,7 +698,9 @@
    "슬리퍼",
    "슬리퍼",
    "슬리퍼"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "크랩",
@@ -643,7 +717,9 @@
    "킹크랩",
    "킹크랩",
    "킹크랩"
-  ]
+  ],
+  "captureRate": 225,
+  "legendary": false
  },
  {
   "line": "찌리리공",
@@ -660,7 +736,9 @@
    "붐볼",
    "붐볼",
    "붐볼"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "아라리",
@@ -677,7 +755,9 @@
    "나시",
    "나시",
    "나시"
-  ]
+  ],
+  "captureRate": 90,
+  "legendary": false
  },
  {
   "line": "탕구리",
@@ -694,7 +774,9 @@
    "텅구리",
    "텅구리",
    "텅구리"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "내루미",
@@ -711,7 +793,9 @@
    "내룸벨트",
    "내룸벨트",
    "내룸벨트"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "또가스",
@@ -728,7 +812,9 @@
    "또도가스",
    "또도가스",
    "또도가스"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "뿔카노",
@@ -745,7 +831,9 @@
    "코뿌리",
    "거대코뿌리",
    "거대코뿌리"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "덩쿠리",
@@ -762,7 +850,9 @@
    "덩쿠림보",
    "덩쿠림보",
    "덩쿠림보"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "쏘드라",
@@ -779,7 +869,9 @@
    "시드라",
    "킹드라",
    "킹드라"
-  ]
+  ],
+  "captureRate": 225,
+  "legendary": false
  },
  {
   "line": "콘치",
@@ -796,7 +888,9 @@
    "왕콘치",
    "왕콘치",
    "왕콘치"
-  ]
+  ],
+  "captureRate": 225,
+  "legendary": false
  },
  {
   "line": "별가사리",
@@ -813,7 +907,9 @@
    "아쿠스타",
    "아쿠스타",
    "아쿠스타"
-  ]
+  ],
+  "captureRate": 225,
+  "legendary": false
  },
  {
   "line": "스라크",
@@ -830,7 +926,9 @@
    "핫삼",
    "핫삼",
    "핫삼"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "잉어킹",
@@ -847,7 +945,9 @@
    "갸라도스",
    "갸라도스",
    "갸라도스"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "이브이",
@@ -864,7 +964,9 @@
    "샤미드",
    "샤미드",
    "샤미드"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "폴리곤",
@@ -881,7 +983,9 @@
    "폴리곤2",
    "폴리곤Z",
    "폴리곤Z"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "암나이트",
@@ -898,7 +1002,9 @@
    "암스타",
    "암스타",
    "암스타"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "투구",
@@ -915,7 +1021,9 @@
    "투구푸스",
    "투구푸스",
    "투구푸스"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "미뇽",
@@ -932,7 +1040,9 @@
    "신뇽",
    "망나뇽",
    "망나뇽"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "치코리타",
@@ -949,7 +1059,9 @@
    "베이리프",
    "메가니움",
    "메가니움"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "브케인",
@@ -966,7 +1078,9 @@
    "마그케인",
    "블레이범",
    "블레이범"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "리아코",
@@ -983,7 +1097,9 @@
    "엘리게이",
    "장크로다일",
    "장크로다일"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "꼬리선",
@@ -1000,7 +1116,9 @@
    "다꼬리",
    "다꼬리",
    "다꼬리"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "부우부",
@@ -1017,7 +1135,9 @@
    "야부엉",
    "야부엉",
    "야부엉"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "레디바",
@@ -1034,7 +1154,9 @@
    "레디안",
    "레디안",
    "레디안"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "페이검",
@@ -1051,7 +1173,9 @@
    "아리아도스",
    "아리아도스",
    "아리아도스"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "초라기",
@@ -1068,7 +1192,9 @@
    "랜턴",
    "랜턴",
    "랜턴"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "피츄",
@@ -1085,7 +1211,9 @@
    "피카츄",
    "라이츄",
    "라이츄"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "삐",
@@ -1102,7 +1230,9 @@
    "삐삐",
    "픽시",
    "픽시"
-  ]
+  ],
+  "captureRate": 150,
+  "legendary": false
  },
  {
   "line": "푸푸린",
@@ -1119,7 +1249,9 @@
    "푸린",
    "푸크린",
    "푸크린"
-  ]
+  ],
+  "captureRate": 170,
+  "legendary": false
  },
  {
   "line": "토게피",
@@ -1136,7 +1268,9 @@
    "토게틱",
    "토게키스",
    "토게키스"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "네이티",
@@ -1153,7 +1287,9 @@
    "네이티오",
    "네이티오",
    "네이티오"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "메리프",
@@ -1170,7 +1306,9 @@
    "보송송",
    "전룡",
    "전룡"
-  ]
+  ],
+  "captureRate": 235,
+  "legendary": false
  },
  {
   "line": "통통코",
@@ -1187,7 +1325,9 @@
    "두코",
    "솜솜코",
    "솜솜코"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "에이팜",
@@ -1204,7 +1344,9 @@
    "겟핸보숭",
    "겟핸보숭",
    "겟핸보숭"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "해너츠",
@@ -1221,7 +1363,9 @@
    "해루미",
    "해루미",
    "해루미"
-  ]
+  ],
+  "captureRate": 235,
+  "legendary": false
  },
  {
   "line": "왕자리",
@@ -1238,7 +1382,9 @@
    "메가자리",
    "메가자리",
    "메가자리"
-  ]
+  ],
+  "captureRate": 75,
+  "legendary": false
  },
  {
   "line": "우파",
@@ -1255,7 +1401,9 @@
    "누오",
    "누오",
    "누오"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "니로우",
@@ -1272,7 +1420,9 @@
    "돈크로우",
    "돈크로우",
    "돈크로우"
-  ]
+  ],
+  "captureRate": 30,
+  "legendary": false
  },
  {
   "line": "무우마",
@@ -1289,7 +1439,9 @@
    "무우마직",
    "무우마직",
    "무우마직"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "피콘",
@@ -1306,7 +1458,9 @@
    "쏘콘",
    "쏘콘",
    "쏘콘"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "글라이거",
@@ -1323,7 +1477,9 @@
    "글라이온",
    "글라이온",
    "글라이온"
-  ]
+  ],
+  "captureRate": 60,
+  "legendary": false
  },
  {
   "line": "블루",
@@ -1340,7 +1496,9 @@
    "그랑블루",
    "그랑블루",
    "그랑블루"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "포푸니",
@@ -1357,7 +1515,9 @@
    "포푸니라",
    "포푸니라",
    "포푸니라"
-  ]
+  ],
+  "captureRate": 60,
+  "legendary": false
  },
  {
   "line": "마그마그",
@@ -1374,7 +1534,9 @@
    "마그카르고",
    "마그카르고",
    "마그카르고"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "꾸꾸리",
@@ -1391,7 +1553,9 @@
    "메꾸리",
    "맘모꾸리",
    "맘모꾸리"
-  ]
+  ],
+  "captureRate": 225,
+  "legendary": false
  },
  {
   "line": "총어",
@@ -1408,7 +1572,9 @@
    "대포무노",
    "대포무노",
    "대포무노"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "델빌",
@@ -1425,7 +1591,9 @@
    "헬가",
    "헬가",
    "헬가"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "코코리",
@@ -1442,7 +1610,9 @@
    "코리갑",
    "코리갑",
    "코리갑"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "배루키",
@@ -1459,7 +1629,9 @@
    "시라소몬",
    "시라소몬",
    "시라소몬"
-  ]
+  ],
+  "captureRate": 75,
+  "legendary": false
  },
  {
   "line": "뽀뽀라",
@@ -1476,7 +1648,9 @@
    "루주라",
    "루주라",
    "루주라"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "에레키드",
@@ -1493,7 +1667,9 @@
    "에레브",
    "에레키블",
    "에레키블"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "마그비",
@@ -1510,7 +1686,9 @@
    "마그마",
    "마그마번",
    "마그마번"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "애버라스",
@@ -1527,7 +1705,9 @@
    "데기라스",
    "마기라스",
    "마기라스"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "나무지기",
@@ -1544,7 +1724,9 @@
    "나무돌이",
    "나무킹",
    "나무킹"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "아차모",
@@ -1561,7 +1743,9 @@
    "영치코",
    "번치코",
    "번치코"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "물짱이",
@@ -1578,7 +1762,9 @@
    "늪짱이",
    "대짱이",
    "대짱이"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "포챠나",
@@ -1595,7 +1781,9 @@
    "그라에나",
    "그라에나",
    "그라에나"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "개무소",
@@ -1612,7 +1800,9 @@
    "실쿤",
    "뷰티플라이",
    "뷰티플라이"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "연꽃몬",
@@ -1629,7 +1819,9 @@
    "로토스",
    "로파파",
    "로파파"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "도토링",
@@ -1646,7 +1838,9 @@
    "잎새코",
    "다탱구",
    "다탱구"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "테일로",
@@ -1663,7 +1857,9 @@
    "스왈로",
    "스왈로",
    "스왈로"
-  ]
+  ],
+  "captureRate": 200,
+  "legendary": false
  },
  {
   "line": "갈모매",
@@ -1680,7 +1876,9 @@
    "패리퍼",
    "패리퍼",
    "패리퍼"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "랄토스",
@@ -1697,7 +1895,9 @@
    "킬리아",
    "가디안",
    "가디안"
-  ]
+  ],
+  "captureRate": 235,
+  "legendary": false
  },
  {
   "line": "비구술",
@@ -1714,7 +1914,9 @@
    "비나방",
    "비나방",
    "비나방"
-  ]
+  ],
+  "captureRate": 200,
+  "legendary": false
  },
  {
   "line": "버섯꼬",
@@ -1731,7 +1933,9 @@
    "버섯모",
    "버섯모",
    "버섯모"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "게을로",
@@ -1748,7 +1952,9 @@
    "발바로",
    "게을킹",
    "게을킹"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "토중몬",
@@ -1765,7 +1971,9 @@
    "아이스크",
    "아이스크",
    "아이스크"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "소곤룡",
@@ -1782,7 +1990,9 @@
    "노공룡",
    "폭음룡",
    "폭음룡"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "마크탕",
@@ -1799,7 +2009,9 @@
    "하리뭉",
    "하리뭉",
    "하리뭉"
-  ]
+  ],
+  "captureRate": 180,
+  "legendary": false
  },
  {
   "line": "루리리",
@@ -1816,7 +2028,9 @@
    "마릴",
    "마릴리",
    "마릴리"
-  ]
+  ],
+  "captureRate": 150,
+  "legendary": false
  },
  {
   "line": "코코파스",
@@ -1833,7 +2047,9 @@
    "대코파스",
    "대코파스",
    "대코파스"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "에나비",
@@ -1850,7 +2066,9 @@
    "델케티",
    "델케티",
    "델케티"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "가보리",
@@ -1867,7 +2085,9 @@
    "갱도라",
    "보스로라",
    "보스로라"
-  ]
+  ],
+  "captureRate": 180,
+  "legendary": false
  },
  {
   "line": "요가랑",
@@ -1884,7 +2104,9 @@
    "요가램",
    "요가램",
    "요가램"
-  ]
+  ],
+  "captureRate": 180,
+  "legendary": false
  },
  {
   "line": "썬더라이",
@@ -1901,7 +2123,9 @@
    "썬더볼트",
    "썬더볼트",
    "썬더볼트"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "꼴깍몬",
@@ -1918,7 +2142,9 @@
    "꿀꺽몬",
    "꿀꺽몬",
    "꿀꺽몬"
-  ]
+  ],
+  "captureRate": 225,
+  "legendary": false
  },
  {
   "line": "샤프니아",
@@ -1935,7 +2161,9 @@
    "샤크니아",
    "샤크니아",
    "샤크니아"
-  ]
+  ],
+  "captureRate": 225,
+  "legendary": false
  },
  {
   "line": "고래왕자",
@@ -1952,7 +2180,9 @@
    "고래왕",
    "고래왕",
    "고래왕"
-  ]
+  ],
+  "captureRate": 125,
+  "legendary": false
  },
  {
   "line": "둔타",
@@ -1969,7 +2199,9 @@
    "폭타",
    "폭타",
    "폭타"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "피그점프",
@@ -1986,7 +2218,9 @@
    "피그킹",
    "피그킹",
    "피그킹"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "톱치",
@@ -2003,7 +2237,9 @@
    "비브라바",
    "플라이곤",
    "플라이곤"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "선인왕",
@@ -2020,7 +2256,9 @@
    "밤선인",
    "밤선인",
    "밤선인"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "파비코",
@@ -2037,7 +2275,9 @@
    "파비코리",
    "파비코리",
    "파비코리"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "미꾸리",
@@ -2054,7 +2294,9 @@
    "메깅",
    "메깅",
    "메깅"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "가재군",
@@ -2071,7 +2313,9 @@
    "가재장군",
    "가재장군",
    "가재장군"
-  ]
+  ],
+  "captureRate": 205,
+  "legendary": false
  },
  {
   "line": "오뚝군",
@@ -2088,7 +2332,9 @@
    "점토도리",
    "점토도리",
    "점토도리"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "릴링",
@@ -2105,7 +2351,9 @@
    "릴리요",
    "릴리요",
    "릴리요"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "아노딥스",
@@ -2122,7 +2370,9 @@
    "아말도",
    "아말도",
    "아말도"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "빈티나",
@@ -2139,7 +2389,9 @@
    "밀로틱",
    "밀로틱",
    "밀로틱"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "어둠대신",
@@ -2156,7 +2408,9 @@
    "다크펫",
    "다크펫",
    "다크펫"
-  ]
+  ],
+  "captureRate": 225,
+  "legendary": false
  },
  {
   "line": "해골몽",
@@ -2173,7 +2427,9 @@
    "미라몽",
    "야느와르몽",
    "야느와르몽"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "마자",
@@ -2190,7 +2446,9 @@
    "마자용",
    "마자용",
    "마자용"
-  ]
+  ],
+  "captureRate": 125,
+  "legendary": false
  },
  {
   "line": "눈꼬마",
@@ -2207,7 +2465,9 @@
    "얼음귀신",
    "얼음귀신",
    "얼음귀신"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "대굴레오",
@@ -2224,7 +2484,9 @@
    "씨레오",
    "씨카이저",
    "씨카이저"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "진주몽",
@@ -2241,7 +2503,9 @@
    "헌테일",
    "헌테일",
    "헌테일"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "아공이",
@@ -2258,7 +2522,9 @@
    "쉘곤",
    "보만다",
    "보만다"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "메탕",
@@ -2275,7 +2541,9 @@
    "메탕구",
    "메타그로스",
    "메타그로스"
-  ]
+  ],
+  "captureRate": 3,
+  "legendary": false
  },
  {
   "line": "모부기",
@@ -2292,7 +2560,9 @@
    "수풀부기",
    "토대부기",
    "토대부기"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "불꽃숭이",
@@ -2309,7 +2579,9 @@
    "파이숭이",
    "초염몽",
    "초염몽"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "팽도리",
@@ -2326,7 +2598,9 @@
    "팽태자",
    "엠페르트",
    "엠페르트"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "찌르꼬",
@@ -2343,7 +2617,9 @@
    "찌르버드",
    "찌르호크",
    "찌르호크"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "비버니",
@@ -2360,7 +2636,9 @@
    "비버통",
    "비버통",
    "비버통"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "귀뚤뚜기",
@@ -2377,7 +2655,9 @@
    "귀뚤톡크",
    "귀뚤톡크",
    "귀뚤톡크"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "꼬링크",
@@ -2394,7 +2674,9 @@
    "럭시오",
    "렌트라",
    "렌트라"
-  ]
+  ],
+  "captureRate": 235,
+  "legendary": false
  },
  {
   "line": "꼬몽울",
@@ -2411,7 +2693,9 @@
    "로젤리아",
    "로즈레이드",
    "로즈레이드"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "두개도스",
@@ -2428,7 +2712,9 @@
    "램펄드",
    "램펄드",
    "램펄드"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "방패톱스",
@@ -2445,7 +2731,9 @@
    "바리톱스",
    "바리톱스",
    "바리톱스"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "도롱충이",
@@ -2462,7 +2750,9 @@
    "도롱마담",
    "도롱마담",
    "도롱마담"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "세꿀버리",
@@ -2479,7 +2769,9 @@
    "비퀸",
    "비퀸",
    "비퀸"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "브이젤",
@@ -2496,7 +2788,9 @@
    "플로젤",
    "플로젤",
    "플로젤"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "체리버",
@@ -2513,7 +2807,9 @@
    "체리꼬",
    "체리꼬",
    "체리꼬"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "깝질무",
@@ -2530,7 +2826,9 @@
    "트리토돈",
    "트리토돈",
    "트리토돈"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "흔들풍손",
@@ -2547,7 +2845,9 @@
    "둥실라이드",
    "둥실라이드",
    "둥실라이드"
-  ]
+  ],
+  "captureRate": 125,
+  "legendary": false
  },
  {
   "line": "이어롤",
@@ -2564,7 +2864,9 @@
    "이어롭",
    "이어롭",
    "이어롭"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "나옹마",
@@ -2581,7 +2883,9 @@
    "몬냥이",
    "몬냥이",
    "몬냥이"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "랑딸랑",
@@ -2598,7 +2902,9 @@
    "치렁",
    "치렁",
    "치렁"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "스컹뿡",
@@ -2615,7 +2921,9 @@
    "스컹탱크",
    "스컹탱크",
    "스컹탱크"
-  ]
+  ],
+  "captureRate": 225,
+  "legendary": false
  },
  {
   "line": "동미러",
@@ -2632,7 +2940,9 @@
    "동탁군",
    "동탁군",
    "동탁군"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "꼬지지",
@@ -2649,7 +2959,9 @@
    "꼬지모",
    "꼬지모",
    "꼬지모"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "핑복",
@@ -2666,7 +2978,9 @@
    "럭키",
    "해피너스",
    "해피너스"
-  ]
+  ],
+  "captureRate": 130,
+  "legendary": false
  },
  {
   "line": "딥상어동",
@@ -2683,7 +2997,9 @@
    "한바이트",
    "한카리아스",
    "한카리아스"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "먹고자",
@@ -2700,7 +3016,9 @@
    "잠만보",
    "잠만보",
    "잠만보"
-  ]
+  ],
+  "captureRate": 50,
+  "legendary": false
  },
  {
   "line": "리오르",
@@ -2717,7 +3035,9 @@
    "루카리오",
    "루카리오",
    "루카리오"
-  ]
+  ],
+  "captureRate": 75,
+  "legendary": false
  },
  {
   "line": "히포포타스",
@@ -2734,7 +3054,9 @@
    "하마돈",
    "하마돈",
    "하마돈"
-  ]
+  ],
+  "captureRate": 140,
+  "legendary": false
  },
  {
   "line": "스콜피",
@@ -2751,7 +3073,9 @@
    "드래피온",
    "드래피온",
    "드래피온"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "삐딱구리",
@@ -2768,7 +3092,9 @@
    "독개굴",
    "독개굴",
    "독개굴"
-  ]
+  ],
+  "captureRate": 140,
+  "legendary": false
  },
  {
   "line": "형광어",
@@ -2785,7 +3111,9 @@
    "네오라이트",
    "네오라이트",
    "네오라이트"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "타만타",
@@ -2802,7 +3130,9 @@
    "만타인",
    "만타인",
    "만타인"
-  ]
+  ],
+  "captureRate": 25,
+  "legendary": false
  },
  {
   "line": "눈쓰개",
@@ -2819,7 +3149,9 @@
    "눈설왕",
    "눈설왕",
    "눈설왕"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "피오네",
@@ -2836,7 +3168,9 @@
    "마나피",
    "마나피",
    "마나피"
-  ]
+  ],
+  "captureRate": 30,
+  "legendary": true
  },
  {
   "line": "주리비얀",
@@ -2853,7 +3187,9 @@
    "샤비",
    "샤로다",
    "샤로다"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "뚜꾸리",
@@ -2870,7 +3206,9 @@
    "차오꿀",
    "염무왕",
    "염무왕"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "수댕이",
@@ -2887,7 +3225,9 @@
    "쌍검자비",
    "대검귀",
    "대검귀"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "보르쥐",
@@ -2904,7 +3244,9 @@
    "보르그",
    "보르그",
    "보르그"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "요테리",
@@ -2921,7 +3263,9 @@
    "하데리어",
    "바랜드",
    "바랜드"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "쌔비냥",
@@ -2938,7 +3282,9 @@
    "레파르다스",
    "레파르다스",
    "레파르다스"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "야나프",
@@ -2955,7 +3301,9 @@
    "야나키",
    "야나키",
    "야나키"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "바오프",
@@ -2972,7 +3320,9 @@
    "바오키",
    "바오키",
    "바오키"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "앗차프",
@@ -2989,7 +3339,9 @@
    "앗차키",
    "앗차키",
    "앗차키"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "몽나",
@@ -3006,7 +3358,9 @@
    "몽얌나",
    "몽얌나",
    "몽얌나"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "콩둘기",
@@ -3023,7 +3377,9 @@
    "유토브",
    "켄호로우",
    "켄호로우"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "줄뮤마",
@@ -3040,7 +3396,9 @@
    "제브라이카",
    "제브라이카",
    "제브라이카"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "단굴",
@@ -3057,7 +3415,9 @@
    "암트르",
    "기가이어스",
    "기가이어스"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "또르박쥐",
@@ -3074,7 +3434,9 @@
    "맘박쥐",
    "맘박쥐",
    "맘박쥐"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "두더류",
@@ -3091,7 +3453,9 @@
    "몰드류",
    "몰드류",
    "몰드류"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "으랏차",
@@ -3108,7 +3472,9 @@
    "토쇠골",
    "노보청",
    "노보청"
-  ]
+  ],
+  "captureRate": 180,
+  "legendary": false
  },
  {
   "line": "동챙이",
@@ -3125,7 +3491,9 @@
    "두까비",
    "두빅굴",
    "두빅굴"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "두르보",
@@ -3142,7 +3510,9 @@
    "두르쿤",
    "모아머",
    "모아머"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "마디네",
@@ -3159,7 +3529,9 @@
    "휠구",
    "펜드라",
    "펜드라"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "소미안",
@@ -3176,7 +3548,9 @@
    "엘풍",
    "엘풍",
    "엘풍"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "치릴리",
@@ -3193,7 +3567,9 @@
    "드레디어",
    "드레디어",
    "드레디어"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "깜눈크",
@@ -3210,7 +3586,9 @@
    "악비르",
    "악비아르",
    "악비아르"
-  ]
+  ],
+  "captureRate": 180,
+  "legendary": false
  },
  {
   "line": "달막화",
@@ -3227,7 +3605,9 @@
    "불비달마",
    "불비달마",
    "불비달마"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "돌살이",
@@ -3244,7 +3624,9 @@
    "암팰리스",
    "암팰리스",
    "암팰리스"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "곤율랭",
@@ -3261,7 +3643,9 @@
    "곤율거니",
    "곤율거니",
    "곤율거니"
-  ]
+  ],
+  "captureRate": 180,
+  "legendary": false
  },
  {
   "line": "데스마스",
@@ -3278,7 +3662,9 @@
    "데스니칸",
    "데스니칸",
    "데스니칸"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "프로토가",
@@ -3295,7 +3681,9 @@
    "늑골라",
    "늑골라",
    "늑골라"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "아켄",
@@ -3312,7 +3700,9 @@
    "아케오스",
    "아케오스",
    "아케오스"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "깨봉이",
@@ -3329,7 +3719,9 @@
    "더스트나",
    "더스트나",
    "더스트나"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "조로아",
@@ -3346,7 +3738,9 @@
    "조로아크",
    "조로아크",
    "조로아크"
-  ]
+  ],
+  "captureRate": 75,
+  "legendary": false
  },
  {
   "line": "치라미",
@@ -3363,7 +3757,9 @@
    "치라치노",
    "치라치노",
    "치라치노"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "고디탱",
@@ -3380,7 +3776,9 @@
    "고디보미",
    "고디모아젤",
    "고디모아젤"
-  ]
+  ],
+  "captureRate": 200,
+  "legendary": false
  },
  {
   "line": "유니란",
@@ -3397,7 +3795,9 @@
    "듀란",
    "란쿨루스",
    "란쿨루스"
-  ]
+  ],
+  "captureRate": 200,
+  "legendary": false
  },
  {
   "line": "꼬지보리",
@@ -3414,7 +3814,9 @@
    "스완나",
    "스완나",
    "스완나"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "바닐프티",
@@ -3431,7 +3833,9 @@
    "바닐리치",
    "배바닐라",
    "배바닐라"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "사철록",
@@ -3448,7 +3852,9 @@
    "바라철록",
    "바라철록",
    "바라철록"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "딱정곤",
@@ -3465,7 +3871,9 @@
    "슈바르고",
    "슈바르고",
    "슈바르고"
-  ]
+  ],
+  "captureRate": 200,
+  "legendary": false
  },
  {
   "line": "깜놀버슬",
@@ -3482,7 +3890,9 @@
    "뽀록나",
    "뽀록나",
    "뽀록나"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "탱그릴",
@@ -3499,7 +3909,9 @@
    "탱탱겔",
    "탱탱겔",
    "탱탱겔"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "파쪼옥",
@@ -3516,7 +3928,9 @@
    "전툴라",
    "전툴라",
    "전툴라"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "철시드",
@@ -3533,7 +3947,9 @@
    "너트령",
    "너트령",
    "너트령"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "기어르",
@@ -3550,7 +3966,9 @@
    "기기어르",
    "기기기어르",
    "기기기어르"
-  ]
+  ],
+  "captureRate": 130,
+  "legendary": false
  },
  {
   "line": "저리어",
@@ -3567,7 +3985,9 @@
    "저리릴",
    "저리더프",
    "저리더프"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "리그레",
@@ -3584,7 +4004,9 @@
    "벰크",
    "벰크",
    "벰크"
-  ]
+  ],
+  "captureRate": 255,
+  "legendary": false
  },
  {
   "line": "불켜미",
@@ -3601,7 +4023,9 @@
    "램프라",
    "샹델라",
    "샹델라"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "터검니",
@@ -3618,7 +4042,9 @@
    "액슨도",
    "액스라이즈",
    "액스라이즈"
-  ]
+  ],
+  "captureRate": 75,
+  "legendary": false
  },
  {
   "line": "코고미",
@@ -3635,7 +4061,9 @@
    "툰베어",
    "툰베어",
    "툰베어"
-  ]
+  ],
+  "captureRate": 120,
+  "legendary": false
  },
  {
   "line": "쪼마리",
@@ -3652,7 +4080,9 @@
    "어지리더",
    "어지리더",
    "어지리더"
-  ]
+  ],
+  "captureRate": 200,
+  "legendary": false
  },
  {
   "line": "비조푸",
@@ -3669,7 +4099,9 @@
    "비조도",
    "비조도",
    "비조도"
-  ]
+  ],
+  "captureRate": 180,
+  "legendary": false
  },
  {
   "line": "골비람",
@@ -3686,7 +4118,9 @@
    "골루그",
    "골루그",
    "골루그"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "수리둥보",
@@ -3703,7 +4137,9 @@
    "워글",
    "워글",
    "워글"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "벌차이",
@@ -3720,7 +4156,9 @@
    "버랜지나",
    "버랜지나",
    "버랜지나"
-  ]
+  ],
+  "captureRate": 190,
+  "legendary": false
  },
  {
   "line": "모노두",
@@ -3737,7 +4175,9 @@
    "디헤드",
    "삼삼드래",
    "삼삼드래"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  },
  {
   "line": "활화르바",
@@ -3754,6 +4194,8 @@
    "불카모스",
    "불카모스",
    "불카모스"
-  ]
+  ],
+  "captureRate": 45,
+  "legendary": false
  }
 ]

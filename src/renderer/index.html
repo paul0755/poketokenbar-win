@@ -23,6 +23,17 @@
   .scroll::-webkit-scrollbar-track { background: transparent; }
 
   header { padding: 14px 16px 10px; position: relative; }
+  /* 희귀도 · 성격 — 같은 종이라도 개체가 다르다는 걸 보여주는 줄 */
+  .traits { display: flex; align-items: center; gap: 7px; margin-top: 5px; flex-wrap: wrap; }
+  .stars { font-size: 11px; color: var(--accent); letter-spacing: 1px; }
+  .stars .off { color: #3a3d46; }
+  .chip {
+    font-size: 10px; padding: 2px 7px; border-radius: 99px;
+    background: var(--card); border: 1px solid var(--line); color: var(--muted);
+  }
+  .chip.r5 { border-color: #c084fc; color: #d8b4fe; }
+  .chip.r4 { border-color: #60a5fa; color: #93c5fd; }
+  .chip b { color: var(--text); font-weight: 600; }
   /* 닫기 — 포커스를 잃으면 자동으로 닫히지만, 명시적으로 닫을 방법도 있어야 한다 */
   .close {
     position: absolute; top: 10px; right: 12px;
@@ -115,6 +126,7 @@
   <button class="close" id="close" title="닫기 (Esc)">✕</button>
   <div class="line" id="line">불러오는 중…</div>
   <div class="stage" id="stage">&nbsp;</div>
+  <div class="traits" id="traits"></div>
 </header>
 
 <div class="sprite-wrap" id="spriteWrap"><div class="egg">🥚</div></div>

@@ -12,6 +12,26 @@ window.ptb.onStats((s) => {
   $("line").textContent = mon.stage.label;
   $("stage").textContent = mon.name;
 
+  // 희귀도와 성격. 같은 종이라도 개체가 다르다는 걸 보여주는 줄이다.
+  const bits = [];
+  if (s.rarity) {
+    const r = s.rarity;
+    const stars =
+      "★".repeat(r.stars) + `<span class="off">${"★".repeat(5 - r.stars)}</span>`;
+    bits.push(`<span class="stars">${stars}</span>`);
+    const cls = r.stars >= 5 ? " r5" : r.stars >= 4 ? " r4" : "";
+    bits.push(
+      `<span class="chip${cls}">${r.label} <b>1/${Math.round(100 / r.chance)}</b></span>`,
+    );
+    if (r.legendary) bits.push('<span class="chip r5">⭐ 전설</span>');
+  }
+  if (s.nature) {
+    const n = s.nature;
+    const mod = n.up && n.down ? ` ${n.up}↑ ${n.down}↓` : " 보정 없음";
+    bits.push(`<span class="chip"><b>${n.name}</b>${mod}</span>`);
+  }
+  $("traits").innerHTML = bits.join("");
+
   // 알 단계엔 스프라이트가 없다. 부화 전까지는 알을 흔든다.
   const url = s.animUrl || s.stillUrl;
   $("spriteWrap").innerHTML = url

@@ -30,17 +30,59 @@ const STAGES = [
  */
 const LINES = require("./lines.json");
 
+const NATURES = require("./natures.json");
+
 /**
- * 뽑기. 지금 키우는 것과 다른 라인이 나오게 한다 —
- * 뽑았는데 같은 게 또 나오면 뽑은 것 같지가 않다.
+ * 희귀도. 공식 포획률(3~255, 낮을수록 희귀)을 5등급으로 묶는다.
+ *
+ * 경계는 실제 분포를 보고 잡았다. 221개 라인의 포획률은
+ * 30 이하 4개 / 45 이하 44개 / 120 이하 65개 / 나머지 156개로
+ * 45와 120 부근에 계단이 있다. 그 계단을 등급 경계로 썼다.
+ *
+ * 가중치 차이는 4배까지만 둔다. 포획률을 그대로 쓰면 85배가 되어
+ * 가장 희귀한 종이 1/12,000이 된다 — 평생 안 나오는 건 등급이 아니라 부재다.
+ */
+const RARITY = [
+  { max: 30, weight: 5, label: "초희귀", stars: 5 },
+  { max: 45, weight: 8, label: "희귀", stars: 4 },
+  { max: 90, weight: 11, label: "보기 드묾", stars: 3 },
+  { max: 150, weight: 15, label: "보통", stars: 2 },
+  { max: Infinity, weight: 20, label: "흔함", stars: 1 },
+];
+
+function rarityOf(lineIndex) {
+  const L = LINES[lineIndex % LINES.length];
+  const cr = L.captureRate ?? 45;
+  const tier = RARITY.find((r) => cr <= r.max);
+  return { ...tier, captureRate: cr, legendary: Boolean(L.legendary) };
+}
+
+/** 각 라인의 뽑기 확률(%) — 설명용 */
+function rollChance(lineIndex) {
+  const total = LINES.reduce((a, _, i) => a + rarityOf(i).weight, 0);
+  return (rarityOf(lineIndex).weight / total) * 100;
+}
+
+/**
+ * 뽑기. 희귀도로 가중치를 준다.
+ *
+ * 지금 키우는 것은 제외한다 — 뽑았는데 같은 게 또 나오면 뽑은 것 같지가 않다.
  */
 function roll(exclude = null) {
   if (LINES.length < 2) return 0;
-  let i;
-  do {
-    i = Math.floor(Math.random() * LINES.length);
-  } while (i === exclude);
-  return i;
+  const weights = LINES.map((_, i) => (i === exclude ? 0 : rarityOf(i).weight));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return i;
+  }
+  return weights.findIndex((w) => w > 0); // 부동소수점 보정
+}
+
+/** 성격 하나를 뽑는다. 능력치 보정은 표시용이고 게임에 영향은 없다. */
+function rollNature() {
+  return Math.floor(Math.random() * NATURES.length);
 }
 
 function stageFor(total) {
@@ -160,4 +202,4 @@ async function spriteWithFallback(mon, cacheDir, kind) {
   catch (e) { console.error("[sprite] 실패 " + mon.dexId + " " + kind + ": " + e.message); return null; }
 }
 
-module.exports = { STAGES, LINES, roll, stageFor, progress, describe, evolutionTree, spritePath, spriteWithFallback };
+module.exports = { STAGES, LINES, NATURES, RARITY, rarityOf, rollChance, roll, rollNature, stageFor, progress, describe, evolutionTree, spritePath, spriteWithFallback };

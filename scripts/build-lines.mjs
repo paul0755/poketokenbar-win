@@ -56,10 +56,39 @@ function flatten(node, acc = []) {
   return acc;
 }
 
-async function koreanName(dex) {
+async function species(dex) {
   const s = await getJson(`https://pokeapi.co/api/v2/pokemon-species/${dex}`);
   const ko = (s.names || []).find((n) => n.language && n.language.name === "ko");
-  return ko ? ko.name : null;
+  return {
+    name: ko ? ko.name : null,
+    // 공식 포획률 3~255. 낮을수록 희귀하다(전설은 3).
+    // 뽑기 가중치로 그대로 쓴다 — 희귀한 게 실제로 희귀해야 뽑는 맛이 난다.
+    captureRate: typeof s.capture_rate === "number" ? s.capture_rate : 45,
+    isLegendary: Boolean(s.is_legendary),
+    isMythical: Boolean(s.is_mythical),
+  };
+}
+
+/** 성격 25종. 오른 능력치/내린 능력치까지 한국어로 받는다. */
+async function natures() {
+  const list = await getJson("https://pokeapi.co/api/v2/nature?limit=30");
+  const koStat = async (ref) => {
+    if (!ref) return null;
+    const s = await getJson(ref.url);
+    const ko = (s.names || []).find((n) => n.language && n.language.name === "ko");
+    return ko ? ko.name : ref.name;
+  };
+  const out = [];
+  for (const it of list.results) {
+    const n = await getJson(it.url);
+    const ko = (n.names || []).find((x) => x.language && x.language.name === "ko");
+    out.push({
+      name: ko ? ko.name : n.name,
+      up: await koStat(n.increased_stat),
+      down: await koStat(n.decreased_stat),
+    });
+  }
+  return out;
 }
 
 const ids = Array.from({ length: CHAINS }, (_, i) => i + 1);
@@ -79,28 +108,32 @@ for (const c of chains) {
 }
 console.log(`  진화하는 라인 ${candidates.length}개`);
 
-console.log("한국어 이름 조회 중…");
+console.log("종 정보(이름·포획률) 조회 중…");
 const dexes = [...new Set(candidates.flat().map((s) => s.dex))];
-const names = new Map();
-await mapLimit(dexes, CONCURRENCY, async (d) => names.set(d, await koreanName(d)));
+const info = new Map();
+await mapLimit(dexes, CONCURRENCY, async (d) => info.set(d, await species(d)));
 
-const missing = dexes.filter((d) => !names.get(d));
+const missing = dexes.filter((d) => !info.get(d) || !info.get(d).name);
 if (missing.length) console.log(`  한국어 이름 없음 ${missing.length}개 — 해당 라인 제외`);
 
 const lines = [];
 for (const stages of candidates) {
-  if (stages.some((s) => !names.get(s.dex))) continue;
+  if (stages.some((s) => !info.get(s.dex) || !info.get(s.dex).name)) continue;
 
   // STAGES(알·부화·1차·최종·마스터) 5칸에 맞춘다.
   // 2단 진화 라인은 중간을 최종으로 한 번 더 채운다.
   const s = stages.slice(0, 3);
   const pick = (i) => s[Math.min(i, s.length - 1)];
   const slots = [null, pick(0), pick(1), pick(2), pick(2)];
+  const base = info.get(s[0].dex); // 알에서 나오는 건 1단계다. 가중치도 여기 기준.
+  const finalInfo = info.get(s[s.length - 1].dex);
 
   lines.push({
-    line: names.get(s[0].dex),
+    line: base.name,
     ids: slots.map((x) => (x ? x.dex : null)),
-    names: slots.map((x) => (x ? names.get(x.dex) : "알")),
+    names: slots.map((x) => (x ? info.get(x.dex).name : "알")),
+    captureRate: base.captureRate,
+    legendary: Boolean(base.isLegendary || base.isMythical || finalInfo.isLegendary || finalInfo.isMythical),
   });
 }
 
@@ -109,5 +142,27 @@ lines.sort((a, b) => a.ids[1] - b.ids[1]);
 const out = path.join(process.cwd(), "src", "main", "lines.json");
 fs.writeFileSync(out, JSON.stringify(lines, null, 1), "utf8");
 console.log(`\n✅ ${lines.length}개 라인 → ${path.relative(process.cwd(), out)}`);
-console.log("\n예시:");
-for (const l of lines.slice(0, 8)) console.log("  " + l.names.slice(1).join(" → "));
+
+console.log("\n성격 조회 중…");
+const nat = await natures();
+const natOut = path.join(process.cwd(), "src", "main", "natures.json");
+fs.writeFileSync(natOut, JSON.stringify(nat, null, 1), "utf8");
+console.log(`✅ ${nat.length}개 성격 → ${path.relative(process.cwd(), natOut)}`);
+
+/* ---- 뽑기 확률이 어떻게 나오는지 바로 보여준다 ---- */
+const sum = lines.reduce((a, l) => a + l.captureRate, 0);
+const sorted = [...lines].sort((a, b) => a.captureRate - b.captureRate);
+console.log("\n가장 희귀한 5개:");
+for (const l of sorted.slice(0, 5)) {
+  const p = (l.captureRate / sum) * 100;
+  console.log(
+    `  ${l.names[3].padEnd(12)} 포획률 ${String(l.captureRate).padStart(3)}` +
+      `  →  ${p.toFixed(3)}%  (약 1/${Math.round(100 / p)})` + (l.legendary ? "  ⭐전설" : ""),
+  );
+}
+console.log("\n가장 흔한 3개:");
+for (const l of sorted.slice(-3)) {
+  const p = (l.captureRate / sum) * 100;
+  console.log(`  ${l.names[3].padEnd(12)} 포획률 ${l.captureRate}  →  ${p.toFixed(2)}%`);
+}
+console.log(`\n전설 라인: ${lines.filter((l) => l.legendary).length}개`);
