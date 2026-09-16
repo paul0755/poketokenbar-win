@@ -25,6 +25,10 @@ window.ptb.onStats((s) => {
     );
     if (r.legendary) bits.push('<span class="chip r5">⭐ 전설</span>');
   }
+  if (s.shiny) {
+    // 1/128로 나오는 개체다. 표시하지 않으면 나온 줄도 모른다.
+    bits.push('<span class="chip r5">✨ 이로치</span>');
+  }
   if (s.nature) {
     const n = s.nature;
     const mod = n.up && n.down ? ` ${n.up}↑ ${n.down}↓` : " 보정 없음";
@@ -51,19 +55,13 @@ window.ptb.onStats((s) => {
       (s.dex.graduated ? "  ·  졸업 " + s.dex.graduated : "");
   }
 
-  // 뽑기권. 없으면 버튼을 잠그고 얼마를 더 써야 하는지 알려준다.
-  const c = s.credits;
-  const swap = $("swap");
-  if (c) {
-    swap.disabled = c.left <= 0;
-    if (c.left > 0) {
-      swap.textContent = "🎲 다시 뽑기 " + c.left + "장";
-      swap.title = "뽑기권 " + c.left + "장 남음";
-    } else {
-      const need = c.cost - (usage.total % c.cost);
-      swap.textContent = "🎲 " + fmt(need) + " 더";
-      swap.title = fmt(c.cost) + "을 쓸 때마다 뽑기권 1장이 생깁니다";
-    }
+  // 사탕. 상점 버튼에 개수를 붙여 굳이 열어보지 않아도 알 수 있게 한다.
+  const c = s.candy;
+  const shop = $("shopBtn");
+  if (c && shop) {
+    shop.textContent = "🍬 상점 " + c.left;
+    shop.title =
+      fmt(c.per) + " 쓸 때마다 사탕 1개 · 다음 사탕까지 " + fmt(c.toNext);
   }
 
   // 진화 트리. 아직 못 간 단계는 흑백으로 두되 숨기지는 않는다 —
@@ -171,7 +169,7 @@ function renderLimits(L) {
 }
 
 $("refresh").onclick = () => window.ptb.request();
-$("swap").onclick = () => window.ptb.nextLine();
+$("shopBtn").onclick = () => window.ptb.openShop();
 $("close").onclick = () => window.ptb.hide();
 
 // Esc로도 닫는다. 포커스가 창 안에 있으면 blur가 안 일어나 자동으로 닫히지 않는다.

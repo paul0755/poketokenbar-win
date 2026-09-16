@@ -80,6 +80,33 @@ function roll(exclude = null) {
   return weights.findIndex((w) => w > 0); // 부동소수점 보정
 }
 
+/**
+ * 최소 ★등급을 보장하는 뽑기.
+ *
+ * 후보를 등급으로 먼저 거르고 그 안에서 가중치를 적용한다.
+ * "★4 이상 확정"이 ★4만 나온다는 뜻이 되면 안 된다 — ★5도 나와야 한다.
+ */
+function rollAtLeast(minStars, exclude = null) {
+  const pool = LINES.map((_, i) => i).filter(
+    (i) => i !== exclude && rarityOf(i).stars >= minStars,
+  );
+  if (!pool.length) return roll(exclude); // 그런 등급이 없으면 일반 뽑기로
+  const weights = pool.map((i) => rarityOf(i).weight);
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let k = 0; k < pool.length; k++) {
+    r -= weights[k];
+    if (r <= 0) return pool[k];
+  }
+  return pool[pool.length - 1];
+}
+
+/** 이로치가 나올 확률. 부적을 사면 두 배가 된다. */
+const SHINY_BASE = 1 / 128;
+function rollShiny(hasCharm = false) {
+  return Math.random() < (hasCharm ? SHINY_BASE * 2 : SHINY_BASE);
+}
+
 /** 성격 하나를 뽑는다. 능력치 보정은 표시용이고 게임에 영향은 없다. */
 function rollNature() {
   return Math.floor(Math.random() * NATURES.length);
@@ -104,7 +131,7 @@ function progress(total) {
   };
 }
 
-function describe(total, lineIndex = 0) {
+function describe(total, lineIndex = 0, opts = {}) {
   const L = LINES[lineIndex % LINES.length];
   const i = stageFor(total);
   return {
@@ -114,7 +141,8 @@ function describe(total, lineIndex = 0) {
     stage: STAGES[i],
     dexId: L.ids[i],
     isEgg: STAGES[i].key === "egg",
-    isShiny: STAGES[i].key === "master",
+    // 마스터는 보상으로 이로치가 되고, 부화 때 이로치로 태어난 개체는 처음부터 이로치다
+    isShiny: STAGES[i].key === "master" || Boolean(opts.shiny),
     progress: progress(total),
   };
 }
@@ -202,4 +230,4 @@ async function spriteWithFallback(mon, cacheDir, kind) {
   catch (e) { console.error("[sprite] 실패 " + mon.dexId + " " + kind + ": " + e.message); return null; }
 }
 
-module.exports = { STAGES, LINES, NATURES, RARITY, rarityOf, rollChance, roll, rollNature, stageFor, progress, describe, evolutionTree, spritePath, spriteWithFallback };
+module.exports = { STAGES, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollShiny, rollNature, stageFor, progress, describe, evolutionTree, spritePath, spriteWithFallback };

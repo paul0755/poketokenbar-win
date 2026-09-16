@@ -17,12 +17,28 @@ let pet = null; // 데스크톱 펫
 let lastStats = null;
 
 /**
- * 뽑기권 1장의 값. 하루 5천만~1억을 쓰면 하루 1~2장이다.
+ * 이상한사탕 1개의 값. 하루 5천만~1억을 쓰면 하루 2~4개다.
  *
  * 뽑기가 공짜 버튼이면 희귀도가 의미를 잃는다. ★5가 1/739여도
  * 1초에 한 번 누르면 10분이면 나온다. 화폐는 "실제로 쓴 토큰"이어야 한다.
  */
-const ROLL_COST = 50_000_000;
+const CANDY_PER = 25_000_000;
+
+/**
+ * 상점.
+ *
+ * 알 값은 "며칠 치인가"로 잡았다. 하루 3개쯤 들어오므로
+ * 일반 알은 하루에 한 번, 전설 알은 열흘쯤 모아야 한다.
+ * 슈퍼·전설 알이 등급을 "확정"하는 것은 가중치를 없애는 게 아니라
+ * 후보를 그 등급 이상으로 좁히는 것이다 — ★4 알에서 ★5도 나온다.
+ */
+const SHOP = [
+  { id: "egg", name: "포켓몬 알", cost: 3, desc: "평범한 알. 등급은 운에 맡긴다", icon: "🥚" },
+  { id: "egg-super", name: "슈퍼 알", cost: 12, desc: "★3 이상 확정", icon: "🥚" },
+  { id: "egg-legend", name: "전설 알", cost: 35, desc: "★4 이상 확정", icon: "🥚" },
+  { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
+  { id: "charm", name: "반짝이는 부적", cost: 60, desc: "이로치 확률 2배. 한 번만 살 수 있다", icon: "✨", once: true },
+];
 
 let save = {
   lineIndex: null, // null이면 아직 안 뽑은 것. 첫 실행에 뽑는다
@@ -34,8 +50,10 @@ let save = {
    * 곧바로 최종 진화라서, 키우는 게임인데 키우는 과정이 없어진다.
    */
   bornAt: 0,
-  rollsUsed: 0, // 써버린 뽑기권
-  freeRolls: 0, // 졸업 보상 등 공짜 뽑기
+  candySpent: 0, // 지금까지 쓴 사탕
+  candyBonus: 0, // 졸업·한도 달성으로 받은 보너스 사탕
+  charm: false, // 반짝이는 부적 보유
+  shiny: false, // 지금 키우는 개체가 이로치인가
   seen: [], // 한 번이라도 받아본 라인 (도감 진행도)
   /**
    * 라인별로 실제 도달한 최고 단계. { lineIndex: stageIndex }
@@ -113,34 +131,59 @@ const hm = (ms) => {
 
 let lastTotal = 0; // 마지막으로 읽은 누적 토큰. 뽑기 비용 계산에 쓴다.
 
-/** 뽑기권 현황 */
-function credits(total = lastTotal) {
-  const earned = Math.floor(total / ROLL_COST);
-  const left = Math.max(0, earned - (save.rollsUsed ?? 0)) + (save.freeRolls ?? 0);
-  return { earned, used: save.rollsUsed ?? 0, free: save.freeRolls ?? 0, left, cost: ROLL_COST };
+/** 이상한사탕 현황 */
+function candy(total = lastTotal) {
+  const fromTokens = Math.floor(total / CANDY_PER);
+  const earned = fromTokens + (save.candyBonus ?? 0);
+  return {
+    earned,
+    spent: save.candySpent ?? 0,
+    left: Math.max(0, earned - (save.candySpent ?? 0)),
+    per: CANDY_PER,
+    // 다음 사탕까지 얼마나 남았나
+    toNext: CANDY_PER - (total % CANDY_PER),
+  };
+}
+
+/** 새 개체를 받는다. minStars가 있으면 그 등급 이상으로 뽑는다. */
+function hatch(minStars = 0) {
+  save.lineIndex =
+    minStars > 0 ? poke.rollAtLeast(minStars, save.lineIndex) : poke.roll(save.lineIndex);
+  save.natureIndex = poke.rollNature();
+  save.shiny = poke.rollShiny(Boolean(save.charm));
+  save.bornAt = lastTotal; // 새 개체는 지금부터 0에서 자란다
+  save.graduatedAt = null;
+  // 떠나보낸 아이를 계속 펫으로 세워둘 수는 없다
+  if (save.petLine != null && !ownedLines().has(save.petLine)) save.petLine = null;
+  if (!save.seen.includes(save.lineIndex)) save.seen.push(save.lineIndex);
 }
 
 /**
- * 뽑기. 새 개체이므로 성격도 bornAt도 새로 잡는다.
- * 공짜 뽑기(졸업 보상)가 있으면 그것부터 쓴다.
+ * 상점 구매. 사탕이 모자라면 아무 일도 일어나지 않는다.
+ * 살 수 있는지 판단은 여기서만 한다 — 렌더러가 보낸 값을 믿지 않는다.
  */
-function rollLine() {
-  const c = credits();
-  if (c.left <= 0) return false;
-  if (save.freeRolls > 0) save.freeRolls--;
-  else save.rollsUsed = (save.rollsUsed ?? 0) + 1;
+function buy(itemId) {
+  const item = SHOP.find((x) => x.id === itemId);
+  if (!item) return { ok: false, reason: "없는 물건" };
+  if (item.once && save.charm) return { ok: false, reason: "이미 가지고 있습니다" };
+  const c = candy();
+  if (c.left < item.cost) return { ok: false, reason: "사탕이 모자랍니다" };
 
-  save.lineIndex = poke.roll(save.lineIndex);
-  save.natureIndex = poke.rollNature();
-  save.bornAt = lastTotal; // 새 개체는 지금부터 0에서 자란다
-  // 떠나보낸 아이를 계속 펫으로 세워둘 수는 없다
-  if (save.petLine != null && !ownedLines().has(save.petLine)) save.petLine = null;
-  save.graduatedAt = null;
-  if (!save.seen.includes(save.lineIndex)) save.seen.push(save.lineIndex);
+  save.candySpent = (save.candySpent ?? 0) + item.cost;
+  let msg = "";
+  if (itemId === "egg") { hatch(0); msg = "새 알을 받았습니다"; }
+  else if (itemId === "egg-super") { hatch(3); msg = "슈퍼 알 — ★3 이상"; }
+  else if (itemId === "egg-legend") { hatch(4); msg = "전설 알 — ★4 이상"; }
+  else if (itemId === "mint") {
+    save.natureIndex = poke.rollNature();
+    msg = "성격이 " + poke.NATURES[save.natureIndex].name + "(으)로 바뀌었습니다";
+  } else if (itemId === "charm") { save.charm = true; msg = "이로치 확률이 2배가 됩니다"; }
+
   writeSave();
   refresh();
   pushDex();
-  return true;
+  pushShop();
+  return { ok: true, message: msg, shiny: itemId.startsWith("egg") && save.shiny };
 }
 
 /**
@@ -163,7 +206,7 @@ function checkGraduation(grown) {
   if (poke.STAGES[idx].key !== "master") return;
   if (save.graduatedAt === save.bornAt) return; // 이미 처리한 개체
 
-  const mon = poke.describe(grown, save.lineIndex ?? 0);
+  const mon = poke.describe(grown, save.lineIndex ?? 0, { shiny: save.shiny });
   const r = poke.rarityOf(save.lineIndex ?? 0);
   save.graduated.push({
     line: save.lineIndex,
@@ -175,7 +218,7 @@ function checkGraduation(grown) {
     at: new Date().toISOString().slice(0, 10),
   });
   save.graduatedAt = save.bornAt;
-  save.freeRolls = (save.freeRolls ?? 0) + 1; // 다음 알은 공짜
+  save.candyBonus = (save.candyBonus ?? 0) + 5; // 졸업 보상
   writeSave();
 }
 
@@ -226,7 +269,9 @@ async function buildStats() {
     },
     grown,
     petSize: save.petSize,
-    credits: credits(u.total),
+    candy: candy(u.total),
+    charm: Boolean(save.charm),
+    shiny: Boolean(save.shiny),
     tree: await buildTree(grown),
     limits: limits.summarize(u),
     rarity: { ...poke.rarityOf(save.lineIndex ?? 0), chance: poke.rollChance(save.lineIndex ?? 0) },
@@ -455,6 +500,47 @@ function openDex() {
   dexWin.on("closed", () => (dexWin = null));
 }
 
+/* ---------------- 상점 ---------------- */
+
+let shopWin = null;
+
+function pushShop() {
+  if (!shopWin || shopWin.isDestroyed()) return;
+  const c = candy();
+  shopWin.webContents.send("shop", {
+    candy: c,
+    charm: Boolean(save.charm),
+    items: SHOP.map((x) => ({
+      ...x,
+      owned: x.once ? Boolean(save.charm) : false,
+      afford: c.left >= x.cost,
+    })),
+  });
+}
+
+function openShop() {
+  if (shopWin && !shopWin.isDestroyed()) {
+    shopWin.show();
+    shopWin.focus();
+    return;
+  }
+  const area = screen.getPrimaryDisplay().workArea;
+  shopWin = new BrowserWindow({
+    width: 420,
+    height: Math.min(560, area.height - 80),
+    frame: false,
+    resizable: true,
+    minWidth: 340,
+    minHeight: 320,
+    backgroundColor: "#14151a",
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
+  });
+  shopWin.loadFile(path.join(__dirname, "..", "renderer", "shop.html"));
+  shopWin.webContents.on("did-finish-load", pushShop);
+  shopWin.webContents.on("console-message", logConsole("shop"));
+  shopWin.on("closed", () => (shopWin = null));
+}
+
 /* ---------------- 설정 ---------------- */
 
 let setWin = null;
@@ -536,8 +622,10 @@ function resetProgress() {
   save.lineIndex = poke.roll(null);
   save.natureIndex = poke.rollNature();
   save.bornAt = lastTotal; // 지금부터 알로 다시 시작
-  save.rollsUsed = 0;
-  save.freeRolls = 0;
+  save.candySpent = 0;
+  save.candyBonus = 0;
+  save.charm = false;
+  save.shiny = false;
   save.seen = [save.lineIndex];
   save.graduated = [];
   save.graduatedAt = null;
@@ -697,11 +785,7 @@ function buildMenu() {
       submenu: [lvl("가만히 있기", "off"), lvl("가끔 (기본)", "rare"), lvl("자주", "often")],
     },
     { type: "separator" },
-    {
-      label: credits().left > 0 ? "🎲 다시 뽑기 (" + credits().left + "장)" : "🎲 뽑기권 없음",
-      enabled: credits().left > 0,
-      click: rollLine,
-    },
+    { label: "🍬 상점 (사탕 " + candy().left + ")", click: openShop },
     { label: "📖 도감 열기", click: openDex },
     { label: "⚙️ 설정", click: openSettings },
     { label: "새로고침", click: refresh },
@@ -743,7 +827,10 @@ app.whenReady().then(async () => {
   ipcMain.on("quit", () => app.quit());
   ipcMain.on("hide-popover", () => win && !win.isDestroyed() && win.hide());
   ipcMain.on("toggle-pet", () => togglePet());
-  ipcMain.on("next-line", rollLine);
+  ipcMain.on("open-shop", openShop);
+  ipcMain.on("request-shop", pushShop);
+  ipcMain.on("close-shop", () => shopWin && !shopWin.isDestroyed() && shopWin.close());
+  ipcMain.handle("buy", (_e, id) => buy(id));
   ipcMain.on("open-dex", openDex);
   ipcMain.on("request-dex", pushDex);
   ipcMain.on("close-dex", () => dexWin && !dexWin.isDestroyed() && dexWin.close());

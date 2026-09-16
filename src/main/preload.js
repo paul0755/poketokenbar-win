@@ -20,6 +20,14 @@ contextBridge.exposeInMainWorld("ptb", {
   onDex: (cb) => ipcRenderer.on("dex", (_e, data) => cb(data)),
   setPetLine: (line) => ipcRenderer.send("set-pet-line", line),
 
+  // 상점
+  openShop: () => ipcRenderer.send("open-shop"),
+  closeShop: () => ipcRenderer.send("close-shop"),
+  requestShop: () => ipcRenderer.send("request-shop"),
+  onShop: (cb) => ipcRenderer.on("shop", (_e, data) => cb(data)),
+  // 구매는 결과를 받아야 한다 (성공/실패·이로치 여부)
+  buy: (id) => ipcRenderer.invoke("buy", id),
+
   // 설정
   openSettings: () => ipcRenderer.send("open-settings"),
   closeSettings: () => ipcRenderer.send("close-settings"),
