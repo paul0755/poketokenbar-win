@@ -50,6 +50,8 @@ window.ptb.onStats((s) => {
     })
     .join("");
 
+  renderLimits(s.limits);
+
   const recent = usage.days.slice(-7);
   const max = Math.max(1, ...recent.map(([, t]) => t));
   $("dayList").innerHTML = recent
@@ -61,6 +63,72 @@ window.ptb.onStats((s) => {
       </div>`)
     .join("");
 });
+
+/** 남은 시간을 "3일 4시간" / "4시간 10분" 으로 */
+function hm(ms) {
+  if (ms <= 0) return "곧";
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h >= 24) return Math.floor(h / 24) + "일 " + (h % 24) + "시간";
+  return h ? h + "시간 " + m + "분" : m + "분";
+}
+
+/**
+ * 한도 표시.
+ *
+ * 퍼센트는 한도를 아는 곳에서만 그린다. Codex는 opencodex가 캐시한
+ * 실제 쿼터가 있지만, 5시간 창은 "얼마가 한도인지"를 알 방법이 없다.
+ * 그래서 창은 쓴 양과 남은 시간, 속도만 보여준다 — %를 지어내지 않는다.
+ */
+function renderLimits(L) {
+  const el = $("limits");
+  if (!L) return void (el.innerHTML = "");
+  const rows = [];
+
+  if (L.block) {
+    const b = L.block;
+    rows.push(`
+      <div class="limrow">
+        <div class="top">
+          <span class="k">5시간 창</span>
+          <span class="v"><b>${fmt(b.used)}</b> · ${hm(b.remainingMs)} 남음</span>
+        </div>
+        <div class="limnote">시간당 ${fmt(b.perHour)} · ${b.count}건</div>
+      </div>`);
+  } else {
+    rows.push(`
+      <div class="limrow">
+        <div class="top"><span class="k">5시간 창</span><span class="v">쉬는 중</span></div>
+        <div class="limnote">5시간 넘게 요청이 없었습니다</div>
+      </div>`);
+  }
+
+  if (L.codex) {
+    const q = L.codex;
+    const hot = q.percent >= 80 ? " hot" : "";
+    rows.push(`
+      <div class="limrow">
+        <div class="top">
+          <span class="k">Codex 주간</span>
+          <span class="v"><b>${q.percent}%</b> · ${hm(q.resetAt - L.now)} 뒤 리셋</span>
+        </div>
+        <div class="limbar${hot}"><i style="width:${Math.min(100, q.percent)}%"></i></div>
+        ${q.stale ? '<div class="limnote">⚠️ 6시간 넘게 갱신되지 않은 값입니다</div>' : ""}
+      </div>`);
+  }
+
+  if (L.week) {
+    rows.push(`
+      <div class="limrow">
+        <div class="top">
+          <span class="k">최근 7일</span>
+          <span class="v"><b>${fmt(L.week.used)}</b></span>
+        </div>
+      </div>`);
+  }
+
+  el.innerHTML = rows.join("");
+}
 
 $("refresh").onclick = () => window.ptb.request();
 $("swap").onclick = () => window.ptb.nextLine();

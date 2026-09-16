@@ -5,6 +5,7 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const usage = require("./usage");
 const poke = require("./pokemon");
+const limits = require("./limits");
 
 const CACHE = path.join(app.getPath("userData"), "sprites");
 const SAVE = path.join(app.getPath("userData"), "save.json");
@@ -45,6 +46,15 @@ const fmt = (n) =>
   : n >= 1e3 ? (n / 1e3).toFixed(1) + "K"
   : String(n);
 
+/** 남은 시간을 "3일 4시간" / "4시간 10분" 형태로 */
+const hm = (ms) => {
+  if (ms <= 0) return "곧";
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h >= 24) return Math.floor(h / 24) + "일 " + (h % 24) + "시간";
+  return h ? h + "시간 " + m + "분" : m + "분";
+};
+
 /** 뽑기. 뽑은 라인은 도감에 남는다. */
 function rollLine() {
   save.lineIndex = poke.roll(save.lineIndex);
@@ -59,8 +69,10 @@ async function buildStats() {
   // 트레이는 정적 PNG(nativeImage는 GIF를 움직이지 못한다), 화면은 애니메이션 GIF.
   const still = await poke.spriteWithFallback(mon, CACHE, "still");
   const anim = await poke.spriteWithFallback(mon, CACHE, "anim");
+  // events는 한도 계산에만 쓴다. 수천 건을 30초마다 IPC로 보낼 이유가 없다.
+  const { events, ...slim } = u;
   return {
-    usage: u,
+    usage: slim,
     mon,
     stillPath: still,
     // 렌더러에 Windows 경로를 넘기면 역슬래시를 직접 다뤄야 한다. 변환은 Node가 한다.
@@ -68,6 +80,7 @@ async function buildStats() {
     animUrl: anim ? pathToFileURL(anim).href : null,
     dex: { seen: save.seen.length, total: poke.LINES.length },
     tree: await buildTree(u.total),
+    limits: limits.summarize(u),
   };
 }
 
@@ -94,10 +107,14 @@ function applyTray(s) {
     if (!img.isEmpty()) tray.setImage(img);
   }
   const p = s.mon.progress;
+  const b = s.limits && s.limits.block;
+  const q = s.limits && s.limits.codex;
   tray.setToolTip(
     s.mon.name + " · " + s.mon.stage.label + "\n" +
       "오늘 " + fmt(s.usage.today) + " · 누적 " + fmt(s.usage.total) +
-      (p.next ? "\n다음(" + p.next + ")까지 " + fmt(p.remaining) : "\n최고 단계입니다"),
+      (p.next ? "\n다음(" + p.next + ")까지 " + fmt(p.remaining) : "\n최고 단계입니다") +
+      (b ? "\n5시간 창 " + fmt(b.used) + " · " + hm(b.remainingMs) + " 남음" : "") +
+      (q ? "\nCodex 주간 " + q.percent + "%" : ""),
   );
 }
 
@@ -132,7 +149,7 @@ function logConsole(tag) {
 function createWindow() {
   win = new BrowserWindow({
     width: 340,
-    height: 580,
+    height: 700,
     show: false,
     frame: false,
     resizable: false,

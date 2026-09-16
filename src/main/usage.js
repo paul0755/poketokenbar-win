@@ -39,7 +39,7 @@ function readClaude(text, add) {
       (u.output_tokens ?? 0) +
       (u.cache_creation_input_tokens ?? 0) +
       (u.cache_read_input_tokens ?? 0);
-    if (n) add(String(o.timestamp ?? "").slice(0, 10), n, o.requestId || o.uuid);
+    if (n) add(o.timestamp, n, o.requestId || o.uuid);
   }
 }
 
@@ -65,7 +65,7 @@ function readCodex(text, add) {
     if (!u) continue;
     const n = u.total_tokens ?? (u.input_tokens ?? 0) + (u.output_tokens ?? 0);
     // response_id 로 중복을 막는다. 재시도·재개 시 같은 응답이 다시 기록된다.
-    if (n) add(String(o.timestamp ?? "").slice(0, 10), n, o.payload.response_id);
+    if (n) add(o.timestamp, n, o.payload.response_id);
   }
 }
 
@@ -127,6 +127,8 @@ function dayOf(iso) {
 function collect() {
   const byDay = new Map();
   const bySource = new Map();
+  // 개별 사용 기록. 5시간 창·번레이트는 일자 합계로는 계산할 수 없다.
+  const events = [];
   let total = 0;
   let files = 0;
 
@@ -136,15 +138,17 @@ function collect() {
     let srcTotal = 0;
     const seen = new Set(); // 중복 레코드 방지 (재시도·세션 재개)
 
-    const add = (rawDay, n, dedupeKey) => {
+    const add = (iso, n, dedupeKey) => {
       if (dedupeKey) {
         const k = src.id + ":" + dedupeKey;
         if (seen.has(k)) return;
         seen.add(k);
       }
-      const day = dayOf(rawDay);
+      const day = dayOf(iso);
       if (!day) return;
       byDay.set(day, (byDay.get(day) ?? 0) + n);
+      const t = Date.parse(iso);
+      if (Number.isFinite(t)) events.push({ t, n, src: src.id });
       srcTotal += n;
       total += n;
     };
@@ -166,11 +170,13 @@ function collect() {
   }
 
   const today = localDay();
+  events.sort((a, b) => a.t - b.t);
   return {
     total,
     today: byDay.get(today) ?? 0,
     days: [...byDay.entries()].sort(),
     sources: [...bySource.entries()].sort((a, b) => b[1] - a[1]),
+    events,
     fileCount: files,
     scannedAt: Date.now(),
   };

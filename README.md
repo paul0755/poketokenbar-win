@@ -17,7 +17,8 @@ Windows로 옮긴 것입니다. 원본 코드를 이식한 게 아니라 새로 
 - 애니메이션 스프라이트, 현재 단계와 종 이름
 - **진화 트리** — 도달한 칸은 컬러, 못 간 칸은 흑백, 각 칸에 필요 토큰
 - 다음 진화까지 진행바, 도감 수집 현황
-- 오늘 / 누적 토큰, 최근 7일 막대 그래프
+- 오늘 / 누적 토큰, **도구별 내역**, 최근 7일 막대 그래프
+- **한도** — 5시간 창(사용량·남은 시간·시간당 속도), Codex 주간 %, 최근 7일
 
 **데스크톱 펫**
 - 투명 창, 항상 위, 작업표시줄에 안 뜸
@@ -94,6 +95,7 @@ Windows 트레이는 텍스트 라벨을 지원하지 않습니다. 이 앱의 �
 
 ```
 src/main/usage.js      JSONL 파서 (앱의 심장, 단독 실행 가능)
+src/main/limits.js     5시간 창 · 주간 · 번레이트 · Codex 쿼터
 src/main/pokemon.js    진화 단계 · 뽑기 · 진화 트리 · 스프라이트 캐시
 src/main/lines.json    221개 진화 라인  ⚠️ 자동 생성물
 src/main/index.js      트레이 · 팝오버 · 펫 · 배회 · 폴링
@@ -110,7 +112,7 @@ scripts/build-lines.mjs  PokéAPI → lines.json
 원본 대비 빠진 것들입니다. [원본 README](https://github.com/chattymin/PokeTokenBar/blob/main/README.ko.md) 참고.
 
 - **Gemini · Copilot** — 로컬 로그에 토큰이 안 남아 불가. Gemini CLI/Copilot CLI를 쓰면 가능해질 수 있음
-- **공식 한도** — 5시간 / 주간 한도, 리셋 카운트다운, 번레이트 예측
+- **Claude 공식 한도 %** — 로컬에 한도값이 없어 불가 (Codex는 opencodex 캐시로 가능)
 - **비용 계산**
 - 도감 화면 · 상점 · 아이템 · 성격 · 이로치 확률
 - 알림 (이로치 부화, 한도 임박)

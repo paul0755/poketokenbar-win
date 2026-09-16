@@ -66,6 +66,22 @@
   .node.current .at { color: var(--accent); }
   .arrow { align-self: center; font-size: 10px; color: var(--text-dim); flex: 0 0 auto; }
 
+  /* ---- 한도 ---- */
+  .lim { padding: 6px 16px 0; }
+  .lim h4 { margin: 10px 0 7px; font-size: 10px; color: var(--muted); font-weight: 600; }
+  .limrow {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 11px; margin-bottom: 6px;
+  }
+  .limrow .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .limrow .k { font-size: 11px; font-weight: 600; }
+  .limrow .v { font-size: 11px; color: var(--muted); }
+  .limrow .v b { color: var(--text); }
+  .limbar { height: 5px; background: #23262f; border-radius: 99px; margin-top: 6px; overflow: hidden; }
+  .limbar > i { display: block; height: 100%; background: linear-gradient(90deg, #4ade9b, #ffcb05); border-radius: 99px; }
+  .limbar.hot > i { background: linear-gradient(90deg, #ffcb05, #ff5a5a); }
+  .limnote { margin-top: 4px; font-size: 9.5px; color: var(--text-dim); }
+
   /* ---- 도구별 내역 ---- */
   .srcs { display: flex; gap: 6px; padding: 2px 16px 0; flex-wrap: wrap; }
   .src { font-size: 10px; color: var(--muted); }
@@ -91,6 +107,8 @@
 </div>
 
 <div class="srcs" id="srcs"></div>
+
+<div class="lim"><h4>한도</h4><div id="limits"></div></div>
 
 <div class="days"><h4>최근 기록</h4><div id="dayList"></div></div>
 
