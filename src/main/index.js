@@ -114,6 +114,7 @@ function rollLine() {
   if (!save.seen.includes(save.lineIndex)) save.seen.push(save.lineIndex);
   writeSave();
   refresh();
+  pushDex();
   return true;
 }
 
@@ -275,6 +276,81 @@ function showNearTray() {
   win.focus();
 }
 
+/* ---------------- 도감 ---------------- */
+
+let dexWin = null;
+
+/**
+ * 도감 데이터.
+ *
+ * 안 만난 종은 이름도 그림도 넘기지 않는다 — 렌더러에 보내놓고 CSS로만
+ * 가리면 개발자 도구로 다 보인다. 모으는 재미가 거기서 끝난다.
+ * 스프라이트도 만난 것만 받는다. 221개를 미리 받을 이유가 없다.
+ */
+async function buildDex() {
+  const gradCount = new Map();
+  for (const g of save.graduated) gradCount.set(g.line, (gradCount.get(g.line) ?? 0) + 1);
+
+  const entries = await Promise.all(
+    poke.LINES.map(async (L, i) => {
+      const seen = save.seen.includes(i);
+      if (!seen) return { index: i, seen: false };
+      const r = poke.rarityOf(i);
+      const dexId = L.ids[3]; // 최종 진화 모습으로 보여준다
+      const p = await poke.spriteWithFallback({ dexId, isShiny: false }, CACHE, "still");
+      return {
+        index: i,
+        seen: true,
+        name: L.names[3],
+        stars: r.stars,
+        label: r.label,
+        graduated: gradCount.get(i) ?? 0,
+        url: p ? pathToFileURL(p).href : null,
+      };
+    }),
+  );
+
+  return {
+    entries,
+    seen: save.seen.length,
+    total: poke.LINES.length,
+    graduated: save.graduated.length,
+  };
+}
+
+async function pushDex() {
+  if (!dexWin || dexWin.isDestroyed()) return;
+  try {
+    dexWin.webContents.send("dex", await buildDex());
+  } catch (e) {
+    console.error("[dex]", e && e.message);
+  }
+}
+
+function openDex() {
+  if (dexWin && !dexWin.isDestroyed()) {
+    dexWin.show();
+    dexWin.focus();
+    return;
+  }
+  const area = screen.getPrimaryDisplay().workArea;
+  dexWin = new BrowserWindow({
+    width: Math.min(560, area.width - 80),
+    height: Math.min(640, area.height - 80),
+    frame: false,
+    resizable: true,
+    minWidth: 340,
+    minHeight: 320,
+    skipTaskbar: false, // 도감은 제대로 된 창이다. 작업표시줄에 있어야 다시 찾는다
+    backgroundColor: "#14151a",
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
+  });
+  dexWin.loadFile(path.join(__dirname, "..", "renderer", "dex.html"));
+  dexWin.webContents.on("did-finish-load", pushDex);
+  dexWin.webContents.on("console-message", logConsole("dex"));
+  dexWin.on("closed", () => (dexWin = null));
+}
+
 /* ---------------- 데스크톱 펫 ---------------- */
 
 const PET_W = 128;
@@ -429,6 +505,7 @@ function buildMenu() {
       enabled: credits().left > 0,
       click: rollLine,
     },
+    { label: "📖 도감 열기", click: openDex },
     { label: "새로고침", click: refresh },
     { type: "separator" },
     { label: "종료", click: () => app.quit() },
@@ -469,6 +546,9 @@ app.whenReady().then(async () => {
   ipcMain.on("hide-popover", () => win && !win.isDestroyed() && win.hide());
   ipcMain.on("toggle-pet", () => togglePet());
   ipcMain.on("next-line", rollLine);
+  ipcMain.on("open-dex", openDex);
+  ipcMain.on("request-dex", pushDex);
+  ipcMain.on("close-dex", () => dexWin && !dexWin.isDestroyed() && dexWin.close());
 
   // 펫을 클릭하면 팝오버를 연다. 펫 옆이 아니라 트레이 옆에 띄운다 —
   // 펫은 화면 아무 데나 있을 수 있어서, 늘 같은 자리에 뜨는 편이 덜 헷갈린다.

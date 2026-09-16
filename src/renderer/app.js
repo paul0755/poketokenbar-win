@@ -178,6 +178,7 @@ $("close").onclick = () => window.ptb.hide();
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") window.ptb.hide();
 });
+$("dex").onclick = () => window.ptb.openDex();
 const petBtn = $("pet");
 if (petBtn) petBtn.onclick = () => window.ptb.togglePet();
 $("quit").onclick = () => window.ptb.quit();

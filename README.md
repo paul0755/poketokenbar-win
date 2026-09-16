@@ -34,6 +34,7 @@ Windows로 옮긴 것입니다. 원본 코드를 이식한 게 아니라 새로 
 - **개체별 성장** — 받은 시점부터 쓴 토큰으로만 자란다. 알부터 시작한다
 - **뽑기권** — 50M 쓸 때마다 1장. 무제한 리롤이면 희귀도가 의미를 잃는다
 - **졸업** — 마스터까지 키우면 도감에 기록되고 다음 알이 공짜로 나온다
+- **도감 창** — 221칸 격자. 만난 종만 그림·이름·★이 보이고 나머지는 번호만
 
 ## 실행
 
@@ -106,7 +107,7 @@ src/main/lines.json    221개 진화 라인(포획률 포함)  ⚠️ 자동 생
 src/main/natures.json  성격 25종                 ⚠️ 자동 생성물
 src/main/index.js      트레이 · 팝오버 · 펫 · 배회 · 폴링
 src/main/preload.js    contextBridge (렌더러는 파일시스템에 안 닿음)
-src/renderer/          팝오버(index) · 데스크톱 펫(pet)
+src/renderer/          팝오버(index) · 데스크톱 펫(pet) · 도감(dex)
 scripts/build-lines.mjs  PokéAPI → lines.json
 ```
 

@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld("ptb", {
   quit: () => ipcRenderer.send("quit"),
   hide: () => ipcRenderer.send("hide-popover"),
 
+  // 도감
+  openDex: () => ipcRenderer.send("open-dex"),
+  closeDex: () => ipcRenderer.send("close-dex"),
+  requestDex: () => ipcRenderer.send("request-dex"),
+  onDex: (cb) => ipcRenderer.on("dex", (_e, data) => cb(data)),
+
   // 데스크톱 펫 전용
   petClick: () => ipcRenderer.send("pet-click"),
   petDrag: (pos) => ipcRenderer.send("pet-drag", pos),
