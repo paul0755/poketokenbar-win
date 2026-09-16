@@ -41,9 +41,10 @@ const fmt = (n) =>
 function showGrowth(pct) {
   $("growthPctVal").textContent = pct + "%";
   const k = pct / 100;
+  // 속도가 빠를수록 필요한 토큰은 줄어든다
   $("growthNote").textContent =
-    STAGES.map(([n, v]) => n + " " + fmt(v * k)).join(" · ") +
-    (pct === 100 ? "" : pct > 100 ? "  (기본보다 느리게)" : "  (기본보다 빠르게)");
+    STAGES.map(([n, v]) => n + " " + fmt(v / k)).join(" · ") +
+    (pct === 100 ? "" : pct > 100 ? "  (기본보다 빠르게)" : "  (기본보다 느리게)");
 }
 
 const on = (id, ev, fn) => $(id).addEventListener(ev, (e) => ready && fn(e));

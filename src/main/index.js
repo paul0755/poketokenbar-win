@@ -79,7 +79,7 @@ let save = {
   /* ---- 설정 ---- */
   /**
    * 난이도. 둘 다 100%가 기본이다.
-   *   growthPct  진화에 필요한 토큰에 곱한다. 200%면 두 배를 써야 한다
+   *   growthPct  성장 속도. 200%면 같은 토큰으로 두 배 빨리 자란다
    *   pricePct   상점 가격에 곱한다
    */
   growthPct: 100,
@@ -138,8 +138,13 @@ const hm = (ms) => {
 
 let lastTotal = 0; // 마지막으로 읽은 누적 토큰. 사탕 계산에 쓴다.
 
-/** 성장 배수. 200%면 2 — 두 배를 써야 같은 단계에 간다. */
-const growthScale = () => Math.max(0.1, (save.growthPct ?? 100) / 100);
+/**
+ * 성장 속도 배수. 200%면 2 — 같은 토큰으로 두 배 빨리 자란다.
+ *
+ * 처음엔 이 값을 임계값에 곱했는데 그러면 200%가 "두 배 더 써야 한다"가 되어
+ * 이름과 반대로 움직였다. 속도는 성장량에 곱하는 쪽이 맞다.
+ */
+const growthSpeed = () => Math.max(0.1, (save.growthPct ?? 100) / 100);
 /** 난이도를 반영한 상점 가격. 공짜가 되지는 않게 최소 1개. */
 const priceOf = (cost) => Math.max(1, Math.round((cost * (save.pricePct ?? 100)) / 100));
 
@@ -240,9 +245,9 @@ async function buildStats() {
   lastTotal = u.total;
   // 성장은 이 개체를 받은 뒤 쓴 토큰으로만 잰다.
   const grown = Math.max(0, u.total - (save.bornAt ?? 0));
-  // 난이도는 임계값을 올리는 대신 성장량을 나눠서 적용한다. 결과는 같고,
+  // 속도는 임계값을 고치는 대신 성장량에 곱해서 적용한다.
   // STAGES를 원본 그대로 둘 수 있어 난이도를 되돌리면 값이 정확히 복원된다.
-  const eff = grown / growthScale();
+  const eff = grown * growthSpeed();
   recordStage(eff);
   checkGraduation(eff);
   const mon = poke.describe(eff, save.lineIndex ?? 0, { shiny: save.shiny });
@@ -306,8 +311,8 @@ async function buildTree(grown) {
         CACHE,
         "still",
       );
-      // at은 원본 임계값이다. 화면에는 난이도를 곱한 실제 필요량을 보여준다.
-      return { ...n, at: Math.round(n.at * growthScale()), url: p ? pathToFileURL(p).href : null };
+      // at은 원본 임계값이다. 화면에는 속도를 반영한 실제 필요량을 보여준다.
+      return { ...n, at: Math.round(n.at / growthSpeed()), url: p ? pathToFileURL(p).href : null };
     }),
   );
 }
