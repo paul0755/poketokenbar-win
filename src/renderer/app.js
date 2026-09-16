@@ -89,6 +89,24 @@ function renderHome(s) {
   if (s.dex && s.dex.graduated) t.push(`<span class="chip">졸업 <b>${s.dex.graduated}</b></span>`);
   $("monTraits").innerHTML = t.join("");
 
+  // 진화 트리. 못 간 단계도 숨기지 않는다 —
+  // 뭐가 나올지 보이는 게 계속 쓰게 만드는 동기다.
+  const tree = s.tree || [];
+  $("chain").innerHTML = tree
+    .map((n, i) => {
+      const cls = ["node", n.reached ? "reached" : "", n.current ? "current" : ""].join(" ");
+      const pic = n.url ? `<img src="${n.url}" alt="">` : window.eggSvg(42);
+      const at = n.at === 0 ? "시작" : fmt(n.at);
+      return (
+        (i ? '<span class="arrow">▸</span>' : "") +
+        `<div class="${cls}">${pic}<div class="nm">${n.name}${n.isShiny ? " ★" : ""}</div><div class="at">${at}</div></div>`
+      );
+    })
+    .join("");
+  // 다음 단계가 남았으면 그것만 짚어 준다. 표 전체를 다시 설명할 필요는 없다.
+  const next = tree.find((n) => !n.reached);
+  $("treeNote").textContent = next ? "다음 " + next.name : tree.length ? "끝까지 왔습니다" : "";
+
   // 펫 줄
   const purl = s.petAnimUrl || s.petStillUrl;
   $("petThumb").innerHTML = purl ? `<img src="${purl}" alt="">` : window.eggSvg(34);

@@ -37,6 +37,25 @@
   nav .sp { flex: 1; }
   nav .ico { padding: 6px 9px; font-size: 13px; }
 
+  /* ---------- 홈: 진화 트리 ---------- */
+  .chain { display: flex; align-items: stretch; gap: 3px; }
+  .node {
+    flex: 1; min-width: 0; text-align: center; padding: 8px 2px 7px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    /* 아직 못 간 단계는 실루엣으로 — 뭐가 나올지는 보이되 아직 내 것은 아니다 */
+    opacity: .36; filter: grayscale(1);
+  }
+  .node.reached { opacity: 1; filter: none; }
+  .node.current { opacity: 1; filter: none; border-color: var(--accent); background: #2b2616; }
+  .node img { width: 42px; height: 42px; object-fit: contain; image-rendering: pixelated; display: block; margin: 0 auto; }
+  .node .nm {
+    margin-top: 3px; font-size: 9.5px; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .node .at { font-size: 8.5px; color: var(--dim); }
+  .node.current .at { color: var(--accent); }
+  .arrow { align-self: center; flex: 0 0 auto; font-size: 10px; color: var(--dim); }
+
   /* ---------- 홈: 개체 카드 ---------- */
   .mon { display: flex; gap: 12px; align-items: flex-start; padding: 4px 2px 12px; }
   .mon .pic {
@@ -218,6 +237,9 @@
         <div class="traits" id="monTraits"></div>
       </div>
     </div>
+
+    <h4>진화 트리<span class="peak" id="treeNote"></span></h4>
+    <div class="chain" id="chain"></div>
 
     <div class="petrow">
       <div class="thumb" id="petThumb"></div>
