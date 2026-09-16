@@ -1,0 +1,149 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>설정</title>
+<style>
+  :root {
+    --bg: #14151a; --card: #1e2027; --line: #2c2f38;
+    --text: #f2f3f5; --muted: #9aa0ab; --dim: #6b6b78; --accent: #ffcb05;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 13px/1.5 "Malgun Gothic", "Segoe UI", system-ui, sans-serif;
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+    display: flex; flex-direction: column;
+  }
+  header {
+    padding: 13px 16px 11px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; flex-shrink: 0;
+    -webkit-app-region: drag;
+  }
+  header h1 { margin: 0; font-size: 15px; font-weight: 700; flex: 1; }
+  .scroll { flex: 1; overflow-y: auto; padding: 6px 16px 18px; min-height: 0; }
+  .scroll::-webkit-scrollbar { width: 9px; }
+  .scroll::-webkit-scrollbar-thumb { background: #33363f; border-radius: 99px; }
+
+  h4 { margin: 16px 0 8px; font-size: 10px; color: var(--muted); font-weight: 600; }
+  .row {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; margin-bottom: 7px;
+  }
+  .row .top { display: flex; align-items: center; gap: 10px; }
+  .row .k { flex: 1; font-size: 12px; font-weight: 600; }
+  .row .note { margin-top: 3px; font-size: 10px; color: var(--dim); line-height: 1.45; }
+
+  button, select {
+    padding: 5px 10px; font: inherit; font-size: 11px; color: var(--text);
+    background: #23262f; border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+    -webkit-app-region: no-drag;
+  }
+  button:hover, select:hover { background: #2b2f39; }
+  .close { width: 28px; height: 28px; padding: 0; font-size: 14px; color: var(--muted); background: transparent; border: 0; }
+  .close:hover { background: var(--card); color: var(--text); }
+
+  /* 토글 */
+  .sw { position: relative; width: 38px; height: 21px; flex-shrink: 0; -webkit-app-region: no-drag; }
+  .sw input { opacity: 0; width: 0; height: 0; }
+  .sw span {
+    position: absolute; inset: 0; background: #33363f; border-radius: 99px;
+    cursor: pointer; transition: background .15s;
+  }
+  .sw span::before {
+    content: ""; position: absolute; width: 15px; height: 15px; left: 3px; top: 3px;
+    background: #9aa0ab; border-radius: 50%; transition: transform .15s, background .15s;
+  }
+  .sw input:checked + span { background: var(--accent); }
+  .sw input:checked + span::before { transform: translateX(17px); background: #14151a; }
+
+  input[type="range"] { flex: 1; -webkit-app-region: no-drag; accent-color: var(--accent); }
+  .val { font-size: 11px; color: var(--accent); min-width: 48px; text-align: right; }
+  .danger { color: #ff8a8a; border-color: #5a2a2a; }
+  .danger:hover { background: #2e1c1c; }
+</style>
+
+<header>
+  <h1>설정</h1>
+  <button class="close" id="close" title="닫기 (Esc)">✕</button>
+</header>
+
+<div class="scroll">
+  <h4>알림</h4>
+  <div class="row">
+    <div class="top">
+      <span class="k">알림 켜기</span>
+      <label class="sw"><input type="checkbox" id="notifyEnabled" /><span></span></label>
+    </div>
+    <div class="note">진화 · 졸업 · 한도 임박. 상태가 바뀐 순간에만 뜹니다.</div>
+  </div>
+  <div class="row">
+    <div class="top">
+      <span class="k">한도 경고 기준</span>
+      <input type="range" id="warnPercent" min="50" max="95" step="5" />
+      <span class="val" id="warnPercentVal">80%</span>
+    </div>
+    <div class="note">Codex 주간 사용률이 이 값을 넘는 순간 한 번 알립니다.</div>
+  </div>
+
+  <h4>펫</h4>
+  <div class="row">
+    <div class="top">
+      <span class="k">크기</span>
+      <input type="range" id="petSize" min="64" max="320" step="16" />
+      <span class="val" id="petSizeVal">128px</span>
+    </div>
+  </div>
+  <div class="row">
+    <div class="top">
+      <span class="k">움직임</span>
+      <select id="wanderLevel">
+        <option value="off">가만히 있기</option>
+        <option value="rare">가끔</option>
+        <option value="often">자주</option>
+      </select>
+    </div>
+  </div>
+
+  <h4>일반</h4>
+  <div class="row">
+    <div class="top">
+      <span class="k">갱신 주기</span>
+      <select id="pollMinutes">
+        <option value="0.5">30초</option>
+        <option value="1">1분</option>
+        <option value="2">2분</option>
+        <option value="5">5분</option>
+        <option value="10">10분</option>
+      </select>
+    </div>
+    <div class="note">로그 파일을 다시 읽는 간격입니다. 길수록 CPU를 덜 씁니다.</div>
+  </div>
+  <div class="row">
+    <div class="top">
+      <span class="k">로그인 시 자동 시작</span>
+      <label class="sw"><input type="checkbox" id="autoLaunch" /><span></span></label>
+    </div>
+  </div>
+
+  <h4>데이터</h4>
+  <div class="row">
+    <div class="top">
+      <span class="k">저장 폴더 열기</span>
+      <button id="openData">열기</button>
+    </div>
+    <div class="note" id="dataPath">…</div>
+  </div>
+  <div class="row">
+    <div class="top">
+      <span class="k">진행 초기화</span>
+      <button id="reset" class="danger">초기화</button>
+    </div>
+    <div class="note">
+      도감 · 졸업 기록 · 뽑기권을 모두 지우고 새 알부터 시작합니다.
+      토큰 기록 자체는 로그에서 다시 읽으므로 지워지지 않습니다.
+    </div>
+  </div>
+</div>
+
+<script src="settings.js"></script>

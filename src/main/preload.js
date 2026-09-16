@@ -19,6 +19,15 @@ contextBridge.exposeInMainWorld("ptb", {
   requestDex: () => ipcRenderer.send("request-dex"),
   onDex: (cb) => ipcRenderer.on("dex", (_e, data) => cb(data)),
 
+  // 설정
+  openSettings: () => ipcRenderer.send("open-settings"),
+  closeSettings: () => ipcRenderer.send("close-settings"),
+  requestSettings: () => ipcRenderer.send("request-settings"),
+  onSettings: (cb) => ipcRenderer.on("settings", (_e, data) => cb(data)),
+  setSettings: (patch) => ipcRenderer.send("set-settings", patch),
+  openDataFolder: () => ipcRenderer.send("open-data-folder"),
+  resetProgress: () => ipcRenderer.send("reset-progress"),
+
   // 데스크톱 펫 전용
   petClick: () => ipcRenderer.send("pet-click"),
   petDrag: (pos) => ipcRenderer.send("pet-drag", pos),

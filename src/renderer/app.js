@@ -179,6 +179,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") window.ptb.hide();
 });
 $("dexBtn").onclick = () => window.ptb.openDex();
+$("settingsBtn").onclick = () => window.ptb.openSettings();
 const petBtn = $("pet");
 if (petBtn) petBtn.onclick = () => window.ptb.togglePet();
 $("quit").onclick = () => window.ptb.quit();

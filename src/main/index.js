@@ -1,15 +1,15 @@
 "use strict";
-const { app, Tray, BrowserWindow, Menu, ipcMain, nativeImage, screen } = require("electron");
+const { app, Tray, BrowserWindow, Menu, ipcMain, nativeImage, screen, Notification, shell } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const usage = require("./usage");
 const poke = require("./pokemon");
 const limits = require("./limits");
+const notify = require("./notify");
 
 const CACHE = path.join(app.getPath("userData"), "sprites");
 const SAVE = path.join(app.getPath("userData"), "save.json");
-const POLL_MS = 30_000;
 
 let tray = null;
 let win = null; // 팝오버
@@ -42,6 +42,13 @@ let save = {
   petVisible: false,
   petPos: null,
   wanderLevel: "rare",
+
+  /* ---- 설정 ---- */
+  notifyEnabled: true,
+  warnPercent: 80, // Codex 주간 한도 경고 기준
+  petSize: 128,
+  pollMinutes: 0.5, // 갱신 주기(분). 0.5 = 30초
+  autoLaunch: false,
 };
 
 let hadSave = false; // 세이브 파일이 원래 있었는가 (첫 실행 vs 이전 버전 이어받기)
@@ -170,6 +177,7 @@ async function buildStats() {
       graduated: save.graduated.length,
     },
     grown,
+    petSize: save.petSize,
     credits: credits(u.total),
     tree: await buildTree(grown),
     limits: limits.summarize(u),
@@ -218,10 +226,35 @@ function push(target, s) {
   if (target && !target.isDestroyed()) target.webContents.send("stats", s);
 }
 
+let prevSnap = null;
+
+/** 상태가 바뀐 순간에만 알린다. 자세한 판단은 notify.js가 한다. */
+function sendNotifications(s) {
+  if (!save.notifyEnabled || !Notification.isSupported()) return;
+  const cur = {
+    ...notify.snapshot({ ...s, bornAtRaw: save.bornAt }),
+    name: s.mon.name,
+    stageLabel: s.mon.stage.label,
+    body: s.mon.progress.next
+      ? s.mon.progress.next + "까지 " + fmt(s.mon.progress.remaining)
+      : "최고 단계입니다",
+    resetIn: s.limits && s.limits.codex ? hm(s.limits.codex.resetAt - Date.now()) : null,
+  };
+  for (const n of notify.pending(prevSnap, cur, { warnPercent: save.warnPercent })) {
+    try {
+      new Notification({ title: n.title, body: n.body, silent: false }).show();
+    } catch (e) {
+      console.error("[notify]", e.message);
+    }
+  }
+  prevSnap = cur;
+}
+
 async function refresh() {
   try {
     const s = await buildStats();
     lastStats = s;
+    sendNotifications(s);
     push(win, s);
     push(pet, s);
     try {
@@ -351,10 +384,103 @@ function openDex() {
   dexWin.on("closed", () => (dexWin = null));
 }
 
+/* ---------------- 설정 ---------------- */
+
+let setWin = null;
+let pollTimer = null;
+
+function settingsPayload() {
+  return {
+    notifyEnabled: save.notifyEnabled,
+    warnPercent: save.warnPercent,
+    petSize: save.petSize,
+    wanderLevel: save.wanderLevel,
+    pollMinutes: save.pollMinutes,
+    autoLaunch: save.autoLaunch,
+    dataPath: app.getPath("userData"),
+  };
+}
+
+function pushSettings() {
+  if (setWin && !setWin.isDestroyed()) setWin.webContents.send("settings", settingsPayload());
+}
+
+/** 폴링 주기를 다시 건다. 설정이 바뀌면 즉시 반영되어야 한다. */
+function restartPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  const ms = Math.max(10_000, (save.pollMinutes ?? 0.5) * 60_000);
+  pollTimer = setInterval(refresh, ms);
+}
+
+function applySettings(patch) {
+  Object.assign(save, patch);
+  writeSave();
+
+  if ("wanderLevel" in patch && pet && !pet.isDestroyed()) startWander();
+  if ("petSize" in patch && pet && !pet.isDestroyed()) {
+    pet.setSize(save.petSize, save.petSize);
+    push(pet, { petSize: save.petSize });
+  }
+  if ("pollMinutes" in patch) restartPolling();
+  if ("autoLaunch" in patch) {
+    // 패키징 전(개발 중 electron.exe 실행)에는 등록해도 의미가 없다.
+    try {
+      app.setLoginItemSettings({ openAtLogin: Boolean(save.autoLaunch) });
+    } catch (e) {
+      console.error("[autoLaunch]", e.message);
+    }
+  }
+  pushSettings();
+  refresh();
+}
+
+function openSettings() {
+  if (setWin && !setWin.isDestroyed()) {
+    setWin.show();
+    setWin.focus();
+    return;
+  }
+  const area = screen.getPrimaryDisplay().workArea;
+  setWin = new BrowserWindow({
+    width: 420,
+    height: Math.min(620, area.height - 80),
+    frame: false,
+    resizable: true,
+    minWidth: 340,
+    minHeight: 320,
+    backgroundColor: "#14151a",
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
+  });
+  setWin.loadFile(path.join(__dirname, "..", "renderer", "settings.html"));
+  setWin.webContents.on("did-finish-load", pushSettings);
+  setWin.webContents.on("console-message", logConsole("settings"));
+  setWin.on("closed", () => (setWin = null));
+}
+
+/**
+ * 진행 초기화. 토큰 기록은 로그가 원본이라 지워지지 않는다 —
+ * 지워지는 건 이 앱이 만든 것(도감·졸업·뽑기권·현재 개체)뿐이다.
+ */
+function resetProgress() {
+  save.lineIndex = poke.roll(null);
+  save.natureIndex = poke.rollNature();
+  save.bornAt = lastTotal; // 지금부터 알로 다시 시작
+  save.rollsUsed = 0;
+  save.freeRolls = 0;
+  save.seen = [save.lineIndex];
+  save.graduated = [];
+  save.graduatedAt = null;
+  prevSnap = null; // 초기화 직후 "진화했습니다"가 뜨지 않게
+  writeSave();
+  refresh();
+  pushDex();
+}
+
+
 /* ---------------- 데스크톱 펫 ---------------- */
 
-const PET_W = 128;
-const PET_H = 128;
+// 펫 크기는 설정에서 바뀐다 (save.petSize)
+const petW = () => save.petSize ?? 128;
 
 /**
  * 배회 강도. 기본은 "가끔" — 데스크톱 펫이 쉬지 않고 돌아다니면
@@ -386,12 +512,12 @@ let selfPos = null;
 function createPet() {
   const area = screen.getPrimaryDisplay().workArea;
   const pos = save.petPos || {
-    x: area.x + area.width - PET_W - 40,
-    y: area.y + area.height - PET_H - 60,
+    x: area.x + area.width - petW() - 40,
+    y: area.y + area.height - petW() - 60,
   };
   pet = new BrowserWindow({
-    width: PET_W,
-    height: PET_H,
+    width: petW(),
+    height: petW(),
     x: pos.x,
     y: pos.y,
     frame: false,
@@ -431,8 +557,8 @@ function startWander() {
     const dx = (Math.random() - 0.5) * cfg.range[0];
     const dy = (Math.random() - 0.5) * cfg.range[1];
     wanderTarget = {
-      x: Math.min(Math.max(area.x, Math.round(p[0] + dx)), area.x + area.width - PET_W),
-      y: Math.min(Math.max(area.y, Math.round(p[1] + dy)), area.y + area.height - PET_H),
+      x: Math.min(Math.max(area.x, Math.round(p[0] + dx)), area.x + area.width - petW()),
+      y: Math.min(Math.max(area.y, Math.round(p[1] + dy)), area.y + area.height - petW()),
     };
   };
 
@@ -506,6 +632,7 @@ function buildMenu() {
       click: rollLine,
     },
     { label: "📖 도감 열기", click: openDex },
+    { label: "⚙️ 설정", click: openSettings },
     { label: "새로고침", click: refresh },
     { type: "separator" },
     { label: "종료", click: () => app.quit() },
@@ -549,6 +676,12 @@ app.whenReady().then(async () => {
   ipcMain.on("open-dex", openDex);
   ipcMain.on("request-dex", pushDex);
   ipcMain.on("close-dex", () => dexWin && !dexWin.isDestroyed() && dexWin.close());
+  ipcMain.on("open-settings", openSettings);
+  ipcMain.on("request-settings", pushSettings);
+  ipcMain.on("set-settings", (_e, patch) => applySettings(patch || {}));
+  ipcMain.on("close-settings", () => setWin && !setWin.isDestroyed() && setWin.close());
+  ipcMain.on("open-data-folder", () => shell.openPath(app.getPath("userData")));
+  ipcMain.on("reset-progress", resetProgress);
 
   // 펫을 클릭하면 팝오버를 연다. 펫 옆이 아니라 트레이 옆에 띄운다 —
   // 펫은 화면 아무 데나 있을 수 있어서, 늘 같은 자리에 뜨는 편이 덜 헷갈린다.
@@ -575,7 +708,7 @@ app.whenReady().then(async () => {
 
   await refresh();
   if (save.petVisible) togglePet(true);
-  setInterval(refresh, POLL_MS);
+  restartPolling();
 });
 
 app.on("window-all-closed", (e) => e.preventDefault()); // 트레이 앱은 창이 없어도 산다
