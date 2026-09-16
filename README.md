@@ -50,7 +50,16 @@ npm run lines
 
 ## 데이터
 
-`~/.claude/projects/**/*.jsonl` 을 읽습니다. **토큰 집계에는 네트워크를 쓰지 않습니다.**
+Claude Code와 Codex의 로컬 로그를 읽습니다.
+
+| 도구 | 경로 | 상태 |
+|---|---|---|
+| Claude Code | `~/.claude/projects/**/*.jsonl` | ✅ |
+| Codex | `~/.codex/sessions/**/*.jsonl` | ✅ |
+| Gemini | — | ❌ Antigravity 로그에 토큰이 없음 |
+| Copilot | — | ❌ `.copilot` 전체에 토큰 필드 없음 |
+
+**토큰 집계에는 네트워크를 쓰지 않습니다.**
 스프라이트를 처음 받을 때만 PokéAPI/GitHub에 접속하고 이후 디스크에 캐시합니다.
 
 토큰은 `input + output + cache_creation + cache_read` 를 전부 더합니다.
@@ -100,7 +109,7 @@ scripts/build-lines.mjs  PokéAPI → lines.json
 
 원본 대비 빠진 것들입니다. [원본 README](https://github.com/chattymin/PokeTokenBar/blob/main/README.ko.md) 참고.
 
-- **Claude Code 외 도구** — Codex · Gemini · Copilot 등 (`usage.js` 의 `SOURCES` 에 추가)
+- **Gemini · Copilot** — 로컬 로그에 토큰이 안 남아 불가. Gemini CLI/Copilot CLI를 쓰면 가능해질 수 있음
 - **공식 한도** — 5시간 / 주간 한도, 리셋 카운트다운, 번레이트 예측
 - **비용 계산**
 - 도감 화면 · 상점 · 아이템 · 성격 · 이로치 확률

@@ -2,59 +2,27 @@
 /**
  * AI 코딩 도구의 로컬 로그에서 토큰 사용량을 읽는다.
  *
- * macOS 원본과 같은 경로를 쓴다 — Windows에도 똑같이 있다.
- *   Claude Code: ~/.claude/projects/**  /*.jsonl
+ * 네트워크를 쓰지 않는다. 이 파일들은 이미 디스크에 있다.
  *
- * 네트워크를 쓰지 않는다. 이 파일들은 이미 당신 디스크에 있다.
+ * ── 도구를 추가하려면 ──
+ * SOURCES에 { id, label, dir, ext, read } 를 넣는다.
+ * read(text, add) 는 파일 내용을 받아 add(일자, 토큰수, 중복키) 를 호출한다.
+ *
+ * ⚠️ 로그에 토큰이 실제로 있는지 먼저 확인하고 추가한다.
+ *    scripts/probe-formats.mjs 로 확인할 수 있다.
+ *    없는 값을 추정해 채우면 게임 전체가 틀린 숫자 위에 선다.
  */
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-/** 로그가 있을 만한 곳. 없는 건 조용히 건너뛴다. */
-const SOURCES = [
-  { id: "claude", label: "Claude Code", dir: path.join(os.homedir(), ".claude", "projects"), ext: ".jsonl" },
-];
+const HOME = os.homedir();
 
-function walk(dir, ext, out = []) {
-  let entries;
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return out; // 폴더가 없으면 그 도구를 안 쓰는 것뿐이다
-  }
-  for (const e of entries) {
-    const p = path.join(dir, e.name);
-    if (e.isDirectory()) walk(p, ext, out);
-    else if (e.name.endsWith(ext)) out.push(p);
-  }
-  return out;
-}
-
-/**
- * 한 줄에서 토큰 수를 뽑는다.
- *
- * 캐시 읽기/쓰기까지 전부 더한다. 청구 기준이 아니라 "얼마나 굴렸나"가
- * 이 앱의 관심사이기 때문이다. 캐시를 뺐더니 하루 수치가 1/10로 줄어
- * 게임이 성립하지 않았다.
- */
-function tokensOf(usage) {
-  if (!usage) return 0;
-  return (
-    (usage.input_tokens ?? 0) +
-    (usage.output_tokens ?? 0) +
-    (usage.cache_creation_input_tokens ?? 0) +
-    (usage.cache_read_input_tokens ?? 0)
-  );
-}
-
-function readClaudeFile(file, acc) {
-  let text;
-  try {
-    text = fs.readFileSync(file, "utf8");
-  } catch {
-    return; // 쓰기 중인 파일일 수 있다. 다음 폴링에서 잡힌다
-  }
+/* ------------------------------------------------------------------
+   Claude Code — ~/.claude/projects/ ** /*.jsonl
+   assistant 레코드의 message.usage 에 토큰이 들어있다.
+   ------------------------------------------------------------------ */
+function readClaude(text, add) {
   for (const line of text.split("\n")) {
     if (!line) continue;
     let o;
@@ -64,15 +32,83 @@ function readClaudeFile(file, acc) {
       continue; // 마지막 줄이 잘려 있는 건 정상이다 (계속 쓰이는 파일)
     }
     if (o.type !== "assistant") continue;
-    const n = tokensOf(o.message && o.message.usage);
-    if (!n) continue;
-    const day = String(o.timestamp ?? "").slice(0, 10);
-    if (!day) continue;
-    acc.byDay.set(day, (acc.byDay.get(day) ?? 0) + n);
-    const model = (o.message && o.message.model) || "unknown";
-    acc.byModel.set(model, (acc.byModel.get(model) ?? 0) + n);
-    acc.total += n;
+    const u = o.message && o.message.usage;
+    if (!u) continue;
+    const n =
+      (u.input_tokens ?? 0) +
+      (u.output_tokens ?? 0) +
+      (u.cache_creation_input_tokens ?? 0) +
+      (u.cache_read_input_tokens ?? 0);
+    if (n) add(String(o.timestamp ?? "").slice(0, 10), n, o.requestId || o.uuid);
   }
+}
+
+/* ------------------------------------------------------------------
+   Codex — ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
+   type: "token_usage_record" 의 payload.usage 가 응답 1건의 사용량이다.
+
+   payload.info.total_token_usage 라는 누적값도 같이 흐르는데 그건 쓰지 않는다.
+   세션 누계라서 더하면 같은 토큰을 수십 번 세게 된다.
+   total_tokens 는 input + output 이고 cached 는 input의 부분집합이다.
+   ------------------------------------------------------------------ */
+function readCodex(text, add) {
+  for (const line of text.split("\n")) {
+    if (!line) continue;
+    let o;
+    try {
+      o = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (o.type !== "token_usage_record") continue;
+    const u = o.payload && o.payload.usage;
+    if (!u) continue;
+    const n = u.total_tokens ?? (u.input_tokens ?? 0) + (u.output_tokens ?? 0);
+    // response_id 로 중복을 막는다. 재시도·재개 시 같은 응답이 다시 기록된다.
+    if (n) add(String(o.timestamp ?? "").slice(0, 10), n, o.payload.response_id);
+  }
+}
+
+/**
+ * 읽을 로그들.
+ *
+ * Gemini·Copilot 은 여기 없다 — 넣을 수 없어서가 아니라 **토큰이 안 남아서**다.
+ *   Gemini  : Antigravity 로그(jsonl·sqlite) 어디에도 토큰 수가 없다.
+ *             Gemini CLI(~/.gemini/tmp/ ** /chats)는 토큰을 남기지만 미설치.
+ *   Copilot : ~/.copilot 전체에 토큰 숫자 필드가 없다.
+ * 둘 다 설치·기록이 생기면 read 함수만 붙이면 된다.
+ */
+const SOURCES = [
+  {
+    id: "claude",
+    label: "Claude Code",
+    dir: path.join(HOME, ".claude", "projects"),
+    ext: ".jsonl",
+    read: readClaude,
+  },
+  {
+    id: "codex",
+    label: "Codex",
+    dir: path.join(HOME, ".codex", "sessions"),
+    ext: ".jsonl",
+    read: readCodex,
+  },
+];
+
+function walk(dir, ext, out = [], depth = 0) {
+  if (depth > 10) return out;
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return out; // 폴더가 없으면 그 도구를 안 쓰는 것뿐이다
+  }
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) walk(p, ext, out, depth + 1);
+    else if (e.name.endsWith(ext)) out.push(p);
+  }
+  return out;
 }
 
 /** 로컬 날짜 'YYYY-MM-DD'. 로그의 timestamp는 UTC라 하루가 밀릴 수 있어 맞춰준다. */
@@ -81,30 +117,77 @@ function localDay(d = new Date()) {
   return new Date(d.getTime() - off).toISOString().slice(0, 10);
 }
 
+/** UTC 타임스탬프 → 로컬 날짜 */
+function dayOf(iso) {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? localDay(new Date(t)) : String(iso).slice(0, 10);
+}
+
 function collect() {
-  const acc = { byDay: new Map(), byModel: new Map(), total: 0, files: 0 };
+  const byDay = new Map();
+  const bySource = new Map();
+  let total = 0;
+  let files = 0;
+
   for (const src of SOURCES) {
-    const files = walk(src.dir, src.ext);
-    acc.files += files.length;
-    for (const f of files) readClaudeFile(f, acc);
+    const paths = walk(src.dir, src.ext);
+    files += paths.length;
+    let srcTotal = 0;
+    const seen = new Set(); // 중복 레코드 방지 (재시도·세션 재개)
+
+    const add = (rawDay, n, dedupeKey) => {
+      if (dedupeKey) {
+        const k = src.id + ":" + dedupeKey;
+        if (seen.has(k)) return;
+        seen.add(k);
+      }
+      const day = dayOf(rawDay);
+      if (!day) return;
+      byDay.set(day, (byDay.get(day) ?? 0) + n);
+      srcTotal += n;
+      total += n;
+    };
+
+    for (const f of paths) {
+      let text;
+      try {
+        text = fs.readFileSync(f, "utf8");
+      } catch {
+        continue; // 쓰기 중인 파일일 수 있다. 다음 폴링에서 잡힌다
+      }
+      try {
+        src.read(text, add);
+      } catch {
+        /* 한 파일이 깨져도 나머지는 세어야 한다 */
+      }
+    }
+    if (srcTotal) bySource.set(src.label, srcTotal);
   }
+
   const today = localDay();
-  const days = [...acc.byDay.entries()].sort();
   return {
-    total: acc.total,
-    today: acc.byDay.get(today) ?? 0,
-    days,
-    models: [...acc.byModel.entries()].sort((a, b) => b[1] - a[1]),
-    fileCount: acc.files,
+    total,
+    today: byDay.get(today) ?? 0,
+    days: [...byDay.entries()].sort(),
+    sources: [...bySource.entries()].sort((a, b) => b[1] - a[1]),
+    fileCount: files,
     scannedAt: Date.now(),
   };
 }
 
-module.exports = { collect, localDay, tokensOf };
+module.exports = { collect, localDay, SOURCES };
 
 // node src/main/usage.js 로 바로 확인할 수 있게
 if (require.main === module) {
+  const t0 = Date.now();
   const r = collect();
-  console.log("파일", r.fileCount, "· 총", r.total.toLocaleString(), "· 오늘", r.today.toLocaleString());
-  for (const [d, t] of r.days) console.log("  " + d, t.toLocaleString());
+  console.log(
+    `파일 ${r.fileCount} · 총 ${r.total.toLocaleString()} · 오늘 ${r.today.toLocaleString()}` +
+      ` (${Date.now() - t0}ms)`,
+  );
+  console.log("\n도구별:");
+  for (const [k, v] of r.sources) console.log("  " + k.padEnd(14) + v.toLocaleString());
+  console.log("\n날짜별 (최근 10일):");
+  for (const [d, t] of r.days.slice(-10)) console.log("  " + d + "  " + t.toLocaleString());
 }

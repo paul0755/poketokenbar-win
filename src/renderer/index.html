@@ -65,6 +65,12 @@
   .node .at { font-size: 8.5px; color: var(--muted); }
   .node.current .at { color: var(--accent); }
   .arrow { align-self: center; font-size: 10px; color: var(--text-dim); flex: 0 0 auto; }
+
+  /* ---- 도구별 내역 ---- */
+  .srcs { display: flex; gap: 6px; padding: 2px 16px 0; flex-wrap: wrap; }
+  .src { font-size: 10px; color: var(--muted); }
+  .src b { color: var(--text); font-weight: 600; }
+  .src .dot { display: inline-block; width: 6px; height: 6px; border-radius: 99px; margin-right: 4px; vertical-align: 1px; }
 </style>
 
 <header>
@@ -83,6 +89,8 @@
   <div class="cell"><b id="today">–</b><span>오늘</span></div>
   <div class="cell"><b id="total">–</b><span>누적</span></div>
 </div>
+
+<div class="srcs" id="srcs"></div>
 
 <div class="days"><h4>최근 기록</h4><div id="dayList"></div></div>
 

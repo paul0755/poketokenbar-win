@@ -41,6 +41,15 @@ window.ptb.onStats((s) => {
   $("today").textContent = fmt(usage.today);
   $("total").textContent = fmt(usage.total);
 
+  // 어느 도구에서 얼마나 나왔는지. 합계만 보면 어디서 튀는지 알 수 없다.
+  const COLORS = { "Claude Code": "#d97757", Codex: "#5aa9e6" };
+  $("srcs").innerHTML = (usage.sources || [])
+    .map(([name, n]) => {
+      const c = COLORS[name] || "#8a8a96";
+      return `<span class="src"><span class="dot" style="background:${c}"></span>${name} <b>${fmt(n)}</b></span>`;
+    })
+    .join("");
+
   const recent = usage.days.slice(-7);
   const max = Math.max(1, ...recent.map(([, t]) => t));
   $("dayList").innerHTML = recent
