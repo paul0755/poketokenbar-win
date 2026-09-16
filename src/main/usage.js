@@ -34,12 +34,14 @@ function readClaude(text, add) {
     if (o.type !== "assistant") continue;
     const u = o.message && o.message.usage;
     if (!u) continue;
-    const n =
-      (u.input_tokens ?? 0) +
-      (u.output_tokens ?? 0) +
-      (u.cache_creation_input_tokens ?? 0) +
-      (u.cache_read_input_tokens ?? 0);
-    if (n) add(o.timestamp, n, o.requestId || o.uuid);
+    const parts = {
+      in: u.input_tokens ?? 0,
+      out: u.output_tokens ?? 0,
+      cacheW: u.cache_creation_input_tokens ?? 0,
+      cacheR: u.cache_read_input_tokens ?? 0,
+    };
+    const n = parts.in + parts.out + parts.cacheW + parts.cacheR;
+    if (n) add(o.timestamp, n, o.requestId || o.uuid, parts);
   }
 }
 
@@ -63,9 +65,17 @@ function readCodex(text, add) {
     if (o.type !== "token_usage_record") continue;
     const u = o.payload && o.payload.usage;
     if (!u) continue;
-    const n = u.total_tokens ?? (u.input_tokens ?? 0) + (u.output_tokens ?? 0);
+    // Codex의 input_tokens는 cached를 포함한 값이다. 겹쳐 세지 않도록 빼준다.
+    const cached = u.cached_input_tokens ?? 0;
+    const parts = {
+      in: Math.max(0, (u.input_tokens ?? 0) - cached),
+      out: u.output_tokens ?? 0,
+      cacheW: u.cache_write_input_tokens ?? 0,
+      cacheR: cached,
+    };
+    const n = u.total_tokens ?? parts.in + parts.out + parts.cacheW + parts.cacheR;
     // response_id 로 중복을 막는다. 재시도·재개 시 같은 응답이 다시 기록된다.
-    if (n) add(o.timestamp, n, o.payload.response_id);
+    if (n) add(o.timestamp, n, o.payload.response_id, parts);
   }
 }
 
@@ -127,6 +137,8 @@ function dayOf(iso) {
 function collect() {
   const byDay = new Map();
   const bySource = new Map();
+  // 도구별 토큰 종류 분해. 합계만 보면 캐시 때문에 커진 건지 알 수 없다.
+  const detail = new Map();
   // 개별 사용 기록. 5시간 창·번레이트는 일자 합계로는 계산할 수 없다.
   const events = [];
   let total = 0;
@@ -138,7 +150,7 @@ function collect() {
     let srcTotal = 0;
     const seen = new Set(); // 중복 레코드 방지 (재시도·세션 재개)
 
-    const add = (iso, n, dedupeKey) => {
+    const add = (iso, n, dedupeKey, parts) => {
       if (dedupeKey) {
         const k = src.id + ":" + dedupeKey;
         if (seen.has(k)) return;
@@ -149,6 +161,11 @@ function collect() {
       byDay.set(day, (byDay.get(day) ?? 0) + n);
       const t = Date.parse(iso);
       if (Number.isFinite(t)) events.push({ t, n, src: src.id });
+      if (parts) {
+        const d = detail.get(src.id) ?? { in: 0, out: 0, cacheW: 0, cacheR: 0 };
+        d.in += parts.in; d.out += parts.out; d.cacheW += parts.cacheW; d.cacheR += parts.cacheR;
+        detail.set(src.id, d);
+      }
       srcTotal += n;
       total += n;
     };
@@ -166,16 +183,44 @@ function collect() {
         /* 한 파일이 깨져도 나머지는 세어야 한다 */
       }
     }
-    if (srcTotal) bySource.set(src.label, srcTotal);
+    if (srcTotal) bySource.set(src.label, { id: src.id, label: src.label, total: srcTotal });
   }
 
   const today = localDay();
   events.sort((a, b) => a.t - b.t);
+
+  // 이번 주(월요일 시작)와 이번 달. 롤링이 아니라 달력 기준이다 —
+  // "이번 달 얼마 썼나"는 달이 바뀌면 0부터 다시 세는 게 자연스럽다.
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  const month1 = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  let week = 0;
+  let month = 0;
+  for (const e of events) {
+    if (e.t >= monday.getTime()) week += e.n;
+    if (e.t >= month1) month += e.n;
+  }
+
+  // 이번 달 일별 (그래프용). 빈 날도 0으로 채워 막대 간격이 일정하게.
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const monthly = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = localDay(new Date(now.getFullYear(), now.getMonth(), d));
+    monthly.push({ day: d, key, n: byDay.get(key) ?? 0 });
+  }
+
   return {
     total,
     today: byDay.get(today) ?? 0,
+    week,
+    month,
+    monthly,
     days: [...byDay.entries()].sort(),
-    sources: [...bySource.entries()].sort((a, b) => b[1] - a[1]),
+    sources: [...bySource.values()]
+      .map((s) => ({ ...s, detail: detail.get(s.id) ?? null }))
+      .sort((a, b) => b.total - a.total),
     events,
     fileCount: files,
     scannedAt: Date.now(),

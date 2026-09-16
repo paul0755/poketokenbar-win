@@ -3,8 +3,9 @@
 <title>PokeTokenBar</title>
 <style>
   :root {
-    --bg: #14151a; --card: #1e2027; --line: #2c2f38;
-    --text: #f2f3f5; --muted: #9aa0ab; --accent: #ffcb05; --accent2: #3b6ec6;
+    --bg: #14151a; --card: #1c1e25; --card2: #22252d; --line: #2c2f38;
+    --text: #f2f3f5; --muted: #9aa0ab; --dim: #6b6e78;
+    --accent: #ffcb05; --blue: #4a9eff; --green: #4ade80; --orange: #ffa245; --red: #ff5a5a;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
@@ -13,153 +14,248 @@
     font: 13px/1.5 "Malgun Gothic", "Segoe UI", system-ui, sans-serif;
     border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
     user-select: none; -webkit-user-select: none;
-    /* 내용이 창보다 길어질 수 있다. 본문만 스크롤하고 버튼은 늘 바닥에 붙인다. */
     display: flex; flex-direction: column;
   }
-  .scroll { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
+  .scroll { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; padding: 0 14px 16px; }
   .scroll::-webkit-scrollbar { width: 8px; }
   .scroll::-webkit-scrollbar-thumb { background: #33363f; border-radius: 99px; }
-  .scroll::-webkit-scrollbar-thumb:hover { background: #3f434e; }
   .scroll::-webkit-scrollbar-track { background: transparent; }
+  [hidden] { display: none !important; }
 
-  header { padding: 14px 16px 10px; position: relative; }
-  /* 희귀도 · 성격 — 같은 종이라도 개체가 다르다는 걸 보여주는 줄 */
-  .traits { display: flex; align-items: center; gap: 7px; margin-top: 5px; flex-wrap: wrap; }
-  .stars { font-size: 11px; color: var(--accent); letter-spacing: 1px; }
-  .stars .off { color: #3a3d46; }
-  .chip {
-    font-size: 10px; padding: 2px 7px; border-radius: 99px;
-    background: var(--card); border: 1px solid var(--line); color: var(--muted);
+  /* ---------- 탭 ---------- */
+  nav {
+    display: flex; align-items: center; gap: 2px; padding: 10px 12px 8px;
+    flex-shrink: 0; -webkit-app-region: drag;
   }
-  .chip.r5 { border-color: #c084fc; color: #d8b4fe; }
-  .chip.r4 { border-color: #60a5fa; color: #93c5fd; }
-  .chip b { color: var(--text); font-weight: 600; }
-  /* 닫기 — 포커스를 잃으면 자동으로 닫히지만, 명시적으로 닫을 방법도 있어야 한다 */
-  .close {
-    position: absolute; top: 10px; right: 12px;
-    width: 26px; height: 26px; padding: 0; line-height: 1;
-    font-size: 15px; color: var(--muted);
-    background: transparent; border: 0; border-radius: 8px; cursor: pointer;
+  nav button {
+    -webkit-app-region: no-drag;
+    padding: 6px 13px; font: inherit; font-size: 12px; font-weight: 600;
+    color: var(--muted); background: transparent; border: 0; border-radius: 9px; cursor: pointer;
   }
-  .close:hover { background: var(--card); color: var(--text); }
-  .line { font-size: 11px; color: var(--muted); }
-  .stage { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
-  .sprite-wrap {
+  nav button:hover { color: var(--text); }
+  nav button.on { color: var(--text); background: var(--card2); }
+  nav .sp { flex: 1; }
+  nav .ico { padding: 6px 9px; font-size: 13px; }
+
+  /* ---------- 홈: 개체 카드 ---------- */
+  .mon { display: flex; gap: 12px; align-items: flex-start; padding: 4px 2px 12px; }
+  .mon .pic {
+    width: 88px; height: 88px; flex-shrink: 0; border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
-    height: 132px; margin: 2px 16px 8px; border-radius: 12px;
-    background: radial-gradient(70% 70% at 50% 35%, #2a2d36 0%, #191b21 100%);
+    background: repeating-conic-gradient(#1b1d23 0% 25%, #191b21 0% 50%) 50% / 12px 12px;
   }
-  .sprite { width: 112px; height: 112px; image-rendering: pixelated; }
-  .eggsvg { animation: wobble 2.4s ease-in-out infinite; transform-origin: 50% 90%; }
-  @keyframes wobble { 0%,100%{transform:rotate(-5deg)} 50%{transform:rotate(5deg)} }
-  .bar { height: 7px; background: #262933; border-radius: 99px; margin: 0 16px; overflow: hidden; }
-  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 99px; transition: width .4s ease; }
-  .next { margin: 6px 16px 0; font-size: 11px; color: var(--muted); text-align: center; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 16px 6px; }
-  .cell { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; }
-  .cell b { display: block; font-size: 17px; font-weight: 700; }
-  .cell span { font-size: 10px; color: var(--muted); }
-  .days { padding: 2px 16px 10px; }
-  .days h4 { margin: 6px 0 6px; font-size: 10px; color: var(--muted); font-weight: 600; }
-  .day { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; font-size: 10px; color: var(--muted); }
-  .day .track { flex: 1; height: 5px; background: #23262f; border-radius: 99px; overflow: hidden; }
-  .day .track > i { display: block; height: 100%; background: var(--accent2); }
-  .day .n { width: 44px; text-align: right; color: var(--text); }
-  footer {
-    display: flex; gap: 6px; padding: 10px 16px 14px;
-    flex-shrink: 0; background: var(--bg); border-top: 1px solid var(--line);
+  .mon .pic img { max-width: 84px; max-height: 84px; image-rendering: pixelated; }
+  .mon .pic svg { max-width: 70px; max-height: 70px; }
+  .mon .info { flex: 1; min-width: 0; padding-top: 2px; }
+  .mon .nm { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .mon .stage { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+  .badge {
+    font-size: 9.5px; font-weight: 800; padding: 1px 6px; border-radius: 5px;
+    background: #2b3340; color: var(--blue); letter-spacing: .3px;
   }
-  button {
-    flex: 1; padding: 7px; font: inherit; font-size: 11px; color: var(--text);
+  .badge.r5 { background: #3a2b16; color: var(--accent); }
+  .badge.sh { background: #3a2f16; color: var(--accent); }
+  .bar { height: 6px; background: #2a2d36; border-radius: 99px; margin-top: 9px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: #cfd3da; border-radius: 99px; transition: width .4s ease; }
+  .goal { margin-top: 5px; font-size: 11px; color: var(--dim); }
+  .goal b { color: var(--muted); font-weight: 600; }
+  .quip { margin-top: 3px; font-size: 11.5px; font-weight: 600; }
+  .traits { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .chip { font-size: 10px; padding: 2px 7px; border-radius: 99px; background: var(--card); border: 1px solid var(--line); color: var(--muted); }
+  .chip b { color: var(--text); font-weight: 600; }
+
+  /* 펫 미리보기 */
+  .petrow { display: flex; align-items: center; gap: 9px; padding: 0 2px 14px; border-bottom: 1px solid var(--line); }
+  .petrow .thumb { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+  .petrow .thumb img { max-width: 42px; max-height: 42px; image-rendering: pixelated; }
+  .petrow .thumb svg { max-width: 34px; max-height: 34px; }
+  .petrow .t { flex: 1; min-width: 0; font-size: 11px; color: var(--muted); }
+  .petrow .t b { color: var(--text); display: block; font-size: 11.5px; }
+  .petrow button {
+    font: inherit; font-size: 10.5px; padding: 4px 9px; color: var(--muted);
+    background: var(--card); border: 1px solid var(--line); border-radius: 7px; cursor: pointer;
+  }
+  .petrow button:hover { background: var(--card2); color: var(--text); }
+  .petrow button.on { color: var(--accent); border-color: #4a3a16; }
+
+  /* ---------- 숫자 ---------- */
+  h4 { margin: 16px 0 8px; font-size: 10.5px; color: var(--muted); font-weight: 700; letter-spacing: .2px; }
+  .big { display: flex; align-items: baseline; gap: 9px; }
+  .big .n { font-size: 30px; font-weight: 800; letter-spacing: -1px; }
+  .big .raw { font-size: 11px; color: var(--dim); }
+  .wm { display: flex; gap: 22px; margin-top: 7px; font-size: 11.5px; color: var(--muted); }
+  .wm b { color: var(--text); font-weight: 700; }
+
+  /* 월 그래프 */
+  .chart { display: flex; align-items: flex-end; gap: 2px; height: 46px; margin-top: 4px; }
+  .chart .b { flex: 1; min-width: 0; background: #3a3e48; border-radius: 2px 2px 0 0; min-height: 2px; }
+  .chart .b.today { background: var(--blue); }
+  .axis { display: flex; justify-content: space-between; margin-top: 3px; font-size: 9.5px; color: var(--dim); }
+  .peak { float: right; font-size: 10px; color: var(--dim); font-weight: 400; }
+
+  /* 도구 탭 */
+  .srctabs { display: flex; gap: 4px; margin: 14px 0 10px; }
+  .srctabs button {
+    flex: 1; padding: 6px 4px; font: inherit; font-size: 11.5px; font-weight: 700;
+    color: var(--dim); background: transparent; border: 0; border-bottom: 2px solid transparent;
+    cursor: pointer;
+  }
+  .srctabs button.on { color: var(--blue); border-bottom-color: var(--blue); }
+  .srcbody .row1 { display: flex; justify-content: space-between; align-items: baseline; }
+  .srcbody .row1 .k { font-size: 13px; font-weight: 700; }
+  .srcbody .row1 .v { font-size: 13px; font-weight: 700; }
+  .parts { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 5px; font-size: 10.5px; color: var(--dim); }
+  .parts b { color: var(--muted); font-weight: 600; }
+
+  /* 한도 */
+  .lim { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 4px; }
+  .limrow { margin-bottom: 12px; }
+  .limrow .top { display: flex; align-items: baseline; gap: 8px; }
+  .limrow .k { flex: 1; font-size: 12.5px; font-weight: 700; }
+  .limrow .t { font-size: 10.5px; color: var(--dim); }
+  .limrow .p { font-size: 12px; font-weight: 800; color: var(--green); }
+  .limrow .p.warn { color: var(--orange); }
+  .limrow .p.hot { color: var(--red); }
+  .track { height: 6px; background: #2a2d36; border-radius: 99px; margin-top: 6px; overflow: hidden; }
+  .track > i { display: block; height: 100%; background: var(--green); border-radius: 99px; }
+  .track > i.warn { background: var(--orange); }
+  .track > i.hot { background: var(--red); }
+  .note { font-size: 10px; color: var(--dim); margin-top: 4px; }
+
+  /* ---------- 상점 ---------- */
+  .wallet { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; margin-top: 4px; }
+  .wallet .lab { font-size: 10.5px; color: var(--muted); }
+  .wallet .n { font-size: 27px; font-weight: 800; letter-spacing: -0.8px; margin-top: 1px; }
+  .wallet .sub { font-size: 10.5px; color: var(--dim); margin-top: 3px; line-height: 1.5; }
+  .item { display: flex; align-items: center; gap: 11px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; margin-top: 8px; }
+  .item .ic { font-size: 22px; width: 28px; text-align: center; flex-shrink: 0; }
+  .item .body { flex: 1; min-width: 0; }
+  .item .nm { font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 5px; }
+  .item .de { font-size: 10.5px; color: var(--dim); margin-top: 1px; }
+  .item .pr { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+  .item button {
+    flex-shrink: 0; min-width: 52px; padding: 6px 10px; font: inherit; font-size: 11px; font-weight: 700;
+    color: #14151a; background: var(--accent); border: 0; border-radius: 8px; cursor: pointer;
+  }
+  .item button:hover { background: #ffd83d; }
+  .item button:disabled { background: #33363f; color: var(--dim); cursor: default; }
+
+  /* ---------- 도감 ---------- */
+  .dexhead { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
+  .dexhead .t { font-size: 14px; font-weight: 800; }
+  .dexhead .c { font-size: 11px; color: var(--muted); }
+  .tiers { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 7px; font-size: 10px; color: var(--dim); }
+  .tiers .d { display: inline-block; width: 6px; height: 6px; border-radius: 99px; margin-right: 4px; vertical-align: 1px; }
+  .dexfilter { display: flex; gap: 5px; margin: 10px 0 9px; }
+  .dexfilter button {
+    padding: 5px 10px; font: inherit; font-size: 10.5px; color: var(--muted);
     background: var(--card); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
   }
-  button:hover { background: #262a33; }
-  button:active { transform: scale(.97); }
-  button:disabled { opacity: .45; cursor: default; }
-  button:disabled:hover { background: var(--card); }
-  button:disabled:active { transform: none; }
-
-  /* ---- 진화 트리 ---- */
-  .tree { padding: 4px 16px 2px; }
-  .tree h4 { margin: 8px 0 7px; font-size: 10px; color: var(--muted); font-weight: 600; }
-  .chain { display: flex; align-items: stretch; gap: 3px; }
-  .node {
-    flex: 1; min-width: 0; text-align: center; padding: 7px 2px 6px;
+  .dexfilter button.on { color: var(--accent); border-color: #4a3a16; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+  .cell {
     background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-    /* 아직 도달하지 않은 단계는 실루엣으로 — 뭐가 나올지는 보이되 아직 내 것은 아니다 */
-    opacity: .38; filter: grayscale(1);
+    padding: 8px 3px 7px; text-align: center; min-height: 86px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
-  .node.reached { opacity: 1; filter: none; }
-  .node.current { border-color: var(--accent); background: #2a2016; opacity: 1; filter: none; }
-  .node img { width: 40px; height: 40px; image-rendering: pixelated; display: block; margin: 0 auto; }
-  .node .nm {
-    margin-top: 2px; font-size: 9.5px; font-weight: 600;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .node .at { font-size: 8.5px; color: var(--muted); }
-  .node.current .at { color: var(--accent); }
-  .arrow { align-self: center; font-size: 10px; color: var(--text-dim); flex: 0 0 auto; }
+  .cell img { width: 44px; height: 44px; image-rendering: pixelated; }
+  .cell .no { font-size: 9px; color: var(--dim); }
+  .cell .nm { font-size: 10px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell .q { font-size: 22px; color: #3a3d46; }
+  .cell.locked .nm { color: var(--dim); }
+  .cell.owned { cursor: pointer; }
+  .cell.owned:hover { border-color: var(--accent); }
+  .cell.pet { border-color: var(--accent); background: #2a2016; }
+  .cell.seenonly img { opacity: .5; }
+  .cell .pin { font-size: 8px; color: var(--accent); }
+  .cell .gr { font-size: 8px; color: var(--green); }
+  .empty { grid-column: 1 / -1; padding: 30px 0; text-align: center; color: var(--dim); font-size: 11px; }
 
-  /* ---- 한도 ---- */
-  .lim { padding: 6px 16px 0; }
-  .lim h4 { margin: 10px 0 7px; font-size: 10px; color: var(--muted); font-weight: 600; }
-  .limrow {
-    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-    padding: 8px 11px; margin-bottom: 6px;
+  #toast {
+    position: fixed; left: 14px; right: 14px; bottom: 12px;
+    background: #26303a; border: 1px solid #3a4a58; border-radius: 10px;
+    padding: 9px 12px; font-size: 11.5px; text-align: center;
+    opacity: 0; transition: opacity .2s; pointer-events: none;
   }
-  .limrow .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .limrow .k { font-size: 11px; font-weight: 600; }
-  .limrow .v { font-size: 11px; color: var(--muted); }
-  .limrow .v b { color: var(--text); }
-  .limbar { height: 5px; background: #23262f; border-radius: 99px; margin-top: 6px; overflow: hidden; }
-  .limbar > i { display: block; height: 100%; background: linear-gradient(90deg, #4ade9b, #ffcb05); border-radius: 99px; }
-  .limbar.hot > i { background: linear-gradient(90deg, #ffcb05, #ff5a5a); }
-  .limnote { margin-top: 4px; font-size: 9.5px; color: var(--text-dim); }
-
-  /* ---- 도구별 내역 ---- */
-  .srcs { display: flex; gap: 6px; padding: 2px 16px 0; flex-wrap: wrap; }
-  .src { font-size: 10px; color: var(--muted); }
-  .src b { color: var(--text); font-weight: 600; }
-  .src .dot { display: inline-block; width: 6px; height: 6px; border-radius: 99px; margin-right: 4px; vertical-align: 1px; }
+  #toast.show { opacity: 1; }
+  #toast.bad { background: #3a2626; border-color: #5a3434; }
+  #toast.shiny { background: #3a2f16; border-color: #6a5420; color: var(--accent); }
 </style>
 
+<nav>
+  <button data-tab="home" class="on">홈</button>
+  <button data-tab="shop">상점</button>
+  <button data-tab="dex">도감</button>
+  <span class="sp"></span>
+  <button class="ico" id="gear" title="설정">⚙</button>
+  <button class="ico" id="close" title="닫기 (Esc)">✕</button>
+</nav>
+
 <div class="scroll">
+  <!-- ---------------- 홈 ---------------- -->
+  <section id="tab-home">
+    <div class="mon">
+      <div class="pic" id="pic"></div>
+      <div class="info">
+        <div class="nm"><span id="monName">불러오는 중…</span><span id="monBadge"></span></div>
+        <div class="stage" id="monStage">&nbsp;</div>
+        <div class="bar"><i id="monBar" style="width:0%"></i></div>
+        <div class="goal" id="monGoal">&nbsp;</div>
+        <div class="quip" id="monQuip"></div>
+        <div class="traits" id="monTraits"></div>
+      </div>
+    </div>
 
-<header>
-  <button class="close" id="close" title="닫기 (Esc)">✕</button>
-  <div class="line" id="line">불러오는 중…</div>
-  <div class="stage" id="stage">&nbsp;</div>
-  <div class="traits" id="traits"></div>
-</header>
+    <div class="petrow">
+      <div class="thumb" id="petThumb"></div>
+      <div class="t"><b id="petName">–</b><span id="petState">바탕화면 펫</span></div>
+      <button id="petToggle">띄우기</button>
+    </div>
 
-<div class="sprite-wrap" id="spriteWrap"></div>
-<div class="bar"><i id="bar" style="width:0%"></i></div>
-<div class="next" id="next">&nbsp;</div>
-<div class="next" id="dex" style="margin-top:2px"></div>
+    <h4>오늘 쓴 토큰</h4>
+    <div class="big"><span class="n" id="today">–</span><span class="raw" id="todayRaw"></span></div>
+    <div class="wm">
+      <span>이번 주 <b id="week">–</b></span>
+      <span>이번 달 <b id="month">–</b></span>
+    </div>
 
-<div class="tree"><h4>진화 트리</h4><div class="chain" id="chain"></div></div>
+    <h4>이번 달 일별<span class="peak" id="peak"></span></h4>
+    <div class="chart" id="chart"></div>
+    <div class="axis" id="axis"></div>
 
-<div class="grid">
-  <div class="cell"><b id="today">–</b><span>오늘</span></div>
-  <div class="cell"><b id="total">–</b><span>누적</span></div>
+    <div class="srctabs" id="srctabs"></div>
+    <div class="srcbody" id="srcbody"></div>
+
+    <div class="lim">
+      <h4>한도</h4>
+      <div id="limits"></div>
+    </div>
+  </section>
+
+  <!-- ---------------- 상점 ---------------- -->
+  <section id="tab-shop" hidden>
+    <div class="wallet">
+      <div class="lab">쓸 수 있는 사탕</div>
+      <div class="n" id="wallet">🍬 –</div>
+      <div class="sub" id="walletSub"></div>
+    </div>
+    <div id="items"></div>
+  </section>
+
+  <!-- ---------------- 도감 ---------------- -->
+  <section id="tab-dex" hidden>
+    <div class="dexhead"><span class="t">도감</span><span class="c" id="dexCount"></span></div>
+    <div class="tiers" id="dexTiers"></div>
+    <div class="dexfilter">
+      <button id="fAll" class="on">전체</button>
+      <button id="fOwned">보유</button>
+      <button id="fGot">만난 것</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
 </div>
 
-<div class="srcs" id="srcs"></div>
-
-<div class="lim"><h4>한도</h4><div id="limits"></div></div>
-
-<div class="days"><h4>최근 기록</h4><div id="dayList"></div></div>
-
-</div><!-- /.scroll -->
-
-<footer>
-  <button id="dexBtn">📖 도감</button>
-  <button id="pet">펫</button>
-  <button id="shopBtn">🍬 상점</button>
-  <button id="settingsBtn">⚙️</button>
-  <button id="refresh">새로고침</button>
-  <button id="quit">종료</button>
-</footer>
+<div id="toast"></div>
 
 <script src="egg.js"></script>
 <script src="app.js"></script>

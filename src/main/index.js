@@ -283,6 +283,7 @@ async function buildStats() {
     petStillUrl: petStill ? pathToFileURL(petStill).href : null,
     petAnimUrl: petAnim ? pathToFileURL(petAnim).href : null,
     petLine: save.petLine,
+    petVisible: Boolean(save.petVisible),
     dex: {
       seen: save.seen.length,
       total: poke.LINES.length,
@@ -396,8 +397,8 @@ function createWindow() {
   // 잘린 만큼은 본문 스크롤이 받아준다.
   const area = screen.getPrimaryDisplay().workArea;
   win = new BrowserWindow({
-    width: 340,
-    height: Math.max(420, Math.min(700, area.height - 80)),
+    width: 400,
+    height: Math.max(460, Math.min(760, area.height - 60)),
     show: false,
     frame: false,
     resizable: false,
@@ -427,7 +428,6 @@ function showNearTray() {
 
 /* ---------------- 도감 ---------------- */
 
-let dexWin = null;
 
 /**
  * 도감 데이터.
@@ -490,47 +490,25 @@ async function buildDex() {
   };
 }
 
+/**
+ * 도감·상점은 메인 창의 탭이다. 별도 창을 띄우지 않는다.
+ *
+ * 처음엔 창을 따로 뒀는데, 원본처럼 한 창에서 탭으로 오가는 편이
+ * 훨씬 덜 번거롭다. 창이 셋이면 어디에 뭐가 있었는지 매번 찾게 된다.
+ */
 async function pushDex() {
-  if (!dexWin || dexWin.isDestroyed()) return;
+  if (!win || win.isDestroyed()) return;
   try {
-    dexWin.webContents.send("dex", await buildDex());
+    win.webContents.send("dex", await buildDex());
   } catch (e) {
     console.error("[dex]", e && e.message);
   }
 }
 
-function openDex() {
-  if (dexWin && !dexWin.isDestroyed()) {
-    dexWin.show();
-    dexWin.focus();
-    return;
-  }
-  const area = screen.getPrimaryDisplay().workArea;
-  dexWin = new BrowserWindow({
-    width: Math.min(560, area.width - 80),
-    height: Math.min(640, area.height - 80),
-    frame: false,
-    resizable: true,
-    minWidth: 340,
-    minHeight: 320,
-    skipTaskbar: false, // 도감은 제대로 된 창이다. 작업표시줄에 있어야 다시 찾는다
-    backgroundColor: "#14151a",
-    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
-  });
-  dexWin.loadFile(path.join(__dirname, "..", "renderer", "dex.html"));
-  dexWin.webContents.on("did-finish-load", pushDex);
-  dexWin.webContents.on("console-message", logConsole("dex"));
-  dexWin.on("closed", () => (dexWin = null));
-}
-
-/* ---------------- 상점 ---------------- */
-
-let shopWin = null;
-
 function pushShop() {
-  if (!shopWin || shopWin.isDestroyed()) return;
+  if (!win || win.isDestroyed()) return;
   const c = candy();
-  shopWin.webContents.send("shop", {
+  win.webContents.send("shop", {
     candy: c,
     charm: Boolean(save.charm),
     items: SHOP.map((x) => ({
@@ -542,28 +520,15 @@ function pushShop() {
   });
 }
 
-function openShop() {
-  if (shopWin && !shopWin.isDestroyed()) {
-    shopWin.show();
-    shopWin.focus();
-    return;
-  }
-  const area = screen.getPrimaryDisplay().workArea;
-  shopWin = new BrowserWindow({
-    width: 420,
-    height: Math.min(560, area.height - 80),
-    frame: false,
-    resizable: true,
-    minWidth: 340,
-    minHeight: 320,
-    backgroundColor: "#14151a",
-    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
-  });
-  shopWin.loadFile(path.join(__dirname, "..", "renderer", "shop.html"));
-  shopWin.webContents.on("did-finish-load", pushShop);
-  shopWin.webContents.on("console-message", logConsole("shop"));
-  shopWin.on("closed", () => (shopWin = null));
+/** 트레이 메뉴에서 부르면 창을 열고 그 탭으로 보낸다. */
+function openTab(name) {
+  if (!win || win.isDestroyed()) return;
+  if (!win.isVisible()) showNearTray();
+  win.webContents.send("go-tab", name);
+  win.focus();
 }
+const openDex = () => openTab("dex");
+const openShop = () => openTab("shop");
 
 /* ---------------- 설정 ---------------- */
 
@@ -856,11 +821,9 @@ app.whenReady().then(async () => {
   ipcMain.on("toggle-pet", () => togglePet());
   ipcMain.on("open-shop", openShop);
   ipcMain.on("request-shop", pushShop);
-  ipcMain.on("close-shop", () => shopWin && !shopWin.isDestroyed() && shopWin.close());
   ipcMain.handle("buy", (_e, id) => buy(id));
   ipcMain.on("open-dex", openDex);
   ipcMain.on("request-dex", pushDex);
-  ipcMain.on("close-dex", () => dexWin && !dexWin.isDestroyed() && dexWin.close());
   ipcMain.on("set-pet-line", (_e, line) => {
     // 보유하지 않은 아이는 세울 수 없다. 렌더러가 보낸 값을 그대로 믿지 않는다.
     if (line != null && !ownedLines().has(line)) return;

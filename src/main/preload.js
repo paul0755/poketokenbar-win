@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld("ptb", {
   closeDex: () => ipcRenderer.send("close-dex"),
   requestDex: () => ipcRenderer.send("request-dex"),
   onDex: (cb) => ipcRenderer.on("dex", (_e, data) => cb(data)),
+  onGoTab: (cb) => ipcRenderer.on("go-tab", (_e, name) => cb(name)),
   setPetLine: (line) => ipcRenderer.send("set-pet-line", line),
 
   // 상점
