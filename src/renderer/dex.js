@@ -27,7 +27,9 @@ function render() {
         : '<div class="q">?</div>';
       const grad = e.graduated
         ? `<div class="badge">졸업 ${e.graduated}</div>`
-        : "";
+        : e.complete
+          ? ""
+          : `<div class="wip">${e.stage}</div>`; // 아직 최종 진화를 못 본 라인
       return `<div class="cell${e.graduated ? " grad" : ""}" title="${e.name} · ${e.label}">
           ${pic}<div class="nm">${e.name}</div>
           <div class="st">${stars(e.stars)}</div>${grad}

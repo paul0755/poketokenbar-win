@@ -37,6 +37,14 @@ let save = {
   rollsUsed: 0, // 써버린 뽑기권
   freeRolls: 0, // 졸업 보상 등 공짜 뽑기
   seen: [], // 한 번이라도 받아본 라인 (도감 진행도)
+  /**
+   * 라인별로 실제 도달한 최고 단계. { lineIndex: stageIndex }
+   *
+   * 이게 없으면 도감이 최종 진화 모습만 보여준다 —
+   * 아직 파비코인데 도감엔 파비코리로 뜨는 문제가 생긴다.
+   * 안 키운 모습을 가진 것처럼 보여주면 도감이 거짓말을 한다.
+   */
+  maxStage: {},
   graduated: [], // 마스터까지 키운 개체들
   graduatedAt: null, // 마지막으로 졸업 처리한 개체의 bornAt (중복 기록 방지)
   petVisible: false,
@@ -70,6 +78,7 @@ function loadSave() {
   }
   if (!Array.isArray(save.seen)) save.seen = [];
   if (!Array.isArray(save.graduated)) save.graduated = [];
+  if (!save.maxStage || typeof save.maxStage !== "object") save.maxStage = {};
 }
 
 function writeSave() {
@@ -131,6 +140,15 @@ function rollLine() {
  * graduatedAt으로 개체를 특정해 중복 기록을 막는다 —
  * 30초마다 도는 refresh가 같은 개체를 계속 졸업시키면 안 된다.
  */
+/** 지금 라인이 도달한 최고 단계를 갱신한다. 내려가지는 않는다. */
+function recordStage(grown) {
+  const li = save.lineIndex ?? 0;
+  const st = poke.stageFor(grown);
+  if ((save.maxStage[li] ?? -1) >= st) return;
+  save.maxStage[li] = st;
+  writeSave();
+}
+
 function checkGraduation(grown) {
   const idx = poke.stageFor(grown);
   if (poke.STAGES[idx].key !== "master") return;
@@ -157,6 +175,7 @@ async function buildStats() {
   lastTotal = u.total;
   // 성장은 이 개체를 받은 뒤 쓴 토큰으로만 잰다.
   const grown = Math.max(0, u.total - (save.bornAt ?? 0));
+  recordStage(grown);
   checkGraduation(grown);
   const mon = poke.describe(grown, save.lineIndex ?? 0);
   // 트레이는 정적 PNG(nativeImage는 GIF를 움직이지 못한다), 화면은 애니메이션 GIF.
@@ -329,12 +348,19 @@ async function buildDex() {
       const seen = save.seen.includes(i);
       if (!seen) return { index: i, seen: false };
       const r = poke.rarityOf(i);
-      const dexId = L.ids[3]; // 최종 진화 모습으로 보여준다
+      // 실제로 도달한 단계로 보여준다. 최종 진화 모습을 박아두면
+      // 아직 못 키운 모습을 가진 것처럼 보인다.
+      const st = Math.max(1, save.maxStage[i] ?? 1);
+      const dexId = L.ids[st];
       const p = await poke.spriteWithFallback({ dexId, isShiny: false }, CACHE, "still");
+      // 이 라인에서 아직 더 클 수 있는지 (도감에 "미완성" 표시용)
+      const top = L.ids.lastIndexOf(L.ids[L.ids.length - 1]);
       return {
         index: i,
         seen: true,
-        name: L.names[3],
+        name: L.names[st],
+        stage: poke.STAGES[st].label,
+        complete: L.ids[st] === L.ids[3], // 최종 진화 모습까지 봤는가
         stars: r.stars,
         label: r.label,
         graduated: gradCount.get(i) ?? 0,
