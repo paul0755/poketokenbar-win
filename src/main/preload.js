@@ -37,6 +37,8 @@ contextBridge.exposeInMainWorld("ptb", {
   requestSettings: () => ipcRenderer.send("request-settings"),
   onSettings: (cb) => ipcRenderer.on("settings", (_e, data) => cb(data)),
   setSettings: (patch) => ipcRenderer.send("set-settings", patch),
+  // 역산 결과를 보여줘야 하므로 invoke
+  calibrateLimit: (a) => ipcRenderer.invoke("calibrate-limit", a),
   openDataFolder: () => ipcRenderer.send("open-data-folder"),
   resetProgress: () => ipcRenderer.send("reset-progress"),
 

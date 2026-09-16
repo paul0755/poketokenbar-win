@@ -343,12 +343,18 @@ function renderLimits(L, srcId, srcLabel) {
     // 제공자가 알려준 값이 있으면 그게 우선이다
     rows.push(limitRow("주간", `${hm(q.resetAt - L.now)} 후 리셋`, Math.max(0, 100 - q.percent),
       `공식 값 · ${quotaAge(q)}`));
-  } else if (p.weekLeftPct != null) {
-    rows.push(limitRow("주간 (최근 7일)", "", p.weekLeftPct,
-      `${fmt(p.week)} / ${fmt(p.weekLimit)} · 직접 넣은 한도`));
   } else {
-    rows.push(usageRow("주간 (최근 7일)", "", fmt(p.week),
-      "설정 › 한도에 값을 넣으면 남은 %가 나옵니다"));
+    // 리셋 요일을 알면 그 창으로 센다. 모르면 롤링 7일인데,
+    // 둘은 다른 값이므로 제목에서 어느 쪽인지 밝힌다.
+    const wTitle = p.weekAnchored ? "주간" : "주간 (최근 7일)";
+    const wSub = p.weekResetAt ? `${hm(p.weekResetAt - L.now)} 후 리셋` : "";
+    if (p.weekLeftPct != null) {
+      rows.push(limitRow(wTitle, wSub, p.weekLeftPct,
+        `${fmt(p.week)} / ${fmt(p.weekLimit)} · 맞춰 넣은 한도`));
+    } else {
+      rows.push(usageRow(wTitle, wSub, fmt(p.week),
+        "설정 › 한도 맞추기에서 지금 몇 %인지 넣으면 막대가 나옵니다"));
+    }
   }
 
   el.innerHTML = rows.join("");

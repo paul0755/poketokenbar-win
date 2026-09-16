@@ -71,6 +71,29 @@ function rollingWeek(events, now = Date.now()) {
 }
 
 /**
+ * 리셋 시각에 맞춘 주간 창.
+ *
+ * 롤링 7일과는 다른 물건이다. Claude 주간 한도는 정해진 요일·시각에
+ * 리셋되는데, 롤링으로 재면 리셋 직후에도 지난주 사용분이 그대로 남는다.
+ * 실제로 Claude가 3%라고 할 때 롤링 창은 560M을 세고 있었다 —
+ * 그 분모로 한도를 역산하면 33배 틀린 값이 나온다.
+ *
+ * day: 0=일 … 6=토, hour: 0~23 (로컬 시각)
+ */
+function anchoredWeek(events, now, day, hour) {
+  const d = new Date(now);
+  const start = new Date(d);
+  start.setDate(d.getDate() - ((d.getDay() - day + 7) % 7));
+  start.setHours(hour, 0, 0, 0);
+  // 오늘이 리셋 요일이어도 아직 시각 전이면 지난주가 현재 창이다
+  if (start.getTime() > now) start.setDate(start.getDate() - 7);
+  const from = start.getTime();
+  let used = 0;
+  for (const e of events) if (e.t >= from) used += e.n;
+  return { used, from, resetAt: from + WEEK };
+}
+
+/**
  * opencodex가 캐시한 Codex 실제 쿼터.
  *
  * 이건 계산이 아니라 제공자가 알려준 값이다. 없으면 null —
@@ -117,11 +140,20 @@ function perSource(usage, now, limits = {}) {
   for (const id of ids) {
     const mine = events.filter((e) => e.src === id);
     const block = currentBlock(mine, now);
-    const week = rollingWeek(mine, now).used;
     const lim = limits[id] || {};
+    // 리셋 요일을 알면 그 창으로 센다. 모르면 롤링 7일 —
+    // 둘은 다른 값이므로 화면에도 어느 쪽인지 밝힌다.
+    const wk =
+      lim.resetDay != null
+        ? anchoredWeek(mine, now, lim.resetDay, lim.resetHour ?? 0)
+        : { used: rollingWeek(mine, now).used, from: now - WEEK, resetAt: null };
+    const week = wk.used;
     out[id] = {
       block,
       week,
+      weekFrom: wk.from,
+      weekResetAt: wk.resetAt,
+      weekAnchored: lim.resetDay != null,
       // 한도를 아는 경우에만 남은 비율을 낸다
       blockLimit: lim.block || null,
       weekLimit: lim.week || null,
@@ -146,7 +178,7 @@ function summarize(usage, now = Date.now(), limits = {}) {
   };
 }
 
-module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, codexQuota, perSource, summarize };
+module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, anchoredWeek, codexQuota, perSource, summarize };
 
 // node src/main/limits.js 로 확인
 if (require.main === module) {

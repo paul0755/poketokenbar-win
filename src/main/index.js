@@ -942,6 +942,38 @@ app.whenReady().then(async () => {
   // on 핸들러는 event 객체를 첫 인자로 넘긴다. 그대로 두면 force=truthy가 된다.
   ipcMain.on("request-stats", () => refresh());
   /**
+   * 한도 보정 — 퍼센트를 받아 한도를 역산한다.
+   *
+   * 사용자가 넣을 수 있는 건 토큰 수가 아니라 퍼센트다. Claude는
+   * 토큰 단위 한도를 공개하지 않고 /usage 도 %만 보여준다.
+   * 그런데 쓴 양은 우리가 정확히 알고 있으니 분모를 되돌릴 수 있다:
+   *
+   *   한도 = 쓴 양 / (퍼센트 / 100)
+   *
+   * 한 번 맞춰 두면 그 뒤로는 계속 막대가 나온다.
+   */
+  ipcMain.handle("calibrate-limit", (_e, { src, win: w, percent }) => {
+    const pct = Number(percent);
+    if (!Number.isFinite(pct) || pct < 1 || pct > 100) {
+      return { ok: false, error: "1에서 100 사이로 넣어 주세요." };
+    }
+    const p = lastStats && lastStats.limits && (lastStats.limits.perSource || {})[src];
+    if (!p) return { ok: false, error: "아직 사용 기록을 읽지 못했습니다." };
+
+    const used = w === "block" ? (p.block && p.block.used) || 0 : p.week || 0;
+    if (!used) {
+      // 쓴 게 0이면 분자가 0이라 역산이 안 된다. 조용히 이상한 값을 넣지 않는다.
+      return { ok: false, error: "이 구간에 쓴 기록이 없어 역산할 수 없습니다." };
+    }
+    const limit = Math.round(used / (pct / 100));
+    save.limits = save.limits || {};
+    save.limits[src] = { ...(save.limits[src] || {}), [w]: limit };
+    writeSave();
+    refresh(true);
+    pushSettings();
+    return { ok: true, limit, used };
+  });
+  /**
    * Claude 공식 한도 가져오기 — 버튼을 눌렀을 때만 실행된다.
    * 타이머에 걸지 않는다. 로그인 정보를 읽는 일은 사용자가 시킬 때만 일어나야 한다.
    */

@@ -58,12 +58,13 @@
   .sw input:checked + span::before { transform: translateX(17px); background: #14151a; }
 
   input[type="range"] { flex: 1; -webkit-app-region: no-drag; accent-color: var(--accent); }
-  input[type="text"] {
+  input[type="text"], input[type="number"] {
     width: 110px; padding: 5px 9px; font: inherit; font-size: 11px; color: var(--text);
     background: #23262f; border: 1px solid var(--line); border-radius: 8px;
     -webkit-app-region: no-drag; text-align: right;
   }
-  input[type="text"]:focus { outline: none; border-color: var(--accent); }
+  input[type="number"] { width: 64px; }
+  input[type="text"]:focus, input[type="number"]:focus { outline: none; border-color: var(--accent); }
   .val { font-size: 11px; color: var(--accent); min-width: 48px; text-align: right; }
   .danger { color: #ff8a8a; border-color: #5a2a2a; }
   .danger:hover { background: #2e1c1c; }
@@ -113,8 +114,8 @@
   <h4>한도 (직접 입력)</h4>
   <div class="row">
     <div class="note" style="margin:0 0 8px">
-      Claude의 공식 한도값은 로컬 어디에도 없습니다 — 로그에도 캐시에도.
-      아는 값을 넣으면 "몇 % 남음"을 계산해 드립니다. 비워 두면 쓴 양만 보여줍니다.
+      한도를 모르면 막대를 그릴 수 없어 쓴 양만 숫자로 나옵니다.
+      아는 값을 넣으면 "몇 % 남음" 막대가 나옵니다.
       단위는 토큰이고 <b>M</b>(백만) / <b>B</b>(십억)으로 적어도 됩니다.
     </div>
     <div class="top" style="margin-bottom:6px">
@@ -130,6 +131,38 @@
       <input type="text" id="limCodexBlock" placeholder="예: 200M" />
     </div>
     <div class="note">Codex 주간은 제공자가 알려주므로 입력하지 않아도 됩니다.</div>
+  </div>
+
+  <h4>한도 맞추기 (퍼센트로)</h4>
+  <div class="row">
+    <div class="note" style="margin:0 0 8px">
+      토큰 단위 한도는 어디에도 공개돼 있지 않습니다. 대신 <b>지금 몇 %인지</b>만
+      알려 주시면 한도를 역산합니다 — 쓴 양은 이미 정확히 재고 있으니까요.<br />
+      터미널에서 <b>claude</b> 를 띄우고 <b>/usage</b> 를 치면 나오는 숫자입니다.
+      한 번만 맞춰 두면 그 뒤로는 계속 막대가 나옵니다.
+    </div>
+    <div class="top" style="margin-bottom:6px">
+      <span class="k">주간 리셋</span>
+      <select id="resetDay"><option value="0">일요일</option><option value="1">월요일</option><option value="2">화요일</option><option value="3">수요일</option><option value="4">목요일</option><option value="5">금요일</option><option value="6">토요일</option></select>
+      <select id="resetHour"><option value="0">오전 12시</option><option value="1">오전 1시</option><option value="2">오전 2시</option><option value="3">오전 3시</option><option value="4">오전 4시</option><option value="5">오전 5시</option><option value="6">오전 6시</option><option value="7">오전 7시</option><option value="8">오전 8시</option><option value="9">오전 9시</option><option value="10">오전 10시</option><option value="11">오전 11시</option><option value="12">오후 12시</option><option value="13">오후 1시</option><option value="14">오후 2시</option><option value="15">오후 3시</option><option value="16">오후 4시</option><option value="17">오후 5시</option><option value="18">오후 6시</option><option value="19">오후 7시</option><option value="20">오후 8시</option><option value="21">오후 9시</option><option value="22">오후 10시</option><option value="23">오후 11시</option></select>
+    </div>
+    <div class="note" style="margin:0 0 8px">
+      Claude 주간 한도는 정해진 요일·시각에 리셋됩니다. 이걸 모르면 "최근 7일"로 세는데,
+      그건 Claude가 세는 창과 다른 값입니다 — 리셋 직후에도 지난주 사용분이 남아
+      한도가 몇십 배 틀리게 역산됩니다. <b>/usage</b> 에 적힌 재설정 시각을 그대로 넣어 주세요.
+    </div>
+
+    <div class="top" style="margin-bottom:6px">
+      <span class="k">Claude 5시간이 지금</span>
+      <input type="number" id="calClaudeBlock" min="1" max="100" placeholder="%" />
+      <button id="calClaudeBlockGo">맞추기</button>
+    </div>
+    <div class="top">
+      <span class="k">Claude 주간이 지금</span>
+      <input type="number" id="calClaudeWeek" min="1" max="100" placeholder="%" />
+      <button id="calClaudeWeekGo">맞추기</button>
+    </div>
+    <div class="note" id="calNote"></div>
   </div>
 
   <h4>트레이</h4>

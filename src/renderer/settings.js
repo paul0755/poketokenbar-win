@@ -6,6 +6,9 @@ const $ = (id) => document.getElementById(id);
 const send = (patch) => window.ptb.setSettings(patch);
 
 let ready = false; // 초기 값을 채우는 동안 change 이벤트가 되돌아 저장되지 않게
+// 리셋 요일을 실제로 정한 적이 있는가. 화면의 기본 선택(수 15시)은
+// 보기 좋으라고 넣은 것이지 사용자가 확인해 준 값이 아니다.
+let anchorSet = false;
 
 window.ptb.onSettings((s) => {
   ready = false;
@@ -22,6 +25,11 @@ window.ptb.onSettings((s) => {
   $("limClaudeBlock").value = toUnit((L.claude || {}).block);
   $("limClaudeWeek").value = toUnit((L.claude || {}).week);
   $("limCodexBlock").value = toUnit((L.codex || {}).block);
+  // 리셋 요일을 안 정했으면 수요일 15시를 기본으로 보여준다 (흔한 값).
+  // 실제 저장은 사용자가 고를 때만 일어난다 — 기본값을 사실처럼 저장하지 않는다.
+  $("resetDay").value = String((L.claude || {}).resetDay ?? 3);
+  $("resetHour").value = String((L.claude || {}).resetHour ?? 15);
+  if ((L.claude || {}).resetDay != null) anchorSet = true;
   $("trayIcon").value = s.trayIcon || "logo";
   $("wanderLevel").value = s.wanderLevel;
   $("pollMinutes").value = String(s.pollMinutes);
@@ -84,6 +92,11 @@ function sendLimits() {
     for (const f of Object.keys(v[k])) if (!v[k][f]) delete v[k][f];
     if (!Object.keys(v[k]).length) delete v[k];
   }
+  // 리셋 요일·시각은 0이 유효한 값이라 위의 falsy 정리에 태우면 안 된다.
+  // 한 번이라도 고른 적이 있을 때만 싣는다.
+  if (anchorSet) {
+    v.claude = { ...(v.claude || {}), resetDay: Number($("resetDay").value), resetHour: Number($("resetHour").value) };
+  }
   send({ limits: v });
 }
 
@@ -100,6 +113,39 @@ for (const id of ["limClaudeBlock", "limClaudeWeek", "limCodexBlock"]) {
     el.value = n ? toUnit(n) : "";
   });
 }
+/**
+ * 퍼센트로 한도 맞추기.
+ *
+ * 토큰 단위 한도는 공개돼 있지 않지만 쓴 양은 우리가 안다.
+ * "지금 12%"만 받으면 분모를 되돌릴 수 있다.
+ * 결과를 반드시 글로 보여준다 — 눌렀는데 아무 말도 없으면 됐는지 알 수 없다.
+ */
+async function calibrate(src, w, inputId) {
+  const el = $(inputId);
+  const note = $("calNote");
+  note.textContent = "맞추는 중…";
+  try {
+    const r = await window.ptb.calibrateLimit({ src, win: w, percent: Number(el.value) });
+    if (!r || !r.ok) {
+      note.textContent = "⚠️ " + ((r && r.error) || "맞추지 못했습니다");
+      return;
+    }
+    const label = w === "block" ? "5시간" : "주간";
+    note.textContent = `${label} 한도를 ${toUnit(r.limit)}로 맞췄습니다 (쓴 양 ${toUnit(r.used)} 기준).`;
+    el.value = "";
+  } catch (e) {
+    note.textContent = "⚠️ 맞추지 못했습니다: " + e.message;
+  }
+}
+for (const id of ["resetDay", "resetHour"]) {
+  on(id, "change", () => {
+    anchorSet = true; // 고른 순간부터 사용자가 정한 값이 된다
+    sendLimits();
+  });
+}
+$("calClaudeBlockGo").onclick = () => calibrate("claude", "block", "calClaudeBlock");
+$("calClaudeWeekGo").onclick = () => calibrate("claude", "week", "calClaudeWeek");
+
 on("trayIcon", "change", () => send({ trayIcon: $("trayIcon").value }));
 on("wanderLevel", "change", () => send({ wanderLevel: $("wanderLevel").value }));
 on("pollMinutes", "change", () => send({ pollMinutes: Number($("pollMinutes").value) }));
