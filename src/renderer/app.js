@@ -132,6 +132,12 @@ function renderLimits(L) {
 
 $("refresh").onclick = () => window.ptb.request();
 $("swap").onclick = () => window.ptb.nextLine();
+$("close").onclick = () => window.ptb.hide();
+
+// Esc로도 닫는다. 포커스가 창 안에 있으면 blur가 안 일어나 자동으로 닫히지 않는다.
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") window.ptb.hide();
+});
 const petBtn = $("pet");
 if (petBtn) petBtn.onclick = () => window.ptb.togglePet();
 $("quit").onclick = () => window.ptb.quit();

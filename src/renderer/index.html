@@ -7,13 +7,30 @@
     --text: #f2f3f5; --muted: #9aa0ab; --accent: #ffcb05; --accent2: #3b6ec6;
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
     font: 13px/1.5 "Malgun Gothic", "Segoe UI", system-ui, sans-serif;
     border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
     user-select: none; -webkit-user-select: none;
+    /* 내용이 창보다 길어질 수 있다. 본문만 스크롤하고 버튼은 늘 바닥에 붙인다. */
+    display: flex; flex-direction: column;
   }
-  header { padding: 14px 16px 10px; }
+  .scroll { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
+  .scroll::-webkit-scrollbar { width: 8px; }
+  .scroll::-webkit-scrollbar-thumb { background: #33363f; border-radius: 99px; }
+  .scroll::-webkit-scrollbar-thumb:hover { background: #3f434e; }
+  .scroll::-webkit-scrollbar-track { background: transparent; }
+
+  header { padding: 14px 16px 10px; position: relative; }
+  /* 닫기 — 포커스를 잃으면 자동으로 닫히지만, 명시적으로 닫을 방법도 있어야 한다 */
+  .close {
+    position: absolute; top: 10px; right: 12px;
+    width: 26px; height: 26px; padding: 0; line-height: 1;
+    font-size: 15px; color: var(--muted);
+    background: transparent; border: 0; border-radius: 8px; cursor: pointer;
+  }
+  .close:hover { background: var(--card); color: var(--text); }
   .line { font-size: 11px; color: var(--muted); }
   .stage { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
   .sprite-wrap {
@@ -37,7 +54,10 @@
   .day .track { flex: 1; height: 5px; background: #23262f; border-radius: 99px; overflow: hidden; }
   .day .track > i { display: block; height: 100%; background: var(--accent2); }
   .day .n { width: 44px; text-align: right; color: var(--text); }
-  footer { display: flex; gap: 6px; padding: 0 16px 14px; }
+  footer {
+    display: flex; gap: 6px; padding: 10px 16px 14px;
+    flex-shrink: 0; background: var(--bg); border-top: 1px solid var(--line);
+  }
   button {
     flex: 1; padding: 7px; font: inherit; font-size: 11px; color: var(--text);
     background: var(--card); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
@@ -89,7 +109,10 @@
   .src .dot { display: inline-block; width: 6px; height: 6px; border-radius: 99px; margin-right: 4px; vertical-align: 1px; }
 </style>
 
+<div class="scroll">
+
 <header>
+  <button class="close" id="close" title="닫기 (Esc)">✕</button>
   <div class="line" id="line">불러오는 중…</div>
   <div class="stage" id="stage">&nbsp;</div>
 </header>
@@ -111,6 +134,8 @@
 <div class="lim"><h4>한도</h4><div id="limits"></div></div>
 
 <div class="days"><h4>최근 기록</h4><div id="dayList"></div></div>
+
+</div><!-- /.scroll -->
 
 <footer>
   <button id="pet">바탕화면 펫</button>

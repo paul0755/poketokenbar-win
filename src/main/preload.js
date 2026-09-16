@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("ptb", {
   nextLine: () => ipcRenderer.send("next-line"),
   togglePet: () => ipcRenderer.send("toggle-pet"),
   quit: () => ipcRenderer.send("quit"),
+  hide: () => ipcRenderer.send("hide-popover"),
 
   // 데스크톱 펫 전용
   petClick: () => ipcRenderer.send("pet-click"),

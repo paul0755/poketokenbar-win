@@ -147,9 +147,12 @@ function logConsole(tag) {
 /* ---------------- 팝오버 ---------------- */
 
 function createWindow() {
+  // 700px가 늘 들어간다는 보장이 없다. 작업 영역을 넘지 않게 자르고,
+  // 잘린 만큼은 본문 스크롤이 받아준다.
+  const area = screen.getPrimaryDisplay().workArea;
   win = new BrowserWindow({
     width: 340,
-    height: 700,
+    height: Math.max(420, Math.min(700, area.height - 80)),
     show: false,
     frame: false,
     resizable: false,
@@ -356,6 +359,7 @@ app.whenReady().then(async () => {
 
   ipcMain.on("request-stats", refresh);
   ipcMain.on("quit", () => app.quit());
+  ipcMain.on("hide-popover", () => win && !win.isDestroyed() && win.hide());
   ipcMain.on("toggle-pet", () => togglePet());
   ipcMain.on("next-line", rollLine);
 
