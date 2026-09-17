@@ -31,7 +31,7 @@ function setTab(name) {
   for (const b of document.querySelectorAll("nav button[data-tab]")) {
     b.classList.toggle("on", b.dataset.tab === name);
   }
-  for (const id of ["home", "shop", "dex"]) $("tab-" + id).hidden = id !== name;
+  for (const id of ["home", "shop", "box", "dex"]) $("tab-" + id).hidden = id !== name;
   document.querySelector(".scroll").scrollTop = 0;
   // 열 때 최신 값을 받아온다. 상점·도감은 홈과 갱신 주기가 다르다.
   if (name === "shop") window.ptb.requestShop();
@@ -168,7 +168,69 @@ function renderHome(s) {
   }
 
   renderLimits(s.limits, srcPick, cur && cur.label);
+  renderBox(s);
 }
+
+/**
+ * 박스 — 보유한 아이들.
+ *
+ * 세 가지를 한 줄에서 할 수 있어야 한다: 어느 아이가 자라는 중인지 보기,
+ * 키우는 아이 바꾸기, 바탕화면에 세우기. 화면을 옮겨 다니게 하면
+ * "얘를 띄우려면 어디로 가야 하지"를 매번 생각하게 된다.
+ */
+function renderBox(s) {
+  const list = s.box || [];
+  $("boxCount").textContent = list.length + "마리";
+  if (!list.length) return void ($("boxList").innerHTML = '<div class="note">아직 없습니다.</div>');
+
+  $("boxList").innerHTML = list
+    .map((m) => {
+      const tags =
+        (m.active ? '<span class="tag">키우는 중</span>' : "") +
+        (m.isPet ? '<span class="tag pet">바탕화면</span>' : "") +
+        (m.graduated ? '<span class="tag gr">졸업</span>' : "");
+      const goal = m.next ? `${m.next}까지 ${fmt(m.remaining)}` : "다 자랐습니다";
+      return `
+        <div class="bx ${m.active ? "act" : ""}" data-id="${m.id}">
+          <div class="pic">${m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50)}</div>
+          <div class="info">
+            <div class="nm">${m.name}${m.shiny ? " ★" : ""}${tags}</div>
+            <div class="sub">${"★".repeat(m.stars)} ${m.stage}${m.nature ? " · " + m.nature : ""}</div>
+            <div class="sub">${goal}</div>
+            <div class="track"><i style="width:${Math.round((m.ratio || 0) * 100)}%"></i></div>
+          </div>
+          <div class="acts">
+            <button data-act="active" ${m.active ? "disabled" : ""}>${m.active ? "키우는 중" : "키우기"}</button>
+            <button data-act="pet" class="${m.isPet ? "on" : ""}">${m.isPet ? "내리기" : "띄우기"}</button>
+            <button data-act="release" class="del">놓아주기</button>
+          </div>
+        </div>`;
+    })
+    .join("");
+}
+
+$("boxList").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const id = btn.closest(".bx").dataset.id;
+  if (btn.dataset.act === "active") return window.ptb.setActive(id);
+  if (btn.dataset.act === "pet") return window.ptb.togglePetMember(id);
+  // 놓아주면 되돌릴 수 없다. 한 번 더 누르게 해서 실수로 지우는 걸 막는다.
+  if (btn.dataset.act === "release") {
+    if (btn.dataset.sure !== "1") {
+      btn.dataset.sure = "1";
+      btn.textContent = "정말?";
+      setTimeout(() => {
+        if (!btn.isConnected) return;
+        btn.dataset.sure = "";
+        btn.textContent = "놓아주기";
+      }, 3000);
+      return;
+    }
+    const r = await window.ptb.release(id);
+    if (!r.ok) toast(r.reason || "놓아주지 못했습니다");
+  }
+});
 
 /**
  * 고른 날의 사용량.
@@ -457,7 +519,7 @@ window.ptb.onDex((d) => {
 $("grid").addEventListener("click", (e) => {
   const cell = e.target.closest(".cell[data-line]");
   if (!cell) return;
-  window.ptb.setPetLine(Number(cell.dataset.line));
+  toast("바탕화면에 세우는 것은 박스 탭에서 고릅니다");
 });
 
 function setDexFilter(name) {

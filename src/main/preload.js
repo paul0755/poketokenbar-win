@@ -5,7 +5,16 @@ const { contextBridge, ipcRenderer } = require("electron");
  * 렌더러는 파일시스템에 직접 닿지 않는다.
  * 메인이 읽어서 정제한 값만 건네받는다.
  */
+/**
+ * 이 창이 맡은 개체 id. 펫 창에만 붙는다.
+ *
+ * 여러 마리를 동시에 띄우므로 창마다 자기가 누구인지 알아야
+ * 자기 그림을 고를 수 있다. 메인이 창을 만들 때 인자로 넣어 준다.
+ */
+const petId = (process.argv.find((a) => a.startsWith("--ptb-pet-id=")) || "").slice(13) || null;
+
 contextBridge.exposeInMainWorld("ptb", {
+  petId,
   onStats: (cb) => ipcRenderer.on("stats", (_e, data) => cb(data)),
   request: () => ipcRenderer.send("request-stats"),
   nextLine: () => ipcRenderer.send("next-line"),
@@ -21,7 +30,10 @@ contextBridge.exposeInMainWorld("ptb", {
   requestDex: () => ipcRenderer.send("request-dex"),
   onDex: (cb) => ipcRenderer.on("dex", (_e, data) => cb(data)),
   onGoTab: (cb) => ipcRenderer.on("go-tab", (_e, name) => cb(name)),
-  setPetLine: (line) => ipcRenderer.send("set-pet-line", line),
+  // 박스
+  setActive: (id) => ipcRenderer.send("set-active", id),
+  togglePetMember: (id) => ipcRenderer.send("toggle-pet-member", id),
+  release: (id) => ipcRenderer.invoke("release", id),
 
   // 상점
   openShop: () => ipcRenderer.send("open-shop"),

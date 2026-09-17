@@ -6,6 +6,7 @@ const { pathToFileURL } = require("node:url");
 const usage = require("./usage");
 const poke = require("./pokemon");
 const limits = require("./limits");
+const box = require("./box");
 const claudeQuota = require("./claude-limits");
 const notify = require("./notify");
 
@@ -33,15 +34,37 @@ const CANDY_PER = 25_000_000;
  * 슈퍼·전설 알이 등급을 "확정"하는 것은 가중치를 없애는 게 아니라
  * 후보를 그 등급 이상으로 좁히는 것이다 — ★4 알에서 ★5도 나온다.
  */
+/**
+ * 사탕 하나로 밀어 넣는 성장량.
+ *
+ * CANDY_PER(2500만)보다 한참 적게 잡았다. 같게 두면 토큰을 사탕으로
+ * 바꿨다 되돌리는 것뿐이라 아무 선택도 아니게 된다. 손해를 감수하고
+ * 특정 아이에게 몰아주는 것이 이 물건의 값어치다.
+ */
+const CANDY_FEED = 10_000_000;
+
 const SHOP = [
-  { id: "egg", name: "포켓몬 알", cost: 3, desc: "평범한 알. 등급은 운에 맡긴다", icon: "🥚" },
+  { id: "egg", name: "포켓몬 알", cost: 3, desc: "평범한 알. 박스에 한 마리 늘어난다", icon: "🥚" },
   { id: "egg-super", name: "슈퍼 알", cost: 12, desc: "★3 이상 확정", icon: "🥚" },
   { id: "egg-legend", name: "전설 알", cost: 35, desc: "★4 이상 확정", icon: "🥚" },
+  { id: "rare-candy", name: "이상한사탕", cost: 1, desc: "키우는 아이를 1000만 만큼 자라게 한다", icon: "🍬" },
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
   { id: "charm", name: "반짝이는 부적", cost: 60, desc: "이로치 확률 2배. 한 번만 살 수 있다", icon: "✨", once: true },
 ];
 
 let save = {
+  /**
+   * 박스 — 보유한 아이들. box.js 참고.
+   *
+   * activeId 가 "키우는 중"이고, 늘어난 토큰은 그 아이에게만 적립된다.
+   * petIds 는 바탕화면에 띄운 아이들 (여러 마리 가능).
+   */
+  box: [],
+  activeId: null,
+  petIds: [],
+  lastTotal: undefined, // 성장 적립의 기준점. undefined면 이번엔 적립하지 않는다
+
+  /* ---- 아래는 0.1.x 세이브를 읽기 위한 것. 옮긴 뒤에는 쓰지 않는다 ---- */
   lineIndex: null, // null이면 아직 안 뽑은 것. 첫 실행에 뽑는다
   natureIndex: null,
   /**
@@ -133,6 +156,8 @@ function loadSave() {
   if (!Array.isArray(save.seen)) save.seen = [];
   if (!Array.isArray(save.graduated)) save.graduated = [];
   if (!save.maxStage || typeof save.maxStage !== "object") save.maxStage = {};
+  if (!Array.isArray(save.box)) save.box = [];
+  if (!Array.isArray(save.petIds)) save.petIds = [];
 }
 
 function writeSave() {
@@ -184,17 +209,21 @@ function candy(total = lastTotal) {
   };
 }
 
-/** 새 개체를 받는다. minStars가 있으면 그 등급 이상으로 뽑는다. */
+/**
+ * 새 개체를 받는다. minStars가 있으면 그 등급 이상으로 뽑는다.
+ *
+ * 0.1.x에서는 여기서 키우던 아이를 덮어썼다. 이제는 박스에 더하고
+ * 새 아이를 "키우는 중"으로 옮긴다 — 이전 아이는 그 자리에 남는다.
+ */
 function hatch(minStars = 0) {
-  save.lineIndex =
-    minStars > 0 ? poke.rollAtLeast(minStars, save.lineIndex) : poke.roll(save.lineIndex);
-  save.natureIndex = poke.rollNature();
-  save.shiny = poke.rollShiny(Boolean(save.charm));
-  save.bornAt = lastTotal; // 새 개체는 지금부터 0에서 자란다
-  save.graduatedAt = null;
-  // 떠나보낸 아이를 계속 펫으로 세워둘 수는 없다
-  if (save.petLine != null && !ownedLines().has(save.petLine)) save.petLine = null;
-  if (!save.seen.includes(save.lineIndex)) save.seen.push(save.lineIndex);
+  const cur = box.active(save);
+  const exclude = cur ? cur.line : null;
+  const line = minStars > 0 ? poke.rollAtLeast(minStars, exclude) : poke.roll(exclude);
+  const m = box.make(line, poke.rollNature(), poke.rollShiny(Boolean(save.charm)));
+  save.box.push(m);
+  save.activeId = m.id;
+  if (!save.seen.includes(line)) save.seen.push(line);
+  return m;
 }
 
 /**
@@ -215,15 +244,23 @@ function buy(itemId) {
   else if (itemId === "egg-super") { hatch(3); msg = "슈퍼 알 — ★3 이상"; }
   else if (itemId === "egg-legend") { hatch(4); msg = "전설 알 — ★4 이상"; }
   else if (itemId === "mint") {
-    save.natureIndex = poke.rollNature();
-    msg = "성격이 " + poke.NATURES[save.natureIndex].name + "(으)로 바뀌었습니다";
+    const a = box.active(save);
+    if (!a) { save.candySpent -= cost; return { ok: false, reason: "키우는 아이가 없습니다" }; }
+    a.nature = poke.rollNature();
+    msg = "성격이 " + poke.NATURES[a.nature].name + "(으)로 바뀌었습니다";
+  } else if (itemId === "rare-candy") {
+    const a = box.active(save);
+    if (!a) { save.candySpent -= cost; return { ok: false, reason: "키우는 아이가 없습니다" }; }
+    a.fed = (a.fed || 0) + CANDY_FEED;
+    msg = poke.describe(box.effOf(a, growthSpeed()), a.line, { shiny: a.shiny }).name + "이(가) 자랐습니다";
   } else if (itemId === "charm") { save.charm = true; msg = "이로치 확률이 2배가 됩니다"; }
 
   writeSave();
   refresh(true);
   pushDex();
   pushShop();
-  return { ok: true, message: msg, shiny: itemId.startsWith("egg") && save.shiny };
+  const a = box.active(save);
+  return { ok: true, message: msg, shiny: itemId.startsWith("egg") && Boolean(a && a.shiny) };
 }
 
 /**
@@ -232,67 +269,112 @@ function buy(itemId) {
  * graduatedAt으로 개체를 특정해 중복 기록을 막는다 —
  * 30초마다 도는 refresh가 같은 개체를 계속 졸업시키면 안 된다.
  */
-/** 지금 라인이 도달한 최고 단계를 갱신한다. 내려가지는 않는다. */
-function recordStage(grown) {
-  const li = save.lineIndex ?? 0;
+/**
+ * 도달한 최고 단계를 갱신한다. 내려가지는 않는다.
+ *
+ * 개체와 라인 양쪽에 남긴다. 개체 쪽은 박스에서 그 아이의 현재 모습을
+ * 그리는 데 쓰고, 라인 쪽은 도감이 "이 종을 어디까지 키워봤나"를 쓰는 데 쓴다.
+ */
+function recordStage(m, grown) {
+  if (!m) return;
   const st = poke.stageFor(grown);
-  if ((save.maxStage[li] ?? -1) >= st) return;
-  save.maxStage[li] = st;
-  writeSave();
+  let dirty = false;
+  if ((m.maxStage ?? -1) < st) { m.maxStage = st; dirty = true; }
+  if ((save.maxStage[m.line] ?? -1) < st) { save.maxStage[m.line] = st; dirty = true; }
+  if (dirty) writeSave();
 }
 
-function checkGraduation(grown) {
+function checkGraduation(m, grown) {
+  if (!m) return;
   const idx = poke.stageFor(grown);
   if (poke.STAGES[idx].key !== "master") return;
-  if (save.graduatedAt === save.bornAt) return; // 이미 처리한 개체
+  if (m.graduatedAt) return; // 이미 처리한 개체
 
-  const mon = poke.describe(grown, save.lineIndex ?? 0, { shiny: save.shiny });
-  const r = poke.rarityOf(save.lineIndex ?? 0);
+  const mon = poke.describe(grown, m.line, { shiny: m.shiny });
+  const r = poke.rarityOf(m.line);
+  m.graduatedAt = new Date().toISOString().slice(0, 10);
   save.graduated.push({
-    line: save.lineIndex,
+    line: m.line,
     name: mon.name,
     dexId: mon.dexId,
     stars: r.stars,
-    nature: (poke.NATURES[save.natureIndex ?? 0] || {}).name ?? null,
+    nature: (poke.NATURES[m.nature ?? 0] || {}).name ?? null,
     grown,
-    at: new Date().toISOString().slice(0, 10),
+    at: m.graduatedAt,
   });
-  save.graduatedAt = save.bornAt;
   save.candyBonus = (save.candyBonus ?? 0) + 5; // 졸업 보상
   writeSave();
 }
 
+/** 졸업 기록에 남은 성격 이름을 인덱스로 되돌린다. 못 찾으면 0. */
+const natureIndexByName = (name) =>
+  Math.max(0, poke.NATURES.findIndex((n) => n.name === name));
+
 async function buildStats() {
   const u = usage.collect();
   lastTotal = u.total;
-  // 성장은 이 개체를 받은 뒤 쓴 토큰으로만 잰다.
-  const grown = Math.max(0, u.total - (save.bornAt ?? 0));
+
+  // 0.1.x 세이브라면 여기서 한 번 박스로 옮긴다. 옮긴 뒤로는 그냥 지나간다.
+  if (box.migrate(save, u.total, natureIndexByName)) {
+    console.log("[box] 세이브를 박스로 옮겼습니다 — " + save.box.length + "마리");
+    writeSave();
+  }
+  // 처음 실행이라 박스가 비었으면 한 마리 준다
+  if (!save.box.length) { hatch(0); writeSave(); }
+
+  // 늘어난 토큰은 키우는 아이에게만 적립된다.
+  if (box.accrue(save, u.total)) writeSave();
+
+  const act = box.active(save);
   // 속도는 임계값을 고치는 대신 성장량에 곱해서 적용한다.
   // STAGES를 원본 그대로 둘 수 있어 난이도를 되돌리면 값이 정확히 복원된다.
-  const eff = grown * growthSpeed();
-  recordStage(eff);
-  checkGraduation(eff);
-  const mon = poke.describe(eff, save.lineIndex ?? 0, { shiny: save.shiny });
+  const eff = box.effOf(act, growthSpeed());
+  const grown = act ? act.raw || 0 : 0;
+  recordStage(act, eff);
+  checkGraduation(act, eff);
+  const mon = poke.describe(eff, act ? act.line : 0, { shiny: act && act.shiny });
   // 트레이는 정적 PNG(nativeImage는 GIF를 움직이지 못한다), 화면은 애니메이션 GIF.
   const still = await poke.spriteWithFallback(mon, CACHE, "still");
   const anim = await poke.spriteWithFallback(mon, CACHE, "anim");
   // events는 한도 계산에만 쓴다. 수천 건을 30초마다 IPC로 보낼 이유가 없다.
   const { events, ...slim } = u;
 
-  // 펫은 대표로 지정한 아이를 보여준다. 없으면 키우는 개체 그대로.
-  let petMon = mon;
-  let petStill = still;
-  let petAnim = anim;
-  if (save.petLine != null && save.petLine !== save.lineIndex) {
-    const L = poke.LINES[save.petLine];
-    if (L) {
-      const st = Math.max(1, save.maxStage[save.petLine] ?? 1);
-      const target = { dexId: L.ids[st], isShiny: false };
-      petMon = { name: L.names[st], stage: poke.STAGES[st] };
-      petStill = await poke.spriteWithFallback(target, CACHE, "still");
-      petAnim = await poke.spriteWithFallback(target, CACHE, "anim");
-    }
-  }
+  // 박스 목록. 화면에서 고르고 바꾸려면 각자의 모습이 필요하다.
+  const boxList = await Promise.all(
+    save.box.map(async (m) => {
+      const e = box.effOf(m, growthSpeed());
+      const d = poke.describe(e, m.line, { shiny: m.shiny });
+      const p = await poke.spriteWithFallback(d, CACHE, "still");
+      // 바탕화면 펫은 움직이는 쪽을 쓴다. 한 번 받으면 디스크에 남는다.
+      const ap = await poke.spriteWithFallback(d, CACHE, "anim");
+      const r = poke.rarityOf(m.line);
+      return {
+        id: m.id,
+        name: d.name,
+        stage: d.stage.label,
+        stageKey: d.stage.key,
+        ratio: d.progress.ratio,
+        next: d.progress.next,
+        remaining: d.progress.remaining,
+        grown: e,
+        stars: r.stars,
+        rarity: r.label,
+        shiny: Boolean(m.shiny),
+        nature: (poke.NATURES[m.nature ?? 0] || {}).name ?? null,
+        caughtAt: m.caughtAt,
+        graduated: Boolean(m.graduatedAt),
+        active: m.id === (act && act.id),
+        isPet: save.petIds.includes(m.id),
+        url: p ? pathToFileURL(p).href : null,
+        animUrl: ap ? pathToFileURL(ap).href : null,
+      };
+    }),
+  );
+
+  // 펫은 박스에서 고른 아이들. 아무도 안 골랐으면 키우는 아이 하나.
+  const petMon = mon;
+  const petStill = still;
+  const petAnim = anim;
 
   return {
     usage: slim,
@@ -304,7 +386,7 @@ async function buildStats() {
     petName: petMon.name,
     petStillUrl: petStill ? pathToFileURL(petStill).href : null,
     petAnimUrl: petAnim ? pathToFileURL(petAnim).href : null,
-    petLine: save.petLine,
+    petLine: null, // 0.1.x 호환. 이제 petIds 를 쓴다
     petVisible: Boolean(save.petVisible),
     dex: {
       seen: save.seen.length,
@@ -318,21 +400,26 @@ async function buildStats() {
     petSize: save.petSize,
     candy: candy(u.total),
     charm: Boolean(save.charm),
-    shiny: Boolean(save.shiny),
-    tree: await buildTree(eff),
+    shiny: Boolean(act && act.shiny),
+    tree: await buildTree(act, eff),
     limits: {
       ...limits.summarize(u, Date.now(), save.limits || {}),
       // 마지막으로 눌러서 가져온 값. 누른 적이 없으면 null이고 화면은 버튼만 보여준다.
       claude: save.claudeQuota || null,
     },
-    rarity: { ...poke.rarityOf(save.lineIndex ?? 0), chance: poke.rollChance(save.lineIndex ?? 0) },
-    nature: poke.NATURES[save.natureIndex ?? 0] ?? null,
+    box: boxList,
+    activeId: act ? act.id : null,
+    petIds: save.petIds,
+    rarity: act
+      ? { ...poke.rarityOf(act.line), chance: poke.rollChance(act.line) }
+      : null,
+    nature: act ? poke.NATURES[act.nature ?? 0] ?? null : null,
   };
 }
 
 /** 진화 트리에 쓸 작은 정적 스프라이트를 붙인다. 못 받으면 그림 없이 이름만 나온다. */
-async function buildTree(grown) {
-  const nodes = poke.evolutionTree(save.lineIndex ?? 0, grown);
+async function buildTree(m, grown) {
+  const nodes = poke.evolutionTree(m ? m.line : 0, grown);
   return Promise.all(
     nodes.map(async (n) => {
       const p = await poke.spriteWithFallback(
@@ -390,7 +477,7 @@ let prevSnap = null;
 function sendNotifications(s) {
   if (!save.notifyEnabled || !Notification.isSupported()) return;
   const cur = {
-    ...notify.snapshot({ ...s, bornAtRaw: save.bornAt }),
+    ...notify.snapshot({ ...s, bornAtRaw: s.activeId }),
     name: s.mon.name,
     stageLabel: s.mon.stage.label,
     body: s.mon.progress.next
@@ -527,7 +614,7 @@ function showNearTray() {
  */
 function ownedLines() {
   const set = new Set(save.graduated.map((g) => g.line));
-  if (save.lineIndex != null) set.add(save.lineIndex);
+  for (const m of save.box) set.add(m.line);
   return set;
 }
 
@@ -558,7 +645,7 @@ async function buildDex() {
         label: r.label,
         graduated: gradCount.get(i) ?? 0,
         owned: owned.has(i),
-        isPet: save.petLine == null ? i === save.lineIndex : i === save.petLine,
+        isPet: save.box.some((m) => m.line === i && save.petIds.includes(m.id)),
         url: p ? pathToFileURL(p).href : null,
       };
     }),
@@ -648,18 +735,18 @@ function applySettings(patch) {
   Object.assign(save, patch);
   writeSave();
 
-  if ("wanderLevel" in patch && pet && !pet.isDestroyed()) startWander();
-  if ("petSize" in patch && pet && !pet.isDestroyed()) {
+  if ("wanderLevel" in patch) for (const id of pets.keys()) startWander(id);
+  if ("petSize" in patch && pets.size) {
     // 투명 창은 setSize로 크기가 제대로 안 바뀐다 — 내용이 다시 그려지지
-    // 않아 사라진 것처럼 보인다. 위치를 기억해 두고 새로 만든다.
-    const p = pet.getPosition();
-    save.petPos = { x: p[0], y: p[1] };
+    // 않아 사라진 것처럼 보인다. 전부 없애고 새 크기로 다시 만든다.
+    const first = [...pets.values()][0];
+    if (first && !first.win.isDestroyed()) {
+      const p = first.win.getPosition();
+      save.petPos = { x: p[0], y: p[1] };
+    }
     petBusy = true;
-    stopWander();
-    pet.destroy();
-    pet = null;
-    createPet(); // 여기서 새 크기에 맞게 위치를 화면 안으로 다시 잡는다
-    if (save.petVisible) pet.showInactive();
+    for (const id of [...pets.keys()]) destroyPet(id);
+    syncPets(); // 여기서 새 크기에 맞게 자리를 다시 잡는다
     setTimeout(() => (petBusy = false), 400);
   }
   if ("trayIcon" in patch && lastStats) applyTray(lastStats);
@@ -707,16 +794,17 @@ function openSettings() {
  * 지워지는 건 이 앱이 만든 것(도감·졸업·뽑기권·현재 개체)뿐이다.
  */
 function resetProgress() {
-  save.lineIndex = poke.roll(null);
-  save.natureIndex = poke.rollNature();
-  save.bornAt = lastTotal; // 지금부터 알로 다시 시작
+  save.box = [];
+  save.activeId = null;
+  save.petIds = [];
+  save.lastTotal = lastTotal; // 지금부터 알로 다시 시작
   save.candySpent = 0;
   save.candyBonus = 0;
   save.charm = false;
-  save.shiny = false;
-  save.seen = [save.lineIndex];
+  save.seen = [];
+  save.maxStage = {};
   save.graduated = [];
-  save.graduatedAt = null;
+  hatch(0); // 첫 알 한 마리
   prevSnap = null; // 초기화 직후 "진화했습니다"가 뜨지 않게
   writeSave();
   refresh(true);
@@ -726,7 +814,18 @@ function resetProgress() {
 
 /* ---------------- 데스크톱 펫 ---------------- */
 
-// 펫 크기는 설정에서 바뀐다 (save.petSize)
+/**
+ * 여러 마리를 동시에 띄운다.
+ *
+ * 0.1.x에서는 창 하나에 전역 변수 한 벌(wanderTarget, selfPos, 타이머 둘)로
+ * 관리했다. 여러 마리가 되면 그 한 벌을 공유할 수가 없다 —
+ * 한 마리가 목적지에 도착해 target을 비우면 나머지도 같이 멈춘다.
+ * 그래서 상태를 창마다 들고 다니게 바꿨다.
+ *
+ * 키는 개체 id다. 같은 종을 두 마리 보유할 수 있으므로 라인으로는 안 된다.
+ */
+const pets = new Map(); // id -> { win, target, selfPos, wanderTimer, stepTimer }
+
 /** 펫 창을 만들거나 없애는 중. 그동안의 blur는 무시한다. */
 let petBusy = false;
 
@@ -746,31 +845,37 @@ const WANDER = {
   often: { pause: 12_000, range: [380, 220], px: 2, ms: 40 },
 };
 
-let wanderTarget = null;
-let wanderTimer = null;
-let stepTimer = null;
+/** 실제로 띄울 아이들. 아무도 안 골랐으면 키우는 아이 한 마리. */
+function petTargets() {
+  const ids = (save.petIds || []).filter((id) => box.find(save.box, id));
+  if (ids.length) return ids;
+  const a = box.active(save);
+  return a ? [a.id] : [];
+}
 
 /**
- * 우리가 옮긴 좌표. 'moved' 이벤트가 우리 때문인지 사용자가 끌어서인지 가린다.
+ * 처음 놓을 자리.
  *
- * 불린 플래그로는 안 된다 — setPosition 직후 플래그를 되돌려도 'moved'는
- * OS 메시지 루프를 거쳐 그 뒤에 도착한다. 그러면 우리 이동이 전부
- * "사용자가 끌었다"로 오인돼 배회 목표가 계속 취소되고 펫이 버벅인다.
+ * 여러 마리가 같은 좌표에 겹쳐 뜨면 한 마리처럼 보인다.
+ * 저장된 자리를 기준으로 순서대로 비켜 놓는다.
  */
-let selfPos = null;
-
-function createPet() {
+function startPos(nth) {
   const area = screen.getPrimaryDisplay().workArea;
-  const want = save.petPos || {
+  const base = save.petPos || {
     x: area.x + area.width - petW() - 40,
     y: area.y + area.height - petW() - 60,
   };
+  const want = { x: base.x - nth * (petW() + 12), y: base.y };
   // 크기를 키우면 전에 있던 자리가 화면 밖으로 밀려날 수 있다. 다시 가둔다.
-  const pos = {
+  return {
     x: Math.min(Math.max(area.x, want.x), area.x + area.width - petW()),
     y: Math.min(Math.max(area.y, want.y), area.y + area.height - petW()),
   };
-  pet = new BrowserWindow({
+}
+
+function createPet(id, nth) {
+  const pos = startPos(nth);
+  const w = new BrowserWindow({
     width: petW(),
     height: petW(),
     x: pos.x,
@@ -783,94 +888,143 @@ function createPet() {
     resizable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
-    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      // 어느 아이의 창인지 렌더러가 알아야 자기 그림을 고를 수 있다
+      additionalArguments: ["--ptb-pet-id=" + id],
+    },
   });
-  pet.setAlwaysOnTop(true, "screen-saver"); // 전체화면 위에도 뜨게
-  pet.loadFile(path.join(__dirname, "..", "renderer", "pet.html"));
-  pet.webContents.on("did-finish-load", () => lastStats && push(pet, lastStats));
-  pet.webContents.on("console-message", logConsole("pet"));
+  const rec = { win: w, target: null, selfPos: null, wanderTimer: null, stepTimer: null };
+  pets.set(id, rec);
 
-  pet.on("moved", () => {
-    if (!pet || pet.isDestroyed()) return;
-    const p = pet.getPosition();
-    if (selfPos && p[0] === selfPos.x && p[1] === selfPos.y) return; // 우리가 옮긴 것
+  w.setAlwaysOnTop(true, "screen-saver"); // 전체화면 위에도 뜨게
+  w.loadFile(path.join(__dirname, "..", "renderer", "pet.html"));
+  w.webContents.on("did-finish-load", () => lastStats && push(w, lastStats));
+  w.webContents.on("console-message", logConsole("pet:" + id));
+
+  w.on("moved", () => {
+    if (w.isDestroyed()) return;
+    const p = w.getPosition();
+    if (rec.selfPos && p[0] === rec.selfPos.x && p[1] === rec.selfPos.y) return; // 우리가 옮긴 것
+    // 마지막으로 사용자가 놓은 자리를 기준점으로 기억한다
     save.petPos = { x: p[0], y: p[1] };
     writeSave();
-    wanderTarget = null; // 사용자가 놓은 자리에서 다시 시작한다
+    rec.target = null; // 사용자가 놓은 자리에서 다시 시작한다
   });
 
-  startWander();
+  startWander(id);
+  return rec;
 }
 
-function startWander() {
-  stopWander();
+/**
+ * 한 마리를 배회시킨다.
+ *
+ * 상태를 rec에 담아 두므로 여러 마리가 서로 간섭하지 않는다.
+ * 목적지도 따로, 타이머도 따로다.
+ */
+function startWander(id) {
+  stopWander(id);
+  const rec = pets.get(id);
   const cfg = WANDER[save.wanderLevel];
-  if (!cfg || !pet || pet.isDestroyed()) return;
+  if (!cfg || !rec || rec.win.isDestroyed()) return;
 
   const pickTarget = () => {
-    if (!pet || pet.isDestroyed()) return;
-    const p = pet.getPosition();
+    if (rec.win.isDestroyed()) return;
+    const p = rec.win.getPosition();
     const area = screen.getDisplayNearestPoint({ x: p[0], y: p[1] }).workArea;
     const dx = (Math.random() - 0.5) * cfg.range[0];
     const dy = (Math.random() - 0.5) * cfg.range[1];
-    wanderTarget = {
+    rec.target = {
       x: Math.min(Math.max(area.x, Math.round(p[0] + dx)), area.x + area.width - petW()),
       y: Math.min(Math.max(area.y, Math.round(p[1] + dy)), area.y + area.height - petW()),
     };
   };
 
-  wanderTimer = setInterval(pickTarget, cfg.pause);
-  setTimeout(pickTarget, 4000);
+  rec.wanderTimer = setInterval(pickTarget, cfg.pause);
+  // 여러 마리가 동시에 출발하면 줄지어 움직이는 것처럼 보인다. 조금씩 어긋나게.
+  setTimeout(pickTarget, 4000 + Math.random() * 3000);
 
-  stepTimer = setInterval(() => {
-    if (!pet || pet.isDestroyed() || !wanderTarget) return;
-    const p = pet.getPosition();
-    const dx = wanderTarget.x - p[0];
-    const dy = wanderTarget.y - p[1];
+  rec.stepTimer = setInterval(() => {
+    if (rec.win.isDestroyed() || !rec.target) return;
+    const p = rec.win.getPosition();
+    const dx = rec.target.x - p[0];
+    const dy = rec.target.y - p[1];
     if (Math.abs(dx) <= cfg.px && Math.abs(dy) <= cfg.px) {
-      wanderTarget = null; // 도착. 다음 pause 동안 가만히 있는다
+      rec.target = null; // 도착. 다음 pause 동안 가만히 있는다
       return;
     }
     const step = (d) => Math.sign(d) * Math.min(Math.abs(d), cfg.px);
     const nx = Math.round(p[0] + step(dx));
     const ny = Math.round(p[1] + step(dy));
-    selfPos = { x: nx, y: ny };
-    pet.setPosition(nx, ny);
-    push(pet, { facing: dx < 0 ? "left" : "right" }); // 진행 방향으로 뒤집게
+    rec.selfPos = { x: nx, y: ny };
+    rec.win.setPosition(nx, ny);
+    push(rec.win, { facing: dx < 0 ? "left" : "right" }); // 진행 방향으로 뒤집게
   }, cfg.ms);
 }
 
-function stopWander() {
-  if (wanderTimer) clearInterval(wanderTimer);
-  if (stepTimer) clearInterval(stepTimer);
-  wanderTimer = null;
-  stepTimer = null;
-  wanderTarget = null;
+function stopWander(id) {
+  const rec = pets.get(id);
+  if (!rec) return;
+  if (rec.wanderTimer) clearInterval(rec.wanderTimer);
+  if (rec.stepTimer) clearInterval(rec.stepTimer);
+  rec.wanderTimer = null;
+  rec.stepTimer = null;
+  rec.target = null;
+}
+
+function stopAllWander() {
+  for (const id of pets.keys()) stopWander(id);
+}
+
+/** 창을 통째로 없앤다 (박스에서 뺐거나 크기가 바뀐 경우) */
+function destroyPet(id) {
+  const rec = pets.get(id);
+  if (!rec) return;
+  stopWander(id);
+  if (!rec.win.isDestroyed()) rec.win.destroy();
+  pets.delete(id);
 }
 
 /**
- * 펫 켜고 끄기.
+ * 띄울 목록과 실제 창을 맞춘다.
  *
  * 숨길 때 창을 없애지 않는다. 다시 만들려면 BrowserWindow 생성 + HTML 로드 +
  * 스프라이트 로드를 처음부터 다시 해야 해서 눈에 띄게 느리다.
  * 감췄다 보이는 것은 즉시 끝난다. 대신 배회는 멈춰 둔다.
+ *
+ * 목록에서 빠진 아이의 창은 없앤다 — 숨겨만 두면 박스에서 뺀 아이의 창이
+ * 계속 메모리에 남는다.
  */
-function togglePet(on) {
-  save.petVisible = on === undefined ? !save.petVisible : on;
-  writeSave();
+function syncPets() {
+  const want = petTargets();
   petBusy = true;
 
-  if (save.petVisible) {
-    if (!pet || pet.isDestroyed()) createPet();
-    else startWander(); // 숨어 있는 동안 멈춰 뒀다
-    pet.showInactive();
-  } else if (pet && !pet.isDestroyed()) {
-    stopWander();
-    pet.hide();
-  }
+  for (const id of [...pets.keys()]) if (!want.includes(id)) destroyPet(id);
+
+  want.forEach((id, nth) => {
+    let rec = pets.get(id);
+    if (!rec || rec.win.isDestroyed()) {
+      if (!save.petVisible) return; // 숨긴 상태면 만들지 않는다
+      rec = createPet(id, nth);
+    }
+    if (save.petVisible) {
+      startWander(id);
+      rec.win.showInactive();
+    } else {
+      stopWander(id);
+      rec.win.hide();
+    }
+  });
 
   // 창 조작으로 생긴 blur가 도착할 시간을 준 뒤 푼다
   setTimeout(() => (petBusy = false), 250);
+}
+
+function togglePet(on) {
+  save.petVisible = on === undefined ? !save.petVisible : on;
+  writeSave();
+  syncPets();
 
   /* 버튼 라벨 하나 바꾸자고 로그 103개를 다시 읽을 이유가 없다.
      마지막 결과에 표시 여부만 갈아 끼워 바로 밀어준다. */
@@ -882,10 +1036,24 @@ function togglePet(on) {
   }
 }
 
+/** 박스에서 이 아이를 바탕화면에 띄울지 토글 */
+function togglePetMember(id) {
+  if (!box.find(save.box, id)) return;
+  const ids = new Set(save.petIds || []);
+  if (ids.has(id)) ids.delete(id);
+  else ids.add(id);
+  save.petIds = [...ids];
+  // 한 마리라도 고르면 자동으로 보이게 — 골랐는데 아무것도 안 나타나면 고장으로 보인다
+  if (save.petIds.length && !save.petVisible) save.petVisible = true;
+  writeSave();
+  syncPets();
+  refresh(true);
+}
+
 function setWanderLevel(level) {
   save.wanderLevel = level;
   writeSave();
-  if (pet && !pet.isDestroyed()) startWander();
+  for (const id of pets.keys()) startWander(id);
 }
 
 /* ---------------- 앱 ---------------- */
@@ -916,20 +1084,11 @@ function buildMenu() {
 app.whenReady().then(async () => {
   loadSave();
 
-  // 첫 알은 공짜다. 고정 1번으로 시작하면 누구나 같은 포켓몬을 받는다.
-  if (save.lineIndex === null || save.lineIndex === undefined) {
-    save.lineIndex = poke.roll(null);
-    if (!save.seen.includes(save.lineIndex)) save.seen.push(save.lineIndex);
-    // 새로 설치한 경우엔 지금부터 0에서 키운다. 이미 쌓인 누적 토큰으로
-    // 곧바로 최종 진화가 되면 첫 화면부터 키울 게 없다.
-    if (!hadSave) save.bornAt = usage.collect().total;
-    writeSave();
-  }
-  // 성격은 뒤에 추가된 값이라, 기존 세이브에는 없다. 그때 한 번 뽑아준다.
-  if (save.natureIndex === null || save.natureIndex === undefined) {
-    save.natureIndex = poke.rollNature();
-    writeSave();
-  }
+  /*
+   * 첫 알도, 0.1.x 세이브를 옮기는 것도 buildStats 에서 한다.
+   * 둘 다 "지금 누적 토큰이 얼마인가"를 알아야 하는데 그건 로그를
+   * 읽어봐야 나온다. 여기서 미리 하면 스캔을 두 번 하게 된다.
+   */
 
   // Windows 트레이는 빈 아이콘을 받으면 아무것도 표시하지 않는다.
   tray = new Tray(getLogo() ?? nativeImage.createEmpty());
@@ -994,15 +1153,32 @@ app.whenReady().then(async () => {
   ipcMain.handle("buy", (_e, id) => buy(id));
   ipcMain.on("open-dex", openDex);
   ipcMain.on("request-dex", () => pushDex());
-  ipcMain.on("set-pet-line", (_e, line) => {
-    // 보유하지 않은 아이는 세울 수 없다. 렌더러가 보낸 값을 그대로 믿지 않는다.
-    if (line != null && !ownedLines().has(line)) return;
-    // 키우는 개체를 고르면 "따라가기"(null)로 되돌린다 — 그게 기본 상태다
-    save.petLine = line === save.lineIndex ? null : line;
+  /** 박스: 키우는 아이 바꾸기 */
+  ipcMain.on("set-active", (_e, id) => {
+    if (!box.find(save.box, id)) return; // 렌더러가 보낸 값을 그대로 믿지 않는다
+    save.activeId = id;
     writeSave();
-    if (save.petVisible && (!pet || pet.isDestroyed())) togglePet(true);
-    refresh();
+    refresh(true);
     pushDex();
+  });
+
+  /** 박스: 바탕화면에 띄울지 토글 */
+  ipcMain.on("toggle-pet-member", (_e, id) => togglePetMember(id));
+
+  /** 박스: 놓아주기 */
+  ipcMain.handle("release", (_e, id) => {
+    const m = box.find(save.box, id);
+    if (!m) return { ok: false, reason: "없는 아이" };
+    if (save.box.length <= 1) return { ok: false, reason: "마지막 한 마리는 놓아줄 수 없습니다" };
+    save.box = save.box.filter((x) => x.id !== id);
+    save.petIds = save.petIds.filter((x) => x !== id);
+    if (save.activeId === id) save.activeId = save.box[0].id;
+    destroyPet(id);
+    writeSave();
+    syncPets();
+    refresh(true);
+    pushDex();
+    return { ok: true };
   });
   ipcMain.on("open-settings", openSettings);
   ipcMain.on("request-settings", () => pushSettings());
@@ -1020,22 +1196,36 @@ app.whenReady().then(async () => {
 
   // 펫 드래그. 창 전체가 app-region:drag면 클릭 이벤트가 오지 않으므로
   // 드래그를 직접 구현하고, 움직임이 거의 없으면 클릭으로 친다.
-  ipcMain.on("pet-drag", (_e, { x, y }) => {
-    if (!pet || pet.isDestroyed()) return;
-    stopWander(); // 끄는 동안 우리가 끼어들면 안 된다
-    pet.setPosition(Math.round(x), Math.round(y));
+  /**
+   * 여러 마리가 떠 있으므로 "어느 창이 보냈나"를 이벤트에서 알아낸다.
+   * 전역 pet 하나를 옮기면 엉뚱한 아이가 끌려간다.
+   */
+  const petIdOf = (e) => {
+    const w = BrowserWindow.fromWebContents(e.sender);
+    for (const [id, rec] of pets) if (rec.win === w) return id;
+    return null;
+  };
+
+  ipcMain.on("pet-drag", (e, { x, y }) => {
+    const id = petIdOf(e);
+    const rec = id && pets.get(id);
+    if (!rec || rec.win.isDestroyed()) return;
+    stopWander(id); // 끄는 동안 우리가 끼어들면 안 된다
+    rec.win.setPosition(Math.round(x), Math.round(y));
   });
 
-  ipcMain.on("pet-drag-end", () => {
-    if (!pet || pet.isDestroyed()) return;
-    const p = pet.getPosition();
+  ipcMain.on("pet-drag-end", (e) => {
+    const id = petIdOf(e);
+    const rec = id && pets.get(id);
+    if (!rec || rec.win.isDestroyed()) return;
+    const p = rec.win.getPosition();
     save.petPos = { x: p[0], y: p[1] };
     writeSave();
-    startWander(); // 놓은 자리에서 다시 시작
+    startWander(id); // 놓은 자리에서 다시 시작
   });
 
   await refresh();
-  if (save.petVisible) togglePet(true);
+  if (save.petVisible) syncPets();
   restartPolling();
 });
 

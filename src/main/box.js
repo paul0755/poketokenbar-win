@@ -1,0 +1,118 @@
+"use strict";
+/**
+ * 박스 — 여러 마리를 보유한다.
+ *
+ * ── 왜 바꿨나 ──
+ *
+ * 0.1.0까지는 개체가 하나였다. 알을 사면 키우던 아이를 덮어썼다.
+ * 기록이 남는 건 마스터까지 간 아이뿐이라, 중간까지 키우다 알을 산
+ * 아이들은 흔적도 없이 사라졌다. 키우는 게임에서 이건 납득이 안 된다.
+ *
+ * ── 성장을 어떻게 세나 ──
+ *
+ * 전에는 (누적 토큰 - 태어난 시점)으로 쟀다. 개체가 하나일 때만 되는
+ * 방식이다. 여러 마리가 되면 "누가 이 토큰을 먹었나"를 정해야 한다.
+ *
+ * 그래서 개체마다 제가 먹은 양을 들고 있게 했다. 갱신할 때마다
+ * 늘어난 만큼을 키우는 중인 아이에게만 적립한다. 박스에 있는 아이는
+ * 그 자리에 멈춰 있는다 — 안 키우는데 자라면 키운다는 말이 무의미해진다.
+ *
+ * raw 와 fed 를 나눠 두는 이유:
+ *   raw  실제로 쓴 토큰. 난이도(성장 속도)가 여기에 곱해진다
+ *   fed  사탕으로 밀어 넣은 양. 난이도와 무관하게 그대로 더한다
+ *
+ * 난이도를 되돌리면 raw 쪽은 정확히 복원된다. 임계값을 건드리지 않고
+ * 성장량에 곱하는 방식을 유지하는 것도 같은 이유다.
+ */
+
+let seq = 0;
+/** 시각 + 일련번호. 같은 밀리초에 두 마리를 받아도 겹치지 않는다. */
+function newId() {
+  return "m" + Date.now().toString(36) + (seq++).toString(36);
+}
+
+function make(line, nature, shiny) {
+  return {
+    id: newId(),
+    line,
+    nature: nature ?? 0,
+    shiny: Boolean(shiny),
+    raw: 0, // 이 아이가 먹은 실제 토큰
+    fed: 0, // 사탕으로 넣은 양
+    maxStage: 0,
+    caughtAt: new Date().toISOString().slice(0, 10),
+    graduatedAt: null,
+  };
+}
+
+/** 난이도를 반영한 실효 성장량 */
+function effOf(m, speed = 1) {
+  if (!m) return 0;
+  return Math.max(0, (m.raw || 0) * speed + (m.fed || 0));
+}
+
+const find = (box, id) => (Array.isArray(box) ? box.find((m) => m.id === id) : null) || null;
+
+/**
+ * 키우는 중인 아이. 지정이 없거나 사라졌으면 박스의 첫 아이로 떨어진다 —
+ * 키우는 아이가 없으면 적립할 곳이 없어 성장이 통째로 멈춘다.
+ */
+function active(save) {
+  return find(save.box, save.activeId) || (save.box && save.box[0]) || null;
+}
+
+/**
+ * 늘어난 토큰을 키우는 아이에게 적립한다.
+ *
+ * lastTotal 이 기준점이다. 이게 없으면(첫 실행·이전 버전 세이브)
+ * 누적 전체가 델타로 잡혀 한 번에 마스터가 된다. 그래서 기준점이
+ * 없을 때는 적립하지 않고 기준점만 세운다.
+ */
+function accrue(save, total) {
+  const prev = save.lastTotal;
+  save.lastTotal = total;
+  if (typeof prev !== "number") return 0; // 기준점만 세우고 이번엔 넘어간다
+  const delta = Math.max(0, total - prev);
+  if (!delta) return 0;
+  const a = active(save);
+  if (a) a.raw = (a.raw || 0) + delta;
+  return delta;
+}
+
+/**
+ * 0.1.x 세이브를 박스로 옮긴다. 한 번만 돈다.
+ *
+ * 되살릴 수 있는 과거는 졸업 기록뿐이다 — 중간에 덮어써진 아이들은
+ * 애초에 어디에도 안 남아 있다. 졸업한 아이는 fed 로 성장량을 넣어
+ * 마스터 모습 그대로 박스에 세운다.
+ */
+function migrate(save, total, natureIndexByName) {
+  if (Array.isArray(save.box) && save.box.length) return false;
+  const box = [];
+
+  for (const g of save.graduated || []) {
+    const m = make(g.line, natureIndexByName(g.nature), false);
+    m.fed = g.grown || 0; // 이미 다 자란 상태로 복원
+    m.maxStage = 4;
+    m.caughtAt = g.at || m.caughtAt;
+    m.graduatedAt = g.at || m.caughtAt;
+    box.push(m);
+  }
+
+  if (save.lineIndex != null) {
+    const cur = make(save.lineIndex, save.natureIndex ?? 0, save.shiny);
+    // 기존 방식대로 (누적 - 태어난 시점)을 그대로 이어받는다.
+    // 여기서 0으로 만들면 키우던 진행을 빼앗는 셈이다.
+    cur.raw = Math.max(0, total - (save.bornAt ?? 0));
+    cur.maxStage = (save.maxStage || {})[save.lineIndex] ?? 0;
+    box.push(cur);
+    save.activeId = cur.id;
+  }
+
+  save.box = box;
+  save.lastTotal = total;
+  if (!save.activeId && box.length) save.activeId = box[box.length - 1].id;
+  return true;
+}
+
+module.exports = { newId, make, effOf, find, active, accrue, migrate };

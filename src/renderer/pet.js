@@ -18,8 +18,16 @@ window.ptb.onStats((s) => {
     img.classList.toggle("left", s.facing === "left");
     if (!s.mon) return;
   }
-  // 대표로 지정한 아이가 있으면 그쪽을 쓴다. 없으면 키우는 개체.
-  const url = s.petAnimUrl || s.petStillUrl || s.animUrl || s.stillUrl;
+  /*
+   * 이 창이 맡은 아이를 박스에서 찾는다.
+   *
+   * 여러 마리가 떠 있으므로 전역 "펫 그림" 하나를 쓰면 전부 같은
+   * 모습이 된다. 못 찾으면(막 놓아준 경우) 키우는 개체로 떨어진다.
+   */
+  const mine = window.ptb.petId && (s.box || []).find((m) => m.id === window.ptb.petId);
+  const url = mine
+    ? mine.animUrl || mine.url
+    : s.petAnimUrl || s.petStillUrl || s.animUrl || s.stillUrl;
   if (url) {
     if (img.getAttribute("src") !== url) img.setAttribute("src", url);
     img.hidden = false;
