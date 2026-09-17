@@ -148,11 +148,20 @@ function claudeQuota(file) {
     for (const x of s) if (x && typeof x.t === "number" && (!last || x.t > last.t)) last = x;
     if (!last || !last.u) return null;
     const pct = (v) => (typeof v === "number" && v >= 0 && v <= 100 ? v : null);
-    const block = pct(last.u.fh);
+    /*
+     * fh(5시간)는 쓰지 않는다.
+     *
+     * 창이 리셋되면 0으로 떨어진 뒤 다시 오르지 않는다. 앱 메뉴가 22% 라고
+     * 말하는 동안 이 값은 3시간 반째 0 이었다. 우리가 늦게 읽는 게 아니라
+     * 파일에 안 쌓인다. 틀린 값으로 막대를 그리느니 안 그리는 게 낫다.
+     *
+     * sd(주간)는 하루 종일 단조 증가했고 메뉴와도 지연 범위 안에서 맞는다
+     * (15% vs 18%, 14분 차). 이쪽만 쓴다.
+     */
     const week = pct(last.u.sd);
-    if (block == null && week == null) return null;
+    if (week == null) return null;
     const ageMs = Date.now() - last.t;
-    return { block, week, at: last.t, ageMs, stale: ageMs > 3600000 };
+    return { block: null, week, at: last.t, ageMs, stale: ageMs > 3600000 };
   } catch {
     return null; // 데스크톱 앱을 안 쓰거나 아직 기록이 없다
   }
