@@ -226,6 +226,15 @@ function perSource(usage, now, limits = {}) {
       weekLeftPct: weekPct ?? (lim.week ? pctLeft(week, lim.week) : null),
       // 공식값을 썼는지, 직접 넣은 값을 썼는지. 화면에 한 줄로 밝힌다.
       limitFrom: blockPct != null || weekPct != null ? "공식 값" : lim.block || lim.week ? "직접 넣은 값" : null,
+      /*
+       * 공식값이 언제 찍힌 값인지.
+       *
+       * Claude 앱은 15분마다 한 줄씩 쓴다. 그래서 앱 메뉴가 보여주는 실시간
+       * 값과 최대 15분까지 벌어진다. 우리 토큰 측정으로 그 사이를 메워 볼까
+       * 했지만 1%당 토큰이 261K~2.0M로 139% 흩어져서(모델별 가중치로 보인다)
+       * 보간이 불가능했다. 메울 수 없으면 얼마나 오래된 값인지라도 밝힌다.
+       */
+      officialAgeMs: blockPct != null || weekPct != null ? off.ageMs : null,
       // 묵어서 막대를 못 그린 경우에도 무엇이 있었는지는 알려준다
       officialStale: off && off.stale ? off : null,
     };

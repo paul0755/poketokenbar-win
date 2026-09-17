@@ -450,7 +450,10 @@ function renderLimits(L, srcId, srcLabel) {
   const rows = [];
 
   // 한도가 어디서 왔는지는 막대 밑에 한 줄로만 밝힌다
-  const src = p.limitFrom ? " · " + p.limitFrom + " 기준" : "";
+  // 공식값은 15분마다 쓰이므로 최대 그만큼 뒤처진다. 나이를 밝혀 둔다.
+  const src = p.limitFrom
+    ? " · " + p.limitFrom + (p.officialAgeMs != null ? " " + age(p.officialAgeMs, false) : " 기준")
+    : "";
 
   /* ── 5시간 블록 ── */
   const bSub = p.block ? `${hm(p.block.remainingMs)} 뒤 새 블록` : "";

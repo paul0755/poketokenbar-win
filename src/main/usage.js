@@ -189,21 +189,56 @@ function split(n, lu) {
  *   Copilot : ~/.copilot 전체에 토큰 숫자 필드가 없다.
  * 둘 다 설치·기록이 생기면 read 함수만 붙이면 된다.
  */
+/**
+ * Claude 로그가 있을 수 있는 모든 곳.
+ *
+ * 한 곳만 보면 환경에 따라 통째로 놓친다.
+ *   · CLAUDE_CONFIG_DIR   설정 위치를 옮긴 경우. 콤마로 여러 개를 줄 수 있다
+ *   · ~/.config/claude    XDG 스타일 설치
+ *   · ~/.claude           기본
+ *   · 임베디드 세션       데스크톱 앱이 세션마다 제 .claude/projects 를 갖는다.
+ *                        <store>/<uuid>/<uuid>/local_<uuid>/.claude/projects 처럼
+ *                        UUID 단계가 여러 겹이라 고정 경로로는 못 잡고 찾아야 한다.
+ */
+function claudeRoots() {
+  const roots = [];
+  const env = process.env.CLAUDE_CONFIG_DIR;
+  if (env) for (const p of env.split(",")) if (p.trim()) roots.push(path.join(p.trim(), "projects"));
+  roots.push(path.join(HOME, ".config", "claude", "projects"));
+  roots.push(path.join(HOME, ".claude", "projects"));
+  for (const store of ["local-agent-mode-sessions", "claude-code-sessions"]) {
+    roots.push(...findEmbedded(path.join(HOME, ".claude", store)));
+  }
+  return roots;
+}
+
+/** <base> 아래에서 `.claude/projects` 디렉터리를 찾는다. `.claude` 는 숨김이라 건너뛰면 안 된다. */
+function findEmbedded(base, depth = 0, out = []) {
+  if (depth > 7) return out;
+  let entries;
+  try {
+    entries = fs.readdirSync(base, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    const p = path.join(base, e.name);
+    if (e.name === "projects" && path.basename(base) === ".claude") out.push(p);
+    else findEmbedded(p, depth + 1, out);
+  }
+  return out;
+}
+
+/** Codex 로그. 보관된 세션도 실제로 쓴 토큰이므로 같이 센다. */
+function codexRoots() {
+  const home = process.env.CODEX_HOME || path.join(HOME, ".codex");
+  return [path.join(home, "sessions"), path.join(home, "archived_sessions")];
+}
+
 const SOURCES = [
-  {
-    id: "claude",
-    label: "Claude Code",
-    dir: path.join(HOME, ".claude", "projects"),
-    ext: ".jsonl",
-    read: readClaude,
-  },
-  {
-    id: "codex",
-    label: "Codex",
-    dir: path.join(HOME, ".codex", "sessions"),
-    ext: ".jsonl",
-    read: readCodex,
-  },
+  { id: "claude", label: "Claude Code", dirs: claudeRoots, ext: ".jsonl", read: readClaude },
+  { id: "codex", label: "Codex", dirs: codexRoots, ext: ".jsonl", read: readCodex },
 ];
 
 function walk(dir, ext, out = [], depth = 0) {
@@ -256,7 +291,23 @@ function collect() {
   let files = 0;
 
   for (const src of SOURCES) {
-    const paths = walk(src.dir, src.ext);
+    /*
+     * 여러 루트를 훑되 같은 파일을 두 번 세지 않는다.
+     * ~/.config/claude 가 ~/.claude 로 걸린 심볼릭 링크인 구성이 흔하다.
+     */
+    const seenPath = new Set();
+    const paths = [];
+    for (const root of src.dirs()) {
+      let real;
+      try {
+        real = fs.realpathSync(root);
+      } catch {
+        continue; // 없는 경로는 그 구성을 안 쓴다는 뜻이다
+      }
+      if (seenPath.has(real)) continue;
+      seenPath.add(real);
+      for (const p of walk(real, src.ext)) if (!seenPath.has(p)) (seenPath.add(p), paths.push(p));
+    }
     files += paths.length;
     let srcTotal = 0;
     const seen = new Set(); // 중복 레코드 방지 (재시도·세션 재개)
