@@ -141,24 +141,42 @@ function perSource(usage, now, limits = {}) {
     const mine = events.filter((e) => e.src === id);
     const block = currentBlock(mine, now);
     const lim = limits[id] || {};
+    // 공식값에서 자동으로 구한 한도. 사용자가 직접 넣은 값이 있으면 그게 우선이다.
+    const auto = autoLimits(usage, id, now);
     // 리셋 요일을 알면 그 창으로 센다. 모르면 롤링 7일 —
     // 둘은 다른 값이므로 화면에도 어느 쪽인지 밝힌다.
     const wk =
       lim.resetDay != null
         ? anchoredWeek(mine, now, lim.resetDay, lim.resetHour ?? 0)
         : { used: rollingWeek(mine, now).used, from: now - WEEK, resetAt: null };
-    const week = wk.used;
+    /*
+     * 공식 창이 있으면 그 창으로 센다.
+     *
+     * 우리가 재구성한 5시간 창은 "쉬었다 다시 시작한 지점"에서 열리는데,
+     * 제공자의 창은 고정된 시각에 리셋된다. 한도를 제공자 기준으로 구했으면
+     * 사용량도 같은 창으로 재야 분자와 분모가 맞는다.
+     */
+    const aBlock = auto && auto.block;
+    const aWeek = auto && auto.week;
+    const blockUsed = aBlock ? aBlock.used : block ? block.used : 0;
+    const week = aWeek ? aWeek.used : wk.used;
+
+    const blockLimit = lim.block || (aBlock && aBlock.limit) || null;
+    const weekLimit = lim.week || (aWeek && aWeek.limit) || null;
+
     out[id] = {
-      block,
+      block: aBlock && block ? { ...block, used: aBlock.used, resetAt: aBlock.resetAt } : block,
       week,
-      weekFrom: wk.from,
-      weekResetAt: wk.resetAt,
-      weekAnchored: lim.resetDay != null,
+      weekFrom: aWeek ? aWeek.start : wk.from,
+      weekResetAt: aWeek ? aWeek.resetAt : wk.resetAt,
+      weekAnchored: Boolean(aWeek) || lim.resetDay != null,
       // 한도를 아는 경우에만 남은 비율을 낸다
-      blockLimit: lim.block || null,
-      weekLimit: lim.week || null,
-      blockLeftPct: lim.block && block ? pctLeft(block.used, lim.block) : null,
-      weekLeftPct: lim.week ? pctLeft(week, lim.week) : null,
+      blockLimit,
+      weekLimit,
+      blockLeftPct: blockLimit ? pctLeft(blockUsed, blockLimit) : null,
+      weekLeftPct: weekLimit ? pctLeft(week, weekLimit) : null,
+      // 한도가 어디서 왔는지 (화면에 한 줄로 밝힌다)
+      limitFrom: lim.block || lim.week ? "직접 넣은 값" : auto ? (aWeek || aBlock).from : null,
     };
   }
   return out;
@@ -183,20 +201,102 @@ function codexOfficial(usage, now) {
   const cache = codexQuota();
   const log = (usage.quota || {}).codex || null;
 
-  const fromCache = cache
-    ? { at: cache.updatedAt, from: "opencodex 캐시", block: null,
-        week: { percent: cache.percent, resetAt: cache.resetAt } }
-    : null;
-  const fromLog = log && (log.block || log.week)
-    ? { at: log.at, from: "Codex 로그", block: log.block, week: log.week }
-    : null;
+  const out = [];
+  if (cache) {
+    out.push({
+      at: cache.updatedAt,
+      from: "opencodex",
+      block: null,
+      // 캐시에는 창 길이가 안 적혀 있다. 주간 쿼터이므로 7일로 둔다.
+      week: { percent: cache.percent, resetAt: cache.resetAt, windowMinutes: 10080 },
+    });
+  }
+  if (log && (log.block || log.week)) {
+    out.push({ at: log.at, from: "Codex 로그", block: log.block, week: log.week });
+  }
+  if (!out.length) return null;
 
-  const pick =
-    fromCache && fromLog ? (fromLog.at >= fromCache.at ? fromLog : fromCache) : fromLog || fromCache;
-  if (!pick) return null;
+  for (const o of out) {
+    o.ageMs = now - o.at;
+    /*
+     * 묵은 값은 막대로 그리지 않는다.
+     *
+     * 21시간 전 "0% 사용"을 꽉 찬 막대로 그린 적이 있다. 틀린 값은 아니었지만
+     * 그 뒤로 쓴 건 하나도 반영이 안 된 값이라, 화면은 "여유 만땅"이라고
+     * 말하고 있었다. 모르는 값으로 %를 만들지 않는다는 원칙은 오래된 값에도
+     * 똑같이 적용된다 — 지금 몇 %인지는 모르는 것이다.
+     */
+    o.stale = o.ageMs > 3600000;
+  }
+  out.sort((a, b) => b.at - a.at); // 최신 먼저
 
-  const ageMs = now - pick.at;
-  return { ...pick, ageMs, stale: ageMs > 3600000 };
+  /*
+   * 출처가 둘인데 값이 크게 갈리면 고르지 않는다.
+   *
+   * opencodex 는 프록시가 붙는 제공자를, Codex 로그는 ChatGPT 계정을 본다.
+   * 서로 다른 한도를 재고 있을 수 있어서 "더 최신"이라는 이유로 하나를
+   * 고르면 엉뚱한 쪽을 보여주게 된다. 둘 다 내보내고 출처를 밝힌다.
+   */
+  return out;
+}
+
+/**
+ * 공식 퍼센트를 보정점 삼아 한도(토큰)를 역산한다.
+ *
+ * 제공자는 "몇 % 썼다"만 알려주고 한도가 몇 토큰인지는 말해주지 않는다.
+ * 그런데 그 시점에 우리가 잰 사용량을 알고 있으니 분모를 되돌릴 수 있다:
+ *
+ *   한도 = 그때까지 쓴 양 / (그때 퍼센트 / 100)
+ *
+ * 한도는 상수다. 한 번 구해 두면 그 뒤로는 우리 측정만으로 지금 퍼센트를
+ * 낼 수 있다 — 공식값이 하루쯤 묵어도 막대는 계속 살아 있다.
+ * 사용자가 설정에서 손으로 넣는 것과 같은 계산이고, 다만 자동이다.
+ */
+function limitFromOfficial(events, w, at) {
+  if (!w || !w.percent || w.percent <= 0 || !w.resetAt || !w.windowMinutes) return null;
+  const winMs = w.windowMinutes * 60000;
+  // 그 값이 찍힌 시점에 열려 있던 창
+  let start = w.resetAt - winMs;
+  while (start > at) start -= winMs; // 리셋이 여러 번 지났으면 되감는다
+  let usedThen = 0;
+  for (const e of events) if (e.t >= start && e.t <= at) usedThen += e.n;
+  if (!usedThen) return null;
+  return Math.round(usedThen / (w.percent / 100));
+}
+
+/** 지금 열려 있는 창의 사용량. resetAt 이 지났으면 다음 창으로 넘어간다. */
+function windowUsage(events, w, now) {
+  if (!w || !w.windowMinutes || !w.resetAt) return null;
+  const winMs = w.windowMinutes * 60000;
+  let reset = w.resetAt;
+  while (reset <= now) reset += winMs;
+  const start = reset - winMs;
+  let used = 0;
+  for (const e of events) if (e.t >= start) used += e.n;
+  return { used, start, resetAt: reset };
+}
+
+/**
+ * 도구의 한도를 공식값에서 자동으로 구한다.
+ *
+ * 출처가 여럿이면 퍼센트가 0이 아닌 것 중 가장 최근 것을 쓴다.
+ * 0% 로는 나눌 수가 없고, 0% 는 애초에 보정에 쓸 정보가 없는 값이다.
+ */
+function autoLimits(usage, id, now) {
+  const src = codexOfficial(usage, now);
+  if (id !== "codex" || !src) return null;
+  const events = (usage.events || []).filter((e) => e.src === id);
+  const out = {};
+  for (const key of ["block", "week"]) {
+    for (const o of src) {
+      const lim = limitFromOfficial(events, o[key], o.at);
+      if (lim) {
+        out[key] = { limit: lim, from: o.from, at: o.at, ...windowUsage(events, o[key], now) };
+        break;
+      }
+    }
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 function summarize(usage, now = Date.now(), limits = {}) {
@@ -205,7 +305,6 @@ function summarize(usage, now = Date.now(), limits = {}) {
     block: currentBlock(events, now),
     week: rollingWeek(events, now),
     codex: codexQuota(),
-    official: { codex: codexOfficial(usage, now) },
     perSource: perSource(usage, now, limits),
     now,
   };

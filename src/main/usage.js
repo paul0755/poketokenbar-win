@@ -106,6 +106,24 @@ function readCodex(text, add, note) {
     }
   }
 
+  /*
+   * 누적치(total_token_usage)의 증가분을 센다.
+   *
+   * 예전에는 token_usage_record 를 셌는데 두 가지로 틀렸다.
+   *   · 8월 세션 36개에는 그 레코드가 아예 없다 (82.6M을 0으로 읽었다)
+   *   · 있는 파일에서도 턴을 다 덮지 못한다 (한 파일에서 2077 vs 3645건)
+   *
+   * 원본 앱처럼 last_token_usage(턴 델타)를 더하는 방법도 재생된 이벤트까지
+   * 세서 20% 넘게 부풀려졌다. 누적치의 증가분은 재생을 자연스럽게 흡수한다 —
+   * 다시 쓰인 이벤트는 누적이 안 늘어나므로 0이 된다.
+   *
+   * 누적이 줄면 세션이 재시작된 것이다(한 파일에서 3번까지 봤다).
+   * 그때는 그 값 자체가 새 구간의 시작이므로 통째로 센다.
+   *
+   * 실측: 정상 파일에서 Codex 자체 누적치와 오차 0.5% 이내.
+   */
+  let prev = null;
+  let seq = 0;
   for (const line of text.split("\n")) {
     if (!line) continue;
     let o;
@@ -114,21 +132,52 @@ function readCodex(text, add, note) {
     } catch {
       continue;
     }
-    if (o.type !== "token_usage_record") continue;
-    const u = o.payload && o.payload.usage;
-    if (!u) continue;
-    // Codex의 input_tokens는 cached를 포함한 값이다. 겹쳐 세지 않도록 빼준다.
-    const cached = u.cached_input_tokens ?? 0;
-    const parts = {
-      in: Math.max(0, (u.input_tokens ?? 0) - cached),
-      out: u.output_tokens ?? 0,
-      cacheW: u.cache_write_input_tokens ?? 0,
-      cacheR: cached,
-    };
-    const n = u.total_tokens ?? parts.in + parts.out + parts.cacheW + parts.cacheR;
-    // response_id 로 중복을 막는다. 재시도·재개 시 같은 응답이 다시 기록된다.
-    if (n) add(o.timestamp, n, o.payload.response_id, parts);
+    if (o.type !== "event_msg" || !o.payload || o.payload.type !== "token_count") continue;
+    const info = o.payload.info;
+    if (!info || !info.total_token_usage) continue;
+
+    const cum = total(info.total_token_usage);
+    const n = prev === null || cum < prev ? cum : cum - prev;
+    prev = cum;
+    if (!n) continue;
+
+    /*
+     * 종류별 분해는 이번 턴(last_token_usage) 비율로 나눈다.
+     * 누적치에서 빼도 되지만 재시작 구간에서 음수가 나온다.
+     */
+    const lu = info.last_token_usage;
+    const parts = split(n, lu);
+    // 한 줄에 하나씩 세므로 중복키는 줄 번호로 충분하다.
+    add(o.timestamp, n, "tc:" + seq++, parts);
   }
+}
+
+/** Codex의 input_tokens는 cached를 포함한 값이다. 겹쳐 세지 않도록 빼준다. */
+function total(u) {
+  if (!u) return 0;
+  const cached = u.cached_input_tokens ?? 0;
+  return (
+    u.total_tokens ??
+    Math.max(0, (u.input_tokens ?? 0) - cached) +
+      (u.output_tokens ?? 0) +
+      (u.cache_write_input_tokens ?? 0) +
+      cached
+  );
+}
+
+/** n 토큰을 이번 턴의 종류별 비율로 나눈다. 비율을 모르면 입력으로 둔다. */
+function split(n, lu) {
+  const cached = (lu && lu.cached_input_tokens) ?? 0;
+  const p = {
+    in: Math.max(0, ((lu && lu.input_tokens) ?? 0) - cached),
+    out: (lu && lu.output_tokens) ?? 0,
+    cacheW: (lu && lu.cache_write_input_tokens) ?? 0,
+    cacheR: cached,
+  };
+  const sum = p.in + p.out + p.cacheW + p.cacheR;
+  if (!sum) return { in: n, out: 0, cacheW: 0, cacheR: 0 };
+  const k = n / sum;
+  return { in: Math.round(p.in * k), out: Math.round(p.out * k), cacheW: Math.round(p.cacheW * k), cacheR: Math.round(p.cacheR * k) };
 }
 
 /**

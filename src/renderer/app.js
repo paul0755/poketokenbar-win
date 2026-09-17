@@ -449,57 +449,32 @@ function renderLimits(L, srcId, srcLabel) {
 
   const rows = [];
 
-  /*
-   * 제공자가 알려준 공식 값이 있으면 그게 가장 정확하다.
-   * 지금은 Codex 만 있다 — 응답에 붙어 오거나 opencodex 가 캐시해 둔 값.
-   */
-  const off = (L.official || {})[srcId];
-  if (off && (off.block || off.week)) {
-    const src = off.from + " · " + age(off.ageMs, off.stale);
-    if (off.block) {
-      rows.push(limitRow("5시간", off.block.resetAt ? `${hm(off.block.resetAt - L.now)} 후 리셋` : "",
-        100 - off.block.percent,
-        [src, p.block && `이 블록 ${fmt(p.block.used)}`].filter(Boolean).join(" · ")));
-    }
-    if (off.week) {
-      rows.push(limitRow("주간", off.week.resetAt ? `${hm(off.week.resetAt - L.now)} 후 리셋` : "",
-        100 - off.week.percent,
-        [src, `최근 7일 ${fmt(p.week)}`].join(" · ")));
-    }
-    el.innerHTML = rows.join("");
-    return;
-  }
+  // 한도가 어디서 왔는지는 막대 밑에 한 줄로만 밝힌다
+  const src = p.limitFrom ? " · " + p.limitFrom + " 기준" : "";
 
   /* ── 5시간 블록 ── */
   const bSub = p.block ? `${hm(p.block.remainingMs)} 뒤 새 블록` : "";
   if (p.block && p.blockLeftPct != null) {
-    rows.push(limitRow("5시간 블록", bSub, p.blockLeftPct,
-      `${fmt(p.block.used)} / ${fmt(p.blockLimit)} · 시간당 ${fmt(p.block.perHour)}`));
+    rows.push(limitRow("5시간", bSub, p.blockLeftPct,
+      `${fmt(p.block.used)} / ${fmt(p.blockLimit)} · 시간당 ${fmt(p.block.perHour)}${src}`));
   } else if (p.block) {
-    rows.push(usageRow("5시간 블록", bSub, fmt(p.block.used),
-      `시간당 ${fmt(p.block.perHour)} · ${p.block.count}건 — 한도값을 설정에 넣으면 남은 %가 나옵니다`));
+    rows.push(usageRow("5시간", bSub, fmt(p.block.used),
+      `시간당 ${fmt(p.block.perHour)} · ${p.block.count}건 — 한도를 알면 막대가 나옵니다`));
   } else {
-    rows.push(usageRow("5시간 블록", "", "쉬는 중", "5시간 넘게 요청이 없었습니다"));
+    rows.push(usageRow("5시간", "", "쉬는 중", "5시간 넘게 요청이 없었습니다"));
   }
 
   /* ── 주간 ── */
-  const q = srcId === "codex" ? L.codex : null;
-  if (q) {
-    // 제공자가 알려준 값이 있으면 그게 우선이다
-    rows.push(limitRow("주간", `${hm(q.resetAt - L.now)} 후 리셋`, Math.max(0, 100 - q.percent),
-      `공식 값 · ${quotaAge(q)}`));
+  // 리셋 시각을 알면 그 창으로 센다. 모르면 롤링 7일인데,
+  // 둘은 다른 값이므로 제목에서 어느 쪽인지 밝힌다.
+  const wTitle = p.weekAnchored ? "주간" : "주간 (최근 7일)";
+  const wSub = p.weekResetAt ? `${hm(p.weekResetAt - L.now)} 후 리셋` : "";
+  if (p.weekLeftPct != null) {
+    rows.push(limitRow(wTitle, wSub, p.weekLeftPct,
+      `${fmt(p.week)} / ${fmt(p.weekLimit)}${src}`));
   } else {
-    // 리셋 요일을 알면 그 창으로 센다. 모르면 롤링 7일인데,
-    // 둘은 다른 값이므로 제목에서 어느 쪽인지 밝힌다.
-    const wTitle = p.weekAnchored ? "주간" : "주간 (최근 7일)";
-    const wSub = p.weekResetAt ? `${hm(p.weekResetAt - L.now)} 후 리셋` : "";
-    if (p.weekLeftPct != null) {
-      rows.push(limitRow(wTitle, wSub, p.weekLeftPct,
-        `${fmt(p.week)} / ${fmt(p.weekLimit)} · 맞춰 넣은 한도`));
-    } else {
-      rows.push(usageRow(wTitle, wSub, fmt(p.week),
-        "설정 › 한도 맞추기에서 지금 몇 %인지 넣으면 막대가 나옵니다"));
-    }
+    rows.push(usageRow(wTitle, wSub, fmt(p.week),
+      "설정 › 한도 맞추기에서 지금 몇 %인지 넣으면 막대가 나옵니다"));
   }
 
   el.innerHTML = rows.join("");
