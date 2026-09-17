@@ -19,11 +19,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yezandi/poketokenbar-win.git"
+    "url": "git+https://github.com/paul0755/poketokenbar-win.git"
   },
-  "homepage": "https://github.com/yezandi/poketokenbar-win#readme",
+  "homepage": "https://github.com/paul0755/poketokenbar-win#readme",
   "bugs": {
-    "url": "https://github.com/yezandi/poketokenbar-win/issues"
+    "url": "https://github.com/paul0755/poketokenbar-win/issues"
   },
   "main": "src/main/index.js",
   "scripts": {

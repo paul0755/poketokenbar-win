@@ -26,7 +26,7 @@ Windows로 옮긴 것입니다. 원본 코드를 이식한 게 아니라 새로 
 Node.js 20 이상이 필요합니다.
 
 ```bash
-git clone https://github.com/yezandi/poketokenbar-win.git
+git clone https://github.com/paul0755/poketokenbar-win.git
 cd poketokenbar-win
 npm install
 npm start
