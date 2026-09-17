@@ -454,9 +454,14 @@ function renderLimits(L, srcId, srcLabel) {
 
   /* ── 5시간 블록 ── */
   const bSub = p.block ? `${hm(p.block.remainingMs)} 뒤 새 블록` : "";
-  if (p.block && p.blockLeftPct != null) {
-    rows.push(limitRow("5시간", bSub, p.blockLeftPct,
-      `${fmt(p.block.used)} / ${fmt(p.blockLimit)} · 시간당 ${fmt(p.block.perHour)}${src}`));
+  if (p.blockLeftPct != null) {
+    // 한도(토큰)는 제공자가 안 알려준다. 아는 경우에만 분모를 적는다.
+    const amount = p.block
+      ? p.blockLimit
+        ? `${fmt(p.block.used)} / ${fmt(p.blockLimit)} · 시간당 ${fmt(p.block.perHour)}`
+        : `${fmt(p.block.used)} 사용 · 시간당 ${fmt(p.block.perHour)}`
+      : "";
+    rows.push(limitRow("5시간", bSub, p.blockLeftPct, [amount, src.slice(3)].filter(Boolean).join(" · ")));
   } else if (p.block) {
     rows.push(usageRow("5시간", bSub, fmt(p.block.used),
       `시간당 ${fmt(p.block.perHour)} · ${p.block.count}건 — 한도를 알면 막대가 나옵니다`));
@@ -470,11 +475,15 @@ function renderLimits(L, srcId, srcLabel) {
   const wTitle = p.weekAnchored ? "주간" : "주간 (최근 7일)";
   const wSub = p.weekResetAt ? `${hm(p.weekResetAt - L.now)} 후 리셋` : "";
   if (p.weekLeftPct != null) {
-    rows.push(limitRow(wTitle, wSub, p.weekLeftPct,
-      `${fmt(p.week)} / ${fmt(p.weekLimit)}${src}`));
+    const amount = p.weekLimit ? `${fmt(p.week)} / ${fmt(p.weekLimit)}` : `${fmt(p.week)} 사용`;
+    rows.push(limitRow(wTitle, wSub, p.weekLeftPct, [amount, src.slice(3)].filter(Boolean).join(" · ")));
   } else {
+    // 공식값이 있었는데 묵어서 막대를 못 그린 경우는 그 사실을 밝힌다
+    const st = p.officialStale;
     rows.push(usageRow(wTitle, wSub, fmt(p.week),
-      "설정 › 한도 맞추기에서 지금 몇 %인지 넣으면 막대가 나옵니다"));
+      st
+        ? `공식값이 ${age(st.ageMs, true)} — 지금 몇 %인지는 알 수 없습니다`
+        : "설정 › 한도 맞추기에서 지금 몇 %인지 넣으면 막대가 나옵니다"));
   }
 
   el.innerHTML = rows.join("");

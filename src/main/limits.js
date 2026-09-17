@@ -125,6 +125,40 @@ function codexQuota() {
 }
 
 /**
+ * Claude 공식 사용률.
+ *
+ * Claude 데스크톱 앱이 제 사용률을 여기에 적어 둔다:
+ *   %APPDATA%/Claude/plan-usage-history.json
+ *   { samples: [ { t: 밀리초, org: "...", u: { fh: 5시간%, sd: 7일% } } ] }
+ *
+ * fh = five hour, sd = seven day, 둘 다 "쓴 비율"이다. 15분쯤마다 한 줄씩
+ * 쌓이고 창이 리셋되면 0으로 떨어진다. 제공자가 알려준 값이라 계산이 아니다.
+ *
+ * 로그에는 한도가 없어서 이 값을 못 구하는 줄 알았는데, 앱이 이미
+ * 받아 두고 있었다. 크리덴셜도 네트워크도 필요 없다 — 이미 디스크에 있다.
+ */
+function claudeQuota() {
+  const f = path.join(os.homedir(), "AppData", "Roaming", "Claude", "plan-usage-history.json");
+  try {
+    const raw = fs.readFileSync(f, "utf8");
+    const j = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw);
+    const s = Array.isArray(j.samples) ? j.samples : [];
+    // 가장 최근 것. 파일이 시간순이라도 믿지 않고 직접 고른다.
+    let last = null;
+    for (const x of s) if (x && typeof x.t === "number" && (!last || x.t > last.t)) last = x;
+    if (!last || !last.u) return null;
+    const pct = (v) => (typeof v === "number" && v >= 0 && v <= 100 ? v : null);
+    const block = pct(last.u.fh);
+    const week = pct(last.u.sd);
+    if (block == null && week == null) return null;
+    const ageMs = Date.now() - last.t;
+    return { block, week, at: last.t, ageMs, stale: ageMs > 3600000 };
+  } catch {
+    return null; // 데스크톱 앱을 안 쓰거나 아직 기록이 없다
+  }
+}
+
+/**
  * 도구별 5시간 블록·주간.
  *
  * 전체 합산만 보여주면 "이 한도가 어느 도구 것인지" 알 수가 없다.
@@ -141,8 +175,17 @@ function perSource(usage, now, limits = {}) {
     const mine = events.filter((e) => e.src === id);
     const block = currentBlock(mine, now);
     const lim = limits[id] || {};
-    // 공식값에서 자동으로 구한 한도. 사용자가 직접 넣은 값이 있으면 그게 우선이다.
-    const auto = autoLimits(usage, id, now);
+    /*
+     * 제공자가 알려준 사용률.
+     *
+     * 전에는 이 퍼센트로 한도(토큰)를 역산했는데 Codex 에서 틀렸다.
+     * opencodex 는 제공자별로 창을 따로 세는데(캐시의 customWindows) 우리가
+     * 세는 토큰은 전부 합친 값이라, 분자와 분모가 다른 걸 재고 있었다.
+     * 퍼센트가 토큰 수에 비례한다는 보장도 없다.
+     *
+     * 그래서 역산하지 않고 알려준 퍼센트를 그대로 쓴다.
+     */
+    const off = officialOf(usage, id, now);
     // 리셋 요일을 알면 그 창으로 센다. 모르면 롤링 7일 —
     // 둘은 다른 값이므로 화면에도 어느 쪽인지 밝힌다.
     const wk =
@@ -156,27 +199,35 @@ function perSource(usage, now, limits = {}) {
      * 제공자의 창은 고정된 시각에 리셋된다. 한도를 제공자 기준으로 구했으면
      * 사용량도 같은 창으로 재야 분자와 분모가 맞는다.
      */
-    const aBlock = auto && auto.block;
-    const aWeek = auto && auto.week;
-    const blockUsed = aBlock ? aBlock.used : block ? block.used : 0;
-    const week = aWeek ? aWeek.used : wk.used;
+    const week = wk.used;
 
-    const blockLimit = lim.block || (aBlock && aBlock.limit) || null;
-    const weekLimit = lim.week || (aWeek && aWeek.limit) || null;
+    /*
+     * 남은 비율은 세 가지에서 나온다. 앞선 것이 이긴다.
+     *   1) 제공자가 알려준 값 — 단, 묵지 않았을 때만
+     *   2) 사용자가 설정에 적어 넣은 한도
+     *   3) 없음 — 쓴 양만 보여준다
+     *
+     * 묵은 공식값으로 막대를 그리지 않는다. 그 뒤로 쓴 게 반영 안 된
+     * 값이라 지금 몇 %인지는 모르는 것이다.
+     */
+    const fresh = off && !off.stale;
+    const blockPct = fresh && off.block != null ? 100 - off.block : null;
+    const weekPct = fresh && off.week != null ? 100 - off.week : null;
 
     out[id] = {
-      block: aBlock && block ? { ...block, used: aBlock.used, resetAt: aBlock.resetAt } : block,
+      block,
       week,
-      weekFrom: aWeek ? aWeek.start : wk.from,
-      weekResetAt: aWeek ? aWeek.resetAt : wk.resetAt,
-      weekAnchored: Boolean(aWeek) || lim.resetDay != null,
-      // 한도를 아는 경우에만 남은 비율을 낸다
-      blockLimit,
-      weekLimit,
-      blockLeftPct: blockLimit ? pctLeft(blockUsed, blockLimit) : null,
-      weekLeftPct: weekLimit ? pctLeft(week, weekLimit) : null,
-      // 한도가 어디서 왔는지 (화면에 한 줄로 밝힌다)
-      limitFrom: lim.block || lim.week ? "직접 넣은 값" : auto ? (aWeek || aBlock).from : null,
+      weekFrom: wk.from,
+      weekResetAt: off && off.weekResetAt ? off.weekResetAt : wk.resetAt,
+      weekAnchored: lim.resetDay != null,
+      blockLimit: lim.block || null,
+      weekLimit: lim.week || null,
+      blockLeftPct: blockPct ?? (lim.block && block ? pctLeft(block.used, lim.block) : null),
+      weekLeftPct: weekPct ?? (lim.week ? pctLeft(week, lim.week) : null),
+      // 공식값을 썼는지, 직접 넣은 값을 썼는지. 화면에 한 줄로 밝힌다.
+      limitFrom: blockPct != null || weekPct != null ? "공식 값" : lim.block || lim.week ? "직접 넣은 값" : null,
+      // 묵어서 막대를 못 그린 경우에도 무엇이 있었는지는 알려준다
+      officialStale: off && off.stale ? off : null,
     };
   }
   return out;
@@ -238,6 +289,29 @@ function codexOfficial(usage, now) {
    * 고르면 엉뚱한 쪽을 보여주게 된다. 둘 다 내보내고 출처를 밝힌다.
    */
   return out;
+}
+
+/**
+ * 도구의 공식 사용률. 출처가 도구마다 다르다.
+ *
+ *   claude : 데스크톱 앱이 적어 두는 plan-usage-history.json (15분마다 갱신)
+ *   codex  : 세션 로그의 rate_limits, 없으면 opencodex 캐시
+ */
+function officialOf(usage, id, now) {
+  if (id === "claude") return claudeQuota();
+  if (id !== "codex") return null;
+  const list = codexOfficial(usage, now);
+  if (!list || !list.length) return null;
+  const o = list[0]; // 최신 먼저 정렬돼 있다
+  return {
+    block: o.block ? o.block.percent : null,
+    week: o.week ? o.week.percent : null,
+    weekResetAt: o.week ? o.week.resetAt : null,
+    at: o.at,
+    ageMs: o.ageMs,
+    stale: o.stale,
+    from: o.from,
+  };
 }
 
 /**
@@ -310,7 +384,7 @@ function summarize(usage, now = Date.now(), limits = {}) {
   };
 }
 
-module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, anchoredWeek, codexQuota, codexOfficial, perSource, summarize };
+module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, anchoredWeek, codexQuota, claudeQuota, codexOfficial, officialOf, perSource, summarize };
 
 // node src/main/limits.js 로 확인
 if (require.main === module) {
