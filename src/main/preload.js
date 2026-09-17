@@ -20,8 +20,6 @@ contextBridge.exposeInMainWorld("ptb", {
   nextLine: () => ipcRenderer.send("next-line"),
   togglePet: () => ipcRenderer.send("toggle-pet"),
   quit: () => ipcRenderer.send("quit"),
-  // 결과(성공/실패 사유)를 화면에 보여줘야 하므로 invoke
-  refreshClaudeQuota: () => ipcRenderer.invoke("refresh-claude-quota"),
   hide: () => ipcRenderer.send("hide-popover"),
 
   // 도감

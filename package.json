@@ -1,23 +1,42 @@
 {
   "name": "poketokenbar-win",
+  "productName": "PokeTokenBar",
   "version": "0.1.0",
   "description": "토큰을 써서 포켓몬을 키우는 Windows 트레이 앱 + 데스크톱 펫",
+  "keywords": [
+    "electron",
+    "windows",
+    "tray",
+    "pokemon",
+    "claude-code",
+    "codex",
+    "token-usage",
+    "desktop-pet"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "yezandi"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yezandi/poketokenbar-win.git"
+  },
+  "homepage": "https://github.com/yezandi/poketokenbar-win#readme",
+  "bugs": {
+    "url": "https://github.com/yezandi/poketokenbar-win/issues"
+  },
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
     "probe": "node src/main/usage.js",
     "lines": "node scripts/build-lines.mjs",
     "icon": "node scripts/make-icon.mjs",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win",
+    "profiles": "node scripts/build-profiles.mjs"
   },
-  "license": "MIT",
   "devDependencies": {
     "electron": "^33.0.0",
     "electron-builder": "^26.15.3"
-  },
-  "productName": "PokeTokenBar",
-  "author": {
-    "name": "yezandi"
   },
   "build": {
     "appId": "dev.yezandi.poketokenbar",

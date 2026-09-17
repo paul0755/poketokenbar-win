@@ -1,0 +1,44 @@
+MIT License
+
+Copyright (c) 2026 yezandi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+이 MIT 라이선스는 이 저장소의 **소스 코드**에만 적용됩니다.
+
+## 원작 아이디어
+
+macOS용 원본 PokeTokenBar (https://github.com/chattymin/PokeTokenBar, MIT)
+에서 아이디어를 얻었습니다. 코드를 가져오지 않고 Windows용으로 새로 썼지만,
+개념과 기능 구성은 원본에서 왔습니다.
+
+## 포켓몬
+
+Pokémon 및 관련 이름·캐릭터·이미지는 Nintendo, Creatures Inc., GAME FREAK inc.
+의 상표이자 저작물입니다. 이 프로젝트는 그들과 **아무 관계가 없고, 승인받지
+않았으며, 후원받지 않았습니다.** 비영리 팬 프로젝트입니다.
+
+스프라이트 이미지는 이 저장소에 포함되어 있지 않습니다 — 실행 중 PokéAPI
+스프라이트 저장소에서 내려받아 사용자 PC에만 캐시합니다.
+
+`src/main/` 안의 데이터 파일(lines.json, species.json, moves.json,
+abilities.json, types.json, natures.json)은 PokéAPI (https://pokeapi.co)
+에서 받아 가공한 것이며, 원 저작권은 위 권리자에게 있습니다.

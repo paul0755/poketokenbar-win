@@ -424,50 +424,15 @@ function usageRow(title, sub, value, extra) {
  *   나머지는 설정에 직접 적어 넣은 값.
  * 둘 다 없으면 쓴 양만 보여준다. 모르는 값으로 %를 만들지 않는다.
  */
-/** "3분 전 가져옴". 가져온 시각을 숨기면 묵은 값이 최신처럼 보인다. */
-function ago(t) {
-  if (!t) return "";
-  const d = Date.now() - t;
-  if (d < 90000) return "방금 가져옴";
-  return (d < 3600000 ? Math.round(d / 60000) + "분 전" : hm(d) + " 전") + " 가져옴";
-}
-
 function renderLimits(L, srcId, srcLabel) {
   const el = $("spans");
   if (!L) return void (el.innerHTML = "");
   $("limSrc").textContent = srcLabel || "";
 
-  // 공식 한도를 눌러서 가져올 수 있는 건 지금은 Claude뿐이다.
-  // Codex는 opencodex 캐시에서 이미 자동으로 온다.
-  const btn = $("quotaBtn");
-  btn.hidden = srcId !== "claude";
-  if (!btn.hidden && !btn.disabled) btn.textContent = L.claude ? "공식 한도 다시 가져오기" : "공식 한도 가져오기";
-
   const p = (L.perSource || {})[srcId];
   if (!p) return void (el.innerHTML = '<div class="note">이 도구의 기록이 없습니다.</div>');
 
   const rows = [];
-
-  /* ── Claude: 버튼으로 가져온 공식 값이 있으면 그게 우선 ── */
-  const cq = srcId === "claude" ? L.claude : null;
-  if (cq && cq.windows && cq.windows.length) {
-    for (const w of cq.windows) {
-      // 공식 값은 퍼센트만 준다. 토큰 수는 우리 로그가 아니까 옆에 붙인다 —
-      // "58%"만 보면 그게 얼마나 쓴 건지 감이 안 온다.
-      const local = /five|5/i.test(w.key)
-        ? p.block && `이 블록 ${fmt(p.block.used)} · 시간당 ${fmt(p.block.perHour)}`
-        : /seven|week|7/i.test(w.key)
-          ? `최근 7일 ${fmt(p.week)}`
-          : null;
-      const sub = w.resetAt ? `${hm(w.resetAt - L.now)} 후 리셋` : "";
-      rows.push(
-        limitRow(w.label, sub, 100 - w.percent,
-          ["공식 값 · " + ago(cq.fetchedAt), local].filter(Boolean).join(" · ")),
-      );
-    }
-    el.innerHTML = rows.join("");
-    return;
-  }
 
   /* ── 5시간 블록 ── */
   const bSub = p.block ? `${hm(p.block.remainingMs)} 뒤 새 블록` : "";
@@ -623,22 +588,6 @@ window.ptb.onStats((s) => {
 });
 
 $("petToggle").onclick = () => window.ptb.togglePet();
-// 누를 때만 동작한다. 주기 실행에 걸지 않는다.
-// 실패하면 반드시 말한다 — 눌렀는데 아무 일도 안 일어나는 게 제일 나쁘다.
-$("quotaBtn").onclick = async () => {
-  const b = $("quotaBtn");
-  b.disabled = true;
-  b.textContent = "가져오는 중…";
-  try {
-    const r = await window.ptb.refreshClaudeQuota();
-    if (!r || !r.ok) toast((r && r.error) || "가져오지 못했습니다");
-  } catch (e) {
-    toast("가져오지 못했습니다: " + e.message);
-  } finally {
-    b.disabled = false;
-    b.textContent = "공식 한도 다시 가져오기";
-  }
-};
 $("gear").onclick = () => window.ptb.openSettings();
 $("close").onclick = () => window.ptb.hide();
 window.addEventListener("keydown", (e) => {
