@@ -451,20 +451,25 @@ function renderLimits(L, srcId, srcLabel) {
 
   // 한도가 어디서 왔는지는 막대 밑에 한 줄로만 밝힌다
   // 공식값은 15분마다 쓰이므로 최대 그만큼 뒤처진다. 나이를 밝혀 둔다.
-  const src = p.limitFrom
-    ? " · " + p.limitFrom + (p.officialAgeMs != null ? " " + age(p.officialAgeMs, false) : " 기준")
-    : "";
+  /**
+   * 출처 꼬리표. 창마다 따로 붙인다.
+   *
+   * 공식값이면 나이까지 적는다. 분모(토큰)는 **직접 넣은 한도로 막대를
+   * 그렸을 때만** 적는다 — 공식 퍼센트로 그린 막대 옆에 옛 수동 한도를
+   * 적어두면 두 숫자가 서로 다른 말을 한다.
+   */
+  const tag = (from) =>
+    !from ? "" : from === "공식 값" && p.officialAgeMs != null ? from + " " + age(p.officialAgeMs, false) : from;
 
   /* ── 5시간 블록 ── */
   const bSub = p.block ? `${hm(p.block.remainingMs)} 뒤 새 블록` : "";
   if (p.blockLeftPct != null) {
-    // 한도(토큰)는 제공자가 안 알려준다. 아는 경우에만 분모를 적는다.
-    const amount = p.block
-      ? p.blockLimit
+    const amount = !p.block
+      ? ""
+      : p.blockFrom === "직접 넣은 값"
         ? `${fmt(p.block.used)} / ${fmt(p.blockLimit)} · 시간당 ${fmt(p.block.perHour)}`
-        : `${fmt(p.block.used)} 사용 · 시간당 ${fmt(p.block.perHour)}`
-      : "";
-    rows.push(limitRow("5시간", bSub, p.blockLeftPct, [amount, src.slice(3)].filter(Boolean).join(" · ")));
+        : `${fmt(p.block.used)} 사용 · 시간당 ${fmt(p.block.perHour)}`;
+    rows.push(limitRow("5시간", bSub, p.blockLeftPct, [amount, tag(p.blockFrom)].filter(Boolean).join(" · ")));
   } else if (p.block) {
     rows.push(usageRow("5시간", bSub, fmt(p.block.used),
       `시간당 ${fmt(p.block.perHour)} · ${p.block.count}건 — 한도를 알면 막대가 나옵니다`));
@@ -478,8 +483,9 @@ function renderLimits(L, srcId, srcLabel) {
   const wTitle = p.weekAnchored ? "주간" : "주간 (최근 7일)";
   const wSub = p.weekResetAt ? `${hm(p.weekResetAt - L.now)} 후 리셋` : "";
   if (p.weekLeftPct != null) {
-    const amount = p.weekLimit ? `${fmt(p.week)} / ${fmt(p.weekLimit)}` : `${fmt(p.week)} 사용`;
-    rows.push(limitRow(wTitle, wSub, p.weekLeftPct, [amount, src.slice(3)].filter(Boolean).join(" · ")));
+    const amount =
+      p.weekFrom === "직접 넣은 값" ? `${fmt(p.week)} / ${fmt(p.weekLimit)}` : `${fmt(p.week)} 사용`;
+    rows.push(limitRow(wTitle, wSub, p.weekLeftPct, [amount, tag(p.weekFrom)].filter(Boolean).join(" · ")));
   } else {
     // 공식값이 있었는데 묵어서 막대를 못 그린 경우는 그 사실을 밝힌다
     const st = p.officialStale;

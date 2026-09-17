@@ -233,8 +233,16 @@ function perSource(usage, now, limits = {}, files = {}) {
       weekLimit: lim.week || null,
       blockLeftPct: blockPct ?? (lim.block && block ? pctLeft(block.used, lim.block) : null),
       weekLeftPct: weekPct ?? (lim.week ? pctLeft(week, lim.week) : null),
-      // 공식값을 썼는지, 직접 넣은 값을 썼는지. 화면에 한 줄로 밝힌다.
-      limitFrom: blockPct != null || weekPct != null ? "공식 값" : lim.block || lim.week ? "직접 넣은 값" : null,
+      /*
+       * 출처는 창마다 따로 적는다.
+       *
+       * 하나로 뭉뚱그렸더니 화면이 모순된 말을 했다 — 주간은 공식값 82%
+       * 막대를 그리면서 옆에는 직접 넣은 한도로 "583.9M / 18.79B"(=97%) 라고
+       * 적혀 있었다. 5시간도 공식값이 없는데 옛 수동 한도로 막대가 떴다.
+       * 어느 숫자가 어디서 왔는지는 창 단위로 갈린다.
+       */
+      blockFrom: blockPct != null ? "공식 값" : lim.block && block ? "직접 넣은 값" : null,
+      weekFrom: weekPct != null ? "공식 값" : lim.week ? "직접 넣은 값" : null,
       /*
        * 공식값이 언제 찍힌 값인지.
        *
