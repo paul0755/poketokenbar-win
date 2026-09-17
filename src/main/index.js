@@ -397,8 +397,10 @@ async function buildStats() {
     petLine: null, // 0.1.x 호환. 이제 petIds 를 쓴다
     petVisible: Boolean(save.petVisible),
     dex: {
-      seen: save.seen.length,
-      total: poke.LINES.length,
+      // 도감이 종 단위가 됐으므로 홈의 진행도도 종으로 센다.
+      // 라인 수(221)와 종 수(519)가 섞이면 어느 쪽이 진짜인지 알 수 없다.
+      seen: dexSpecies().filter((sp) => (save.maxStage[sp.line] ?? -1) >= sp.stage).length,
+      total: dexSpecies().length,
       graduated: save.graduated.length,
     },
     grown,
@@ -626,34 +628,69 @@ function ownedLines() {
   return set;
 }
 
+/**
+ * 도감에 들어갈 종 목록.
+ *
+ * 라인이 아니라 종 단위다. 전에는 라인 하나에 칸 하나였는데,
+ * 고라파덕을 골덕으로 키우면 고라파덕이 도감에서 사라졌다.
+ * 진화는 기록을 덮어쓰는 일이 아니다 — 거쳐 온 모습도 만난 것이다.
+ *
+ * 라인 안에서 같은 종이 여러 단계에 걸쳐 있으면(2단 진화 라인은
+ * 1차와 최종이 같은 종이다) 가장 이른 단계 하나로 합친다.
+ */
+let dexSpeciesCache = null;
+function dexSpecies() {
+  if (dexSpeciesCache) return dexSpeciesCache;
+  const out = [];
+  poke.LINES.forEach((L, line) => {
+    const firstStage = new Map(); // dexId -> 가장 이른 단계
+    L.ids.forEach((id, st) => {
+      if (!id) return; // 0단계(알)는 종이 아니다
+      if (!firstStage.has(id)) firstStage.set(id, st);
+    });
+    for (const [dexId, st] of firstStage) {
+      out.push({ dexId, line, stage: st, name: L.names[st] });
+    }
+  });
+  // 도감 번호 순. 라인 순으로 두면 같은 번호가 흩어져 훑을 수가 없다.
+  out.sort((a, b) => a.dexId - b.dexId);
+  dexSpeciesCache = out;
+  return out;
+}
+
 async function buildDex() {
   const owned = ownedLines();
   const gradCount = new Map();
   for (const g of save.graduated) gradCount.set(g.line, (gradCount.get(g.line) ?? 0) + 1);
 
+  // 지금 바탕화면에 떠 있는 아이들의 현재 모습
+  const petDex = new Set();
+  for (const m of save.box) {
+    if (!save.petIds.includes(m.id)) continue;
+    const L = poke.LINES[m.line];
+    if (L) petDex.add(L.ids[poke.stageFor(box.effOf(m, growthSpeed()))]);
+  }
+
+  const list = dexSpecies();
   const entries = await Promise.all(
-    poke.LINES.map(async (L, i) => {
-      const seen = save.seen.includes(i);
-      if (!seen) return { index: i, seen: false };
-      const r = poke.rarityOf(i);
-      // 실제로 도달한 단계로 보여준다. 최종 진화 모습을 박아두면
-      // 아직 못 키운 모습을 가진 것처럼 보인다.
-      const st = Math.max(1, save.maxStage[i] ?? 1);
-      const dexId = L.ids[st];
-      const p = await poke.spriteWithFallback({ dexId, isShiny: false }, CACHE, "still");
-      // 이 라인에서 아직 더 클 수 있는지 (도감에 "미완성" 표시용)
-      const top = L.ids.lastIndexOf(L.ids[L.ids.length - 1]);
+    list.map(async (sp) => {
+      // 그 라인을 만났고, 이 모습까지 실제로 키웠을 때만 만난 것으로 친다.
+      const reached = (save.maxStage[sp.line] ?? -1) >= sp.stage;
+      const seen = save.seen.includes(sp.line) && reached;
+      if (!seen) return { dexId: sp.dexId, seen: false };
+      const r = poke.rarityOf(sp.line);
+      const p = await poke.spriteWithFallback({ dexId: sp.dexId, isShiny: false }, CACHE, "still");
       return {
-        index: i,
+        dexId: sp.dexId,
+        line: sp.line,
         seen: true,
-        name: L.names[st],
-        stage: poke.STAGES[st].label,
-        complete: L.ids[st] === L.ids[3], // 최종 진화 모습까지 봤는가
+        name: sp.name,
+        stage: poke.STAGES[sp.stage].label,
         stars: r.stars,
         label: r.label,
-        graduated: gradCount.get(i) ?? 0,
-        owned: owned.has(i),
-        isPet: save.box.some((m) => m.line === i && save.petIds.includes(m.id)),
+        graduated: gradCount.get(sp.line) ?? 0,
+        owned: owned.has(sp.line),
+        isPet: petDex.has(sp.dexId),
         url: p ? pathToFileURL(p).href : null,
       };
     }),
@@ -661,8 +698,8 @@ async function buildDex() {
 
   return {
     entries,
-    seen: save.seen.length,
-    total: poke.LINES.length,
+    seen: entries.filter((e) => e.seen).length,
+    total: list.length,
     graduated: save.graduated.length,
   };
 }

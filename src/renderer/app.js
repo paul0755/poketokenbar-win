@@ -561,18 +561,19 @@ function renderDex() {
     ? '<div class="empty">아직 없습니다</div>'
     : list
         .map((e) => {
-          if (!e.seen) {
-            return `<div class="cell locked"><div class="q">?</div><div class="no">No.${e.index + 1}</div></div>`;
-          }
+          // 전국도감 번호를 그대로 쓴다. 칸 순서가 아니다 —
+          // 안 만난 종도 번호는 알려 준다. 빈칸이 어디인지 보여야 모은다.
+          const no = `<div class="no">No.${String(e.dexId).padStart(3, "0")}</div>`;
+          if (!e.seen) return `<div class="cell locked"><div class="q">?</div>${no}</div>`;
           const cls = ["cell", e.owned ? "owned" : "seenonly", e.isPet ? "pet" : ""].join(" ");
-          const tip = e.owned
-            ? `${e.name} · ${e.label}\n클릭하면 바탕화면 펫이 됩니다`
-            : `${e.name} · ${e.label}\n만난 기록입니다. 보유 중이 아닙니다`;
-          return `<div class="${cls}"${e.owned ? ` data-line="${e.index}"` : ""} title="${tip}">
+          const tip = `${e.name} · ${e.label} · ${e.stage}\n${
+            e.owned ? "이 라인을 보유 중입니다" : "만난 기록입니다. 보유 중이 아닙니다"
+          }`;
+          return `<div class="${cls}" title="${tip}">
               ${e.isPet ? '<div class="pin">바탕화면</div>' : ""}
               ${e.url ? `<img src="${e.url}" alt="">` : '<div class="q">?</div>'}
               <div class="nm">${e.name}</div>
-              <div class="no">No.${e.index + 1}</div>
+              ${no}
               ${e.graduated ? `<div class="gr">졸업 ${e.graduated}</div>` : ""}
             </div>`;
         })
@@ -599,8 +600,7 @@ window.ptb.onDex((d) => {
 });
 
 $("grid").addEventListener("click", (e) => {
-  const cell = e.target.closest(".cell[data-line]");
-  if (!cell) return;
+  if (!e.target.closest(".cell.owned")) return;
   toast("바탕화면에 세우는 것은 박스 탭에서 고릅니다");
 });
 
