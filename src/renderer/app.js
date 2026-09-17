@@ -375,6 +375,21 @@ $("srctabs").addEventListener("click", (e) => {
  * 틀린 게 아니라 오래된 것인데, 화면에서는 구분되지 않는다.
  * 실제로 Codex가 32%일 때 앱이 37%를 보여준 적이 있다 — 4시간 45분 묵은 값이었다.
  */
+/**
+ * 값이 얼마나 묵었는지.
+ *
+ * 제공자 값은 그쪽이 새로 알려줄 때만 바뀐다. 갱신이 멈추면 우리 숫자는
+ * 틀린 게 아니라 오래된 것인데, 화면에서는 구분되지 않는다.
+ * 실제로 Codex가 32%일 때 4시간 45분 묵은 37%를 최신처럼 보여준 적이 있다.
+ */
+function age(ms, stale) {
+  if (typeof ms !== "number") return "";
+  const m = Math.round(ms / 60000);
+  if (m < 2) return "방금 값";
+  const when = m < 60 ? m + "분 전" : hm(ms) + " 전";
+  return stale ? `⚠️ ${when} 값` : `${when} 값`;
+}
+
 function quotaAge(q) {
   if (typeof q.ageMs !== "number") return "";
   const m = Math.round(q.ageMs / 60000);
@@ -433,6 +448,27 @@ function renderLimits(L, srcId, srcLabel) {
   if (!p) return void (el.innerHTML = '<div class="note">이 도구의 기록이 없습니다.</div>');
 
   const rows = [];
+
+  /*
+   * 제공자가 알려준 공식 값이 있으면 그게 가장 정확하다.
+   * 지금은 Codex 만 있다 — 응답에 붙어 오거나 opencodex 가 캐시해 둔 값.
+   */
+  const off = (L.official || {})[srcId];
+  if (off && (off.block || off.week)) {
+    const src = off.from + " · " + age(off.ageMs, off.stale);
+    if (off.block) {
+      rows.push(limitRow("5시간", off.block.resetAt ? `${hm(off.block.resetAt - L.now)} 후 리셋` : "",
+        100 - off.block.percent,
+        [src, p.block && `이 블록 ${fmt(p.block.used)}`].filter(Boolean).join(" · ")));
+    }
+    if (off.week) {
+      rows.push(limitRow("주간", off.week.resetAt ? `${hm(off.week.resetAt - L.now)} 후 리셋` : "",
+        100 - off.week.percent,
+        [src, `최근 7일 ${fmt(p.week)}`].join(" · ")));
+    }
+    el.innerHTML = rows.join("");
+    return;
+  }
 
   /* ── 5시간 블록 ── */
   const bSub = p.block ? `${hm(p.block.remainingMs)} 뒤 새 블록` : "";

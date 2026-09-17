@@ -167,18 +167,51 @@ function perSource(usage, now, limits = {}) {
 const pctLeft = (used, limit) =>
   Math.max(0, Math.min(100, Math.round(((limit - used) / limit) * 100)));
 
+/**
+ * Codex 공식 한도 — 캐시와 로그 중 더 최신인 쪽.
+ *
+ * 출처가 둘이다.
+ *   1) opencodex 캐시  주간만 있다. opencodex 가 갱신할 때만 바뀐다
+ *   2) Codex 세션 로그  5시간·주간 둘 다. 응답에 붙어 온 값 그대로다
+ *
+ * 둘 다 "제공자가 알려준 값"이지만 시점이 다르다. 오래된 쪽을 보여주면
+ * 실제로 틀린 숫자가 최신처럼 보인다 — 4시간 45분 묵은 값 때문에
+ * 겪었던 일이다. 그래서 더 최신인 쪽을 고르고, 어디서 왔는지와
+ * 얼마나 묵었는지를 함께 넘긴다.
+ */
+function codexOfficial(usage, now) {
+  const cache = codexQuota();
+  const log = (usage.quota || {}).codex || null;
+
+  const fromCache = cache
+    ? { at: cache.updatedAt, from: "opencodex 캐시", block: null,
+        week: { percent: cache.percent, resetAt: cache.resetAt } }
+    : null;
+  const fromLog = log && (log.block || log.week)
+    ? { at: log.at, from: "Codex 로그", block: log.block, week: log.week }
+    : null;
+
+  const pick =
+    fromCache && fromLog ? (fromLog.at >= fromCache.at ? fromLog : fromCache) : fromLog || fromCache;
+  if (!pick) return null;
+
+  const ageMs = now - pick.at;
+  return { ...pick, ageMs, stale: ageMs > 3600000 };
+}
+
 function summarize(usage, now = Date.now(), limits = {}) {
   const events = usage.events || [];
   return {
     block: currentBlock(events, now),
     week: rollingWeek(events, now),
     codex: codexQuota(),
+    official: { codex: codexOfficial(usage, now) },
     perSource: perSource(usage, now, limits),
     now,
   };
 }
 
-module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, anchoredWeek, codexQuota, perSource, summarize };
+module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, anchoredWeek, codexQuota, codexOfficial, perSource, summarize };
 
 // node src/main/limits.js 로 확인
 if (require.main === module) {

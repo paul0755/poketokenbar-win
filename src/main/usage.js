@@ -53,7 +53,59 @@ function readClaude(text, add) {
    세션 누계라서 더하면 같은 토큰을 수십 번 세게 된다.
    total_tokens 는 input + output 이고 cached 는 input의 부분집합이다.
    ------------------------------------------------------------------ */
-function readCodex(text, add) {
+/**
+ * Codex 로그에 섞여 있는 공식 한도.
+ *
+ * 응답에 rate_limits 가 붙어 온다. 대부분 null 이지만 값이 채워진 것도 있고,
+ * 그건 제공자가 알려준 사실이다 — 우리가 계산한 게 아니다.
+ *
+ *   primary    창 300분   = 5시간 한도
+ *   secondary  창 10080분 = 주간 한도
+ *
+ * opencodex 캐시(codex-quota-cache.json)보다 나은 점이 둘 있다.
+ * 5시간 창도 들어 있고, 어느 시각의 값인지 기록에 그대로 남아 있다.
+ */
+function pickRateLimits(o) {
+  const find = (x, d = 0) => {
+    if (!x || typeof x !== "object" || d > 6) return null;
+    if (x.rate_limits && (x.rate_limits.primary || x.rate_limits.secondary)) return x.rate_limits;
+    for (const v of Object.values(x)) {
+      const r = find(v, d + 1);
+      if (r) return r;
+    }
+    return null;
+  };
+  return find(o);
+}
+
+const rlWindow = (w) =>
+  w && typeof w.used_percent === "number"
+    ? {
+        percent: w.used_percent,
+        windowMinutes: w.window_minutes ?? null,
+        resetAt: w.resets_at ? w.resets_at * 1000 : null,
+      }
+    : null;
+
+function readCodex(text, add, note) {
+  // 한도가 붙은 줄만 먼저 훑는다. 값이 없는 파일이 대부분이라 문자열로 먼저 거른다.
+  if (note && text.includes('"used_percent"')) {
+    for (const line of text.split("\n")) {
+      if (!line.includes("used_percent")) continue;
+      let o;
+      try {
+        o = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      const rl = pickRateLimits(o);
+      const t = Date.parse(o.timestamp);
+      if (rl && Number.isFinite(t)) {
+        note({ at: t, block: rlWindow(rl.primary), week: rlWindow(rl.secondary) });
+      }
+    }
+  }
+
   for (const line of text.split("\n")) {
     if (!line) continue;
     let o;
@@ -134,6 +186,14 @@ function dayOf(iso) {
   return Number.isFinite(t) ? localDay(new Date(t)) : String(iso).slice(0, 10);
 }
 
+/**
+ * 파일별 파싱 결과 캐시. 프로세스가 살아 있는 동안만 유지된다.
+ *
+ * 디스크에 쓰지 않는다 — 로그가 원본이고, 앱을 다시 켜면 다시 읽으면 된다.
+ * 캐시가 틀릴 위험보다 첫 스캔 한 번이 느린 쪽이 낫다.
+ */
+const fileCache = new Map();
+
 function collect() {
   const byDay = new Map();
   const bySource = new Map();
@@ -141,6 +201,8 @@ function collect() {
   const detail = new Map();
   // 개별 사용 기록. 5시간 창·번레이트는 일자 합계로는 계산할 수 없다.
   const events = [];
+  // 로그에 섞여 있는 공식 한도 (도구별로 가장 최근 것)
+  const quota = {};
   let total = 0;
   let files = 0;
 
@@ -149,6 +211,15 @@ function collect() {
     files += paths.length;
     let srcTotal = 0;
     const seen = new Set(); // 중복 레코드 방지 (재시도·세션 재개)
+
+    /**
+     * 파서가 찾은 공식 한도 중 가장 최근 것만 남긴다.
+     * 오래된 값이 새 값을 덮어쓰면 화면이 거꾸로 간다.
+     */
+    const note = (q) => {
+      if (!q || (!q.block && !q.week)) return;
+      if (!quota[src.id] || q.at > quota[src.id].at) quota[src.id] = q;
+    };
 
     const add = (iso, n, dedupeKey, parts) => {
       if (dedupeKey) {
@@ -171,14 +242,49 @@ function collect() {
     };
 
     for (const f of paths) {
+      /*
+       * 안 바뀐 파일은 지난번에 읽은 결과를 그대로 쓴다.
+       *
+       * 로그는 append-only 다. 크기와 mtime 이 같으면 다시 파싱해도 같은 값이
+       * 나온다. 그런데 30초마다 109개를 전부 JSON.parse 하면 4초가 걸린다 —
+       * 그중 실제로 바뀌는 건 지금 쓰고 있는 한두 개뿐이다.
+       */
+      let st;
+      try {
+        st = fs.statSync(f);
+      } catch {
+        continue;
+      }
+      const key = src.id + ":" + f;
+      const hit = fileCache.get(key);
+      if (hit && hit.mtime === st.mtimeMs && hit.size === st.size) {
+        for (const r of hit.rows) add(r[0], r[1], r[2], r[3]);
+        if (hit.quota) note(hit.quota);
+        continue;
+      }
+
       let text;
       try {
         text = fs.readFileSync(f, "utf8");
       } catch {
         continue; // 쓰기 중인 파일일 수 있다. 다음 폴링에서 잡힌다
       }
+      // 이번에 읽은 것을 캐시에 적어 둔다. add/note 를 감싸 기록만 남긴다.
+      const rows = [];
+      let q = null;
       try {
-        src.read(text, add);
+        src.read(
+          text,
+          (iso, n, k, parts) => {
+            rows.push([iso, n, k, parts]);
+            add(iso, n, k, parts);
+          },
+          (x) => {
+            if (x && (!q || x.at > q.at)) q = x;
+            note(x);
+          },
+        );
+        fileCache.set(key, { mtime: st.mtimeMs, size: st.size, rows, quota: q });
       } catch {
         /* 한 파일이 깨져도 나머지는 세어야 한다 */
       }
@@ -222,6 +328,8 @@ function collect() {
       .map((s) => ({ ...s, detail: detail.get(s.id) ?? null }))
       .sort((a, b) => b.total - a.total),
     events,
+    // 로그에서 주운 공식 한도. 없으면 빈 객체 — 지어내지 않는다.
+    quota,
     fileCount: files,
     scannedAt: Date.now(),
   };
