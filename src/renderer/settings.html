@@ -79,6 +79,10 @@
   .pth .m.on { color: var(--accent); }
   .pth button { padding: 3px 7px; font-size: 10px; flex-shrink: 0; }
 
+  /* 추가 버튼은 둘이 폭을 나눠 갖는다. 오른쪽 끝에 몰아두면 눈에 안 띈다. */
+  .addrow { display: flex; gap: 6px; margin-top: 9px; }
+  .addrow button { flex: 1; padding: 7px 4px; font-size: 11px; font-weight: 600; }
+
   .danger { color: #ff8a8a; border-color: #5a2a2a; }
   .danger:hover { background: #2e1c1c; }
 </style>
@@ -185,10 +189,11 @@
       <b>기본 경로를 대체하지 않고 추가로</b> 읽습니다.
     </div>
     <div id="pathLogs"></div>
-    <div class="top" style="margin-top:8px">
-      <span class="k">로그 폴더 추가</span>
-      <button data-add="claude">Claude</button>
-      <button data-add="codex">Codex</button>
+    <!-- 버튼에 하는 일을 다 적는다. 옆에 설명 글자를 두고 버튼에는 도구
+         이름만 적으면, 그 글자를 못 본 사람은 눌렀을 때 뭐가 일어날지 모른다. -->
+    <div class="addrow">
+      <button data-add="claude">＋ Claude 로그 폴더 추가</button>
+      <button data-add="codex">＋ Codex 로그 폴더 추가</button>
     </div>
   </div>
   <div class="row">

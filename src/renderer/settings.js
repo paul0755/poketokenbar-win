@@ -214,15 +214,18 @@ function renderPaths(r) {
           : q.ageMs < 3600000
             ? Math.round(q.ageMs / 60000) + "분 전 값"
             : Math.floor(q.ageMs / 3600000) + "시간 전 값";
-      const fixed = q.path !== "세션 로그 안에 포함";
+      // 세션 로그에 섞여 오는 값은 파일이 아니라서 고를 대상이 없다
+      const pickable = q.path !== "세션 로그 안에 포함";
+      const custom = Boolean((r.files || {})[q.id]);
       return `
         <div class="pth">
           <span class="st">${q.ok ? "✅" : "·"}</span>
           <div class="bd">
             <div class="p">${short(q.path)}</div>
-            <div class="m ${q.ok ? "on" : ""}">${q.label} · ${q.ok ? q.detail + " · " + ago : "읽지 못함"}</div>
+            <div class="m ${q.ok ? "on" : ""}">${q.label} · ${q.ok ? q.detail + " · " + ago : "읽지 못함"}${custom ? " · 직접 고름" : ""}</div>
           </div>
-          ${fixed ? `<button data-qf="${q.id}">고르기</button>` : ""}
+          ${pickable ? `<button data-qf="${q.id}">파일 고르기</button>` : ""}
+          ${custom ? `<button data-qr="${q.id}">기본값</button>` : ""}
         </div>`;
     })
     .join("");
@@ -248,7 +251,11 @@ document.addEventListener("click", async (e) => {
   if (qf) {
     const p = await window.ptb.pickPath({ kind: "file", title: "사용률 파일" });
     if (p) renderPaths(await window.ptb.setQuotaFile({ src: qf.dataset.qf, path: p }));
+    return;
   }
+  // 직접 고른 파일을 물릴 길이 있어야 한다. 잘못 고르면 되돌릴 방법이 없어진다.
+  const qr = e.target.closest("button[data-qr]");
+  if (qr) renderPaths(await window.ptb.setQuotaFile({ src: qr.dataset.qr, path: null }));
 });
 
 loadPaths();
