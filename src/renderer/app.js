@@ -81,6 +81,16 @@ function renderHome(s) {
   $("monQuip").textContent = quipFor(mon, usage.today);
 
   const t = [];
+  // 레벨·타입은 홈에서도 보여야 한다. 박스를 열어야만 보이면
+  // 키우는 아이의 상태를 확인하려고 매번 탭을 옮기게 된다.
+  const act = (s.box || []).find((m) => m.id === s.activeId);
+  const ap = act && act.profile;
+  if (ap) {
+    t.push(`<span class="chip"><b>Lv.${ap.level}</b></span>`);
+    for (let i = 0; i < ap.types.length; i++) {
+      t.push(`<span class="ty t-${ap.typeKeys[i]}">${ap.types[i]}</span>`);
+    }
+  }
   if (s.nature) {
     const n = s.nature;
     t.push(`<span class="chip"><b>${n.name}</b>${n.up ? ` ${n.up}↑ ${n.down}↓` : ""}</span>`);
@@ -178,6 +188,8 @@ function renderHome(s) {
  * 키우는 아이 바꾸기, 바탕화면에 세우기. 화면을 옮겨 다니게 하면
  * "얘를 띄우려면 어디로 가야 하지"를 매번 생각하게 된다.
  */
+let openProfile = null; // 펼쳐 둔 개체 id
+
 function renderBox(s) {
   const list = s.box || [];
   $("boxCount").textContent = list.length + "마리";
@@ -190,12 +202,14 @@ function renderBox(s) {
         (m.isPet ? '<span class="tag pet">바탕화면</span>' : "") +
         (m.graduated ? '<span class="tag gr">졸업</span>' : "");
       const goal = m.next ? `${m.next}까지 ${fmt(m.remaining)}` : "다 자랐습니다";
+      const p = m.profile;
+      const lv = p ? `Lv.${p.level} · ` : "";
       return `
         <div class="bx ${m.active ? "act" : ""}" data-id="${m.id}">
           <div class="pic">${m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50)}</div>
-          <div class="info">
+          <div class="info" title="눌러서 상세 보기">
             <div class="nm">${m.name}${m.shiny ? " ★" : ""}${tags}</div>
-            <div class="sub">${"★".repeat(m.stars)} ${m.stage}${m.nature ? " · " + m.nature : ""}</div>
+            <div class="sub">${lv}${"★".repeat(m.stars)} ${m.stage}${m.nature ? " · " + m.nature : ""}</div>
             <div class="sub">${goal}</div>
             <div class="track"><i style="width:${Math.round((m.ratio || 0) * 100)}%"></i></div>
           </div>
@@ -204,12 +218,80 @@ function renderBox(s) {
             <button data-act="pet" class="${m.isPet ? "on" : ""}">${m.isPet ? "내리기" : "띄우기"}</button>
             <button data-act="release" class="del">놓아주기</button>
           </div>
-        </div>`;
+        </div>
+        ${openProfile === m.id ? profileHtml(p) : ""}`;
     })
     .join("");
 }
 
+/**
+ * 개체 상세.
+ *
+ * 능력치는 숫자만 나열하면 어느 게 높은지 훑어지지 않는다. 막대로 그리되
+ * 기준을 255로 둔다 — 원작 종족값 상한이라 종끼리 비교가 된다.
+ * 개체값은 따로 적는다. 능력치가 낮은 게 레벨 탓인지 개체 탓인지
+ * 구분이 안 되면 "개체값"을 보여주는 의미가 없다.
+ */
+function profileHtml(p) {
+  if (!p) return '<div class="prof"><div class="meta">이 종의 상세 정보가 없습니다.</div></div>';
+
+  const types = (p.typeKeys || [])
+    .map((k, i) => `<span class="ty t-${k}">${p.types[i]}</span>`)
+    .join("");
+
+  const stats = p.stats
+    .map(
+      (s) => `
+      <div class="stat">
+        <span class="k">${s.name}</span>
+        <span class="v">${s.value}</span>
+        <span class="bar"><i style="width:${Math.min(100, Math.round((s.base / 255) * 100))}%"></i></span>
+        <span class="iv ${s.iv === 31 ? "max" : ""}">${s.iv}/31</span>
+      </div>`,
+    )
+    .join("");
+
+  const moves = p.moves.length
+    ? p.moves
+        .map(
+          (m) => `
+        <div class="mv">
+          <span class="ty t-${m.typeKey || "normal"}">${m.type || "?"}</span>
+          <span class="n">${m.name}</span>
+          <span class="p">${m.power ? "위력 " + m.power : m.damageClass === "status" ? "변화" : "—"}</span>
+        </div>`,
+        )
+        .join("")
+    : '<div class="meta">아직 배운 기술이 없습니다.</div>';
+
+  return `
+    <div class="prof">
+      <div class="hd">
+        <span class="lv">Lv.${p.level}</span>
+        ${types}
+        <span class="meta">${p.gender}</span>
+      </div>
+      <div class="abil">
+        특성 <b>${p.ability || "—"}</b>${p.abilityHidden ? " (숨겨진 특성)" : ""}
+        ${p.abilityDesc ? `<br>${p.abilityDesc}` : ""}
+      </div>
+      <h5>능력치 — 개체값 합계 ${p.ivTotal}/${p.ivMax}</h5>
+      ${stats}
+      <h5>기술</h5>
+      ${moves}
+    </div>`;
+}
+
 $("boxList").addEventListener("click", async (e) => {
+  // 정보 영역을 누르면 상세를 펼친다. 같은 아이를 다시 누르면 접는다.
+  const info = e.target.closest(".info");
+  if (info) {
+    const id = info.closest(".bx").dataset.id;
+    openProfile = openProfile === id ? null : id;
+    if (lastStats) renderBox(lastStats);
+    return;
+  }
+
   const btn = e.target.closest("button[data-act]");
   if (!btn) return;
   const id = btn.closest(".bx").dataset.id;

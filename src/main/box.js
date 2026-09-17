@@ -25,18 +25,33 @@
  * 성장량에 곱하는 방식을 유지하는 것도 같은 이유다.
  */
 
+const poke = require("./pokemon");
+const profile = require("./profile");
+
 let seq = 0;
 /** 시각 + 일련번호. 같은 밀리초에 두 마리를 받아도 겹치지 않는다. */
 function newId() {
   return "m" + Date.now().toString(36) + (seq++).toString(36);
 }
 
+/**
+ * 개체값·성별·특성은 받는 순간 정해진다.
+ *
+ * 매번 굴리면 갱신할 때마다 능력치가 흔들려서 "개체값"이라는 말이
+ * 성립하지 않는다. 종 단위 값이라 진화해도 그대로 간다 —
+ * 그래서 라인의 첫 형태(ids[1])를 기준으로 굴린다.
+ */
 function make(line, nature, shiny) {
+  const L = poke.LINES[line];
+  const baseDex = L && L.ids ? L.ids[1] : null;
   return {
     id: newId(),
     line,
     nature: nature ?? 0,
     shiny: Boolean(shiny),
+    ivs: profile.rollIVs(),
+    gender: baseDex ? profile.rollGender(baseDex) : "무성",
+    ability: baseDex ? profile.rollAbility(baseDex) : 0,
     raw: 0, // 이 아이가 먹은 실제 토큰
     fed: 0, // 사탕으로 넣은 양
     maxStage: 0,
@@ -49,6 +64,24 @@ function make(line, nature, shiny) {
 function effOf(m, speed = 1) {
   if (!m) return 0;
   return Math.max(0, (m.raw || 0) * speed + (m.fed || 0));
+}
+
+/**
+ * 프로필이 없던 시절의 개체를 채운다.
+ *
+ * 없는 채로 두면 화면이 전부 0으로 나온다. 지금 굴려 주는 것이
+ * 원래 값을 복원하는 건 아니지만, 애초에 존재한 적이 없는 값이다.
+ */
+function backfill(box) {
+  let dirty = false;
+  for (const m of box || []) {
+    const L = poke.LINES[m.line];
+    const baseDex = L && L.ids ? L.ids[1] : null;
+    if (!Array.isArray(m.ivs) || m.ivs.length !== 6) { m.ivs = profile.rollIVs(); dirty = true; }
+    if (!m.gender) { m.gender = baseDex ? profile.rollGender(baseDex) : "무성"; dirty = true; }
+    if (typeof m.ability !== "number") { m.ability = baseDex ? profile.rollAbility(baseDex) : 0; dirty = true; }
+  }
+  return dirty;
 }
 
 const find = (box, id) => (Array.isArray(box) ? box.find((m) => m.id === id) : null) || null;
@@ -115,4 +148,4 @@ function migrate(save, total, natureIndexByName) {
   return true;
 }
 
-module.exports = { newId, make, effOf, find, active, accrue, migrate };
+module.exports = { newId, make, effOf, find, active, accrue, migrate, backfill };

@@ -7,6 +7,7 @@ const usage = require("./usage");
 const poke = require("./pokemon");
 const limits = require("./limits");
 const box = require("./box");
+const profile = require("./profile");
 const claudeQuota = require("./claude-limits");
 const notify = require("./notify");
 
@@ -29,8 +30,11 @@ const CANDY_PER = 25_000_000;
 /**
  * 상점.
  *
- * 알 값은 "며칠 치인가"로 잡았다. 하루 3개쯤 들어오므로
- * 일반 알은 하루에 한 번, 전설 알은 열흘쯤 모아야 한다.
+ * 알 값은 "며칠 치인가"로 잡았다. 하루 3개쯤 들어온다.
+ *
+ * 처음엔 3/12/35 였는데 너무 비쌌다. 박스가 생기기 전에는 알을 사면
+ * 키우던 아이를 잃는 거라 값이 곧 망설임의 이유였는데, 이제는 그냥
+ * 늘어나기만 한다. 모으는 재미보다 굴리는 재미가 맞다.
  * 슈퍼·전설 알이 등급을 "확정"하는 것은 가중치를 없애는 게 아니라
  * 후보를 그 등급 이상으로 좁히는 것이다 — ★4 알에서 ★5도 나온다.
  */
@@ -44,9 +48,9 @@ const CANDY_PER = 25_000_000;
 const CANDY_FEED = 10_000_000;
 
 const SHOP = [
-  { id: "egg", name: "포켓몬 알", cost: 3, desc: "평범한 알. 박스에 한 마리 늘어난다", icon: "🥚" },
-  { id: "egg-super", name: "슈퍼 알", cost: 12, desc: "★3 이상 확정", icon: "🥚" },
-  { id: "egg-legend", name: "전설 알", cost: 35, desc: "★4 이상 확정", icon: "🥚" },
+  { id: "egg", name: "포켓몬 알", cost: 2, desc: "평범한 알. 박스에 한 마리 늘어난다", icon: "🥚" },
+  { id: "egg-super", name: "슈퍼 알", cost: 7, desc: "★3 이상 확정", icon: "🥚" },
+  { id: "egg-legend", name: "전설 알", cost: 18, desc: "★4 이상 확정", icon: "🥚" },
   { id: "rare-candy", name: "이상한사탕", cost: 1, desc: "키우는 아이를 1000만 만큼 자라게 한다", icon: "🍬" },
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
   { id: "charm", name: "반짝이는 부적", cost: 60, desc: "이로치 확률 2배. 한 번만 살 수 있다", icon: "✨", once: true },
@@ -322,6 +326,9 @@ async function buildStats() {
   // 처음 실행이라 박스가 비었으면 한 마리 준다
   if (!save.box.length) { hatch(0); writeSave(); }
 
+  // 프로필이 없던 시절의 개체를 채운다 (한 번만 걸린다)
+  if (box.backfill(save.box)) writeSave();
+
   // 늘어난 토큰은 키우는 아이에게만 적립된다.
   if (box.accrue(save, u.total)) writeSave();
 
@@ -367,6 +374,7 @@ async function buildStats() {
         isPet: save.petIds.includes(m.id),
         url: p ? pathToFileURL(p).href : null,
         animUrl: ap ? pathToFileURL(ap).href : null,
+        profile: profile.build(m, e),
       };
     }),
   );

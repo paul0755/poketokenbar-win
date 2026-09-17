@@ -222,6 +222,42 @@
   .bx .acts button.on { color: #14151a; background: var(--accent); border-color: var(--accent); }
   .bx .acts button.del:hover { color: var(--red); border-color: var(--red); }
 
+  /* ---------- 개체 프로필 ---------- */
+  .bx .info { cursor: pointer; }
+  .prof { margin: -2px 0 8px; padding: 11px 13px; background: var(--card2); border: 1px solid var(--line); border-radius: 11px; }
+  .prof .hd { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 9px; }
+  .prof .lv { font-size: 13px; font-weight: 800; color: var(--accent); }
+  .prof .ty {
+    font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 99px;
+    background: #33363f; color: var(--text);
+  }
+  /* 타입은 색으로 구분되어야 한다 — 이름만 나열하면 훑어볼 수가 없다 */
+  .ty.t-normal{background:#9099a1}.ty.t-fire{background:#e8703a}.ty.t-water{background:#4a90d9}
+  .ty.t-electric{background:#e0c63a;color:#14151a}.ty.t-grass{background:#63b75c;color:#14151a}
+  .ty.t-ice{background:#68c5c5;color:#14151a}.ty.t-fighting{background:#c2452f}.ty.t-poison{background:#9a5ca8}
+  .ty.t-ground{background:#b0894a}.ty.t-flying{background:#8c9fd8}.ty.t-psychic{background:#e06b8b}
+  .ty.t-bug{background:#8fb92a;color:#14151a}.ty.t-rock{background:#b0a253;color:#14151a}
+  .ty.t-ghost{background:#6b5a9b}.ty.t-dragon{background:#5a5ac4}.ty.t-dark{background:#5a4a44}
+  .ty.t-steel{background:#8f9fb0;color:#14151a}.ty.t-fairy{background:#e79cd6;color:#14151a}
+  .prof .meta { font-size: 10px; color: var(--muted); }
+  .prof h5 { margin: 11px 0 6px; font-size: 9.5px; color: var(--dim); font-weight: 700; }
+
+  /* 능력치: 막대 하나로 개체값과 실제 수치를 같이 읽게 */
+  .stat { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; font-size: 10px; }
+  .stat .k { width: 38px; color: var(--muted); flex-shrink: 0; }
+  .stat .v { width: 30px; text-align: right; font-weight: 700; flex-shrink: 0; }
+  .stat .bar { flex: 1; height: 5px; background: #2b2e37; border-radius: 99px; overflow: hidden; }
+  .stat .bar i { display: block; height: 100%; border-radius: 99px; background: var(--blue); }
+  .stat .iv { width: 40px; text-align: right; color: var(--dim); flex-shrink: 0; }
+  /* 개체값 31은 만점이라 따로 보여야 한다 */
+  .stat .iv.max { color: var(--green); font-weight: 700; }
+
+  .mv { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; font-size: 10px; }
+  .mv .n { flex: 1; font-weight: 600; }
+  .mv .p { color: var(--muted); }
+  .prof .abil { font-size: 10px; color: var(--muted); line-height: 1.5; }
+  .prof .abil b { color: var(--text); }
+
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
   .cell {
     background: var(--card); border: 1px solid var(--line); border-radius: 10px;
