@@ -1,5 +1,5 @@
 "use strict";
-const { app, Tray, BrowserWindow, Menu, ipcMain, nativeImage, screen, Notification, shell } = require("electron");
+const { app, Tray, BrowserWindow, Menu, ipcMain, nativeImage, screen, Notification, shell, dialog } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -17,6 +17,7 @@ let tray = null;
 let win = null; // 팝오버
 let pet = null; // 데스크톱 펫
 let lastStats = null;
+let lastUsage = null; // 마지막 스캔 결과. 설정 화면의 경로 진단에 쓴다
 
 /**
  * 이상한사탕 1개의 값. 하루 5천만~1억을 쓰면 하루 2~4개다.
@@ -117,6 +118,18 @@ let save = {
    * 쓴 양만 보여준다.
    */
   limits: {},
+  /**
+   * 사용자가 더해 준 경로.
+   *
+   * 기본 경로를 대체하지 않고 앞에 끼워 넣는다 — "여기도 봐 줘"이지
+   * "여기만 봐"가 아니다. 잘못 지정했을 때 멀쩡히 읽히던 게 통째로
+   * 사라지는 쪽이 더 나쁘다.
+   *
+   *   logs   { claude: [폴더...], codex: [폴더...] }
+   *   quota  { claude: 파일, codex: 파일 }
+   */
+  logRoots: { claude: [], codex: [] },
+  quotaFiles: {},
   growthPct: 100,
   pricePct: 100,
   notifyEnabled: true,
@@ -309,7 +322,8 @@ const natureIndexByName = (name) =>
   Math.max(0, poke.NATURES.findIndex((n) => n.name === name));
 
 async function buildStats() {
-  const u = usage.collect();
+  const u = usage.collect(save.logRoots || {});
+  lastUsage = u;
   lastTotal = u.total;
 
   // 0.1.x 세이브라면 여기서 한 번 박스로 옮긴다. 옮긴 뒤로는 그냥 지나간다.
@@ -406,7 +420,7 @@ async function buildStats() {
     charm: Boolean(save.charm),
     shiny: Boolean(act && act.shiny),
     tree: await buildTree(act, eff),
-    limits: limits.summarize(u, Date.now(), save.limits || {}),
+    limits: limits.summarize(u, Date.now(), save.limits || {}, save.quotaFiles || {}),
     box: boxList,
     activeId: act ? act.id : null,
     petIds: save.petIds,
@@ -738,6 +752,17 @@ const openShop = () => openTab("shop");
 
 let setWin = null;
 let pollTimer = null;
+
+/** 설정 화면에 보여줄 경로 상태. 실제로 읽히는지까지 확인해서 준다. */
+function pathReport() {
+  const u = lastUsage || usage.collect(save.logRoots || {});
+  return {
+    logs: usage.diagnose(save.logRoots || {}),
+    quota: limits.diagnoseQuota(u, save.quotaFiles || {}),
+    roots: save.logRoots || { claude: [], codex: [] },
+    files: save.quotaFiles || {},
+  };
+}
 
 function settingsPayload() {
   return {
@@ -1208,6 +1233,44 @@ app.whenReady().then(async () => {
   ipcMain.on("close-settings", () => setWin && !setWin.isDestroyed() && setWin.close());
   ipcMain.on("open-data-folder", () => shell.openPath(app.getPath("userData")));
   ipcMain.on("reset-progress", resetProgress);
+
+  /* ---- 읽을 경로 ---- */
+  ipcMain.handle("path-report", () => pathReport());
+
+  /** 폴더/파일 고르기. 취소하면 아무 일도 없다. */
+  ipcMain.handle("pick-path", async (_e, { kind, title }) => {
+    const r = await dialog.showOpenDialog(setWin || win, {
+      title: title || "선택",
+      properties: kind === "file" ? ["openFile"] : ["openDirectory"],
+      filters: kind === "file" ? [{ name: "JSON", extensions: ["json"] }] : undefined,
+    });
+    return r.canceled || !r.filePaths.length ? null : r.filePaths[0];
+  });
+
+  /**
+   * 경로 추가/제거. 저장하고 바로 다시 스캔한다 —
+   * 넣자마자 몇 개가 잡혔는지 보여야 맞게 넣었는지 알 수 있다.
+   */
+  ipcMain.handle("set-log-root", async (_e, { src, path: p, remove }) => {
+    if (src !== "claude" && src !== "codex") return pathReport();
+    const roots = save.logRoots || (save.logRoots = { claude: [], codex: [] });
+    if (!Array.isArray(roots[src])) roots[src] = [];
+    if (remove) roots[src] = roots[src].filter((x) => x !== p);
+    else if (p && !roots[src].includes(p)) roots[src].push(p);
+    writeSave();
+    await refresh(true);
+    return pathReport();
+  });
+
+  ipcMain.handle("set-quota-file", async (_e, { src, path: p }) => {
+    if (src !== "claude" && src !== "codex") return pathReport();
+    save.quotaFiles = save.quotaFiles || {};
+    if (p) save.quotaFiles[src] = p;
+    else delete save.quotaFiles[src];
+    writeSave();
+    await refresh(true);
+    return pathReport();
+  });
 
   // 펫을 클릭하면 팝오버를 연다. 펫 옆이 아니라 트레이 옆에 띄운다 —
   // 펫은 화면 아무 데나 있을 수 있어서, 늘 같은 자리에 뜨는 편이 덜 헷갈린다.

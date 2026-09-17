@@ -66,6 +66,19 @@
   input[type="number"] { width: 64px; }
   input[type="text"]:focus, input[type="number"]:focus { outline: none; border-color: var(--accent); }
   .val { font-size: 11px; color: var(--accent); min-width: 48px; text-align: right; }
+  /* 읽는 곳 */
+  .pth { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .pth:first-child { border-top: 0; }
+  .pth .st { width: 15px; flex-shrink: 0; text-align: center; font-size: 11px; }
+  .pth .bd { flex: 1; min-width: 0; }
+  .pth .p {
+    font-size: 10px; font-family: Consolas, monospace; color: var(--text);
+    word-break: break-all; line-height: 1.35;
+  }
+  .pth .m { font-size: 9.5px; color: var(--dim); margin-top: 1px; }
+  .pth .m.on { color: var(--accent); }
+  .pth button { padding: 3px 7px; font-size: 10px; flex-shrink: 0; }
+
   .danger { color: #ff8a8a; border-color: #5a2a2a; }
   .danger:hover { background: #2e1c1c; }
 </style>
@@ -163,6 +176,27 @@
       <button id="calClaudeWeekGo">맞추기</button>
     </div>
     <div class="note" id="calNote"></div>
+  </div>
+
+  <h4>읽는 곳</h4>
+  <div class="row">
+    <div class="note" style="margin:0 0 9px">
+      기본 경로를 자동으로 찾습니다. 못 찾거나 다른 곳에 있으면 여기서 더해 주세요 —
+      <b>기본 경로를 대체하지 않고 추가로</b> 읽습니다.
+    </div>
+    <div id="pathLogs"></div>
+    <div class="top" style="margin-top:8px">
+      <span class="k">로그 폴더 추가</span>
+      <button data-add="claude">Claude</button>
+      <button data-add="codex">Codex</button>
+    </div>
+  </div>
+  <div class="row">
+    <div class="note" style="margin:0 0 9px">
+      <b>사용률(%)</b>은 도구가 직접 적어 두는 파일에서 읽습니다.
+      없으면 막대 없이 쓴 양만 나옵니다 — 설정 › 한도 맞추기로 대신할 수 있습니다.
+    </div>
+    <div id="pathQuota"></div>
   </div>
 
   <h4>트레이</h4>

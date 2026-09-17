@@ -50,6 +50,12 @@ contextBridge.exposeInMainWorld("ptb", {
   // 역산 결과를 보여줘야 하므로 invoke
   calibrateLimit: (a) => ipcRenderer.invoke("calibrate-limit", a),
   openDataFolder: () => ipcRenderer.send("open-data-folder"),
+
+  // 읽을 경로
+  pathReport: () => ipcRenderer.invoke("path-report"),
+  pickPath: (a) => ipcRenderer.invoke("pick-path", a),
+  setLogRoot: (a) => ipcRenderer.invoke("set-log-root", a),
+  setQuotaFile: (a) => ipcRenderer.invoke("set-quota-file", a),
   resetProgress: () => ipcRenderer.send("reset-progress"),
 
   // 데스크톱 펫 전용

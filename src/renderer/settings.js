@@ -169,6 +169,90 @@ $("petSize").addEventListener("input", () => {
 });
 on("petSize", "change", () => send({ petSize: Number($("petSize").value) }));
 
+/* ---------------- 읽는 곳 ---------------- */
+
+const short = (p) => (p.length > 64 ? p.slice(0, 28) + " … " + p.slice(-32) : p);
+
+/**
+ * 경로마다 실제로 읽히는지까지 보여준다.
+ *
+ * 경로만 나열하면 오타를 알아챌 방법이 없다. 몇 개가 잡혔는지,
+ * 값이 언제 것인지가 같이 보여야 맞게 넣었는지 알 수 있다.
+ */
+function renderPaths(r) {
+  if (!r) return;
+  const userRoots = r.roots || { claude: [], codex: [] };
+
+  $("pathLogs").innerHTML = (r.logs || [])
+    .map((d) => {
+      const mine = (userRoots[d.id] || []).includes(d.path);
+      const st = !d.exists ? "·" : d.dup ? "·" : d.files ? "✅" : "⚠️";
+      const msg = !d.exists
+        ? "폴더 없음"
+        : d.dup
+          ? "위와 같은 폴더 (건너뜀)"
+          : d.files
+            ? `${d.label} · 파일 ${d.files}개`
+            : `${d.label} · 파일 0개`;
+      return `
+        <div class="pth">
+          <span class="st">${st}</span>
+          <div class="bd">
+            <div class="p">${short(d.path)}</div>
+            <div class="m ${d.files ? "on" : ""}">${msg}${mine ? " · 직접 추가함" : ""}</div>
+          </div>
+          ${mine ? `<button data-del="${d.id}" data-path="${d.path}">빼기</button>` : ""}
+        </div>`;
+    })
+    .join("");
+
+  $("pathQuota").innerHTML = (r.quota || [])
+    .map((q) => {
+      const ago =
+        q.ageMs == null
+          ? ""
+          : q.ageMs < 3600000
+            ? Math.round(q.ageMs / 60000) + "분 전 값"
+            : Math.floor(q.ageMs / 3600000) + "시간 전 값";
+      const fixed = q.path !== "세션 로그 안에 포함";
+      return `
+        <div class="pth">
+          <span class="st">${q.ok ? "✅" : "·"}</span>
+          <div class="bd">
+            <div class="p">${short(q.path)}</div>
+            <div class="m ${q.ok ? "on" : ""}">${q.label} · ${q.ok ? q.detail + " · " + ago : "읽지 못함"}</div>
+          </div>
+          ${fixed ? `<button data-qf="${q.id}">고르기</button>` : ""}
+        </div>`;
+    })
+    .join("");
+}
+
+async function loadPaths() {
+  renderPaths(await window.ptb.pathReport());
+}
+
+document.addEventListener("click", async (e) => {
+  const add = e.target.closest("button[data-add]");
+  if (add) {
+    const p = await window.ptb.pickPath({ kind: "dir", title: add.dataset.add + " 로그 폴더" });
+    if (p) renderPaths(await window.ptb.setLogRoot({ src: add.dataset.add, path: p }));
+    return;
+  }
+  const del = e.target.closest("button[data-del]");
+  if (del) {
+    renderPaths(await window.ptb.setLogRoot({ src: del.dataset.del, path: del.dataset.path, remove: true }));
+    return;
+  }
+  const qf = e.target.closest("button[data-qf]");
+  if (qf) {
+    const p = await window.ptb.pickPath({ kind: "file", title: "사용률 파일" });
+    if (p) renderPaths(await window.ptb.setQuotaFile({ src: qf.dataset.qf, path: p }));
+  }
+});
+
+loadPaths();
+
 $("openData").onclick = () => window.ptb.openDataFolder();
 $("reset").onclick = () => window.ptb.resetProgress();
 $("close").onclick = () => window.ptb.closeSettings();

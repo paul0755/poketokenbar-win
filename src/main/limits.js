@@ -99,8 +99,8 @@ function anchoredWeek(events, now, day, hour) {
  * 이건 계산이 아니라 제공자가 알려준 값이다. 없으면 null —
  * 없는 걸 추정해서 채우지 않는다.
  */
-function codexQuota() {
-  const f = path.join(os.homedir(), ".opencodex", "codex-quota-cache.json");
+function codexQuota(file) {
+  const f = file || path.join(os.homedir(), ".opencodex", "codex-quota-cache.json");
   try {
     const raw = fs.readFileSync(f, "utf8");
     const j = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw);
@@ -137,8 +137,8 @@ function codexQuota() {
  * 로그에는 한도가 없어서 이 값을 못 구하는 줄 알았는데, 앱이 이미
  * 받아 두고 있었다. 크리덴셜도 네트워크도 필요 없다 — 이미 디스크에 있다.
  */
-function claudeQuota() {
-  const f = path.join(os.homedir(), "AppData", "Roaming", "Claude", "plan-usage-history.json");
+function claudeQuota(file) {
+  const f = file || path.join(os.homedir(), "AppData", "Roaming", "Claude", "plan-usage-history.json");
   try {
     const raw = fs.readFileSync(f, "utf8");
     const j = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw);
@@ -167,7 +167,7 @@ function claudeQuota() {
  * limits 는 사용자가 설정에 적어 넣은 한도값이다 — 없으면 퍼센트를 내지 않는다.
  * 우리가 아는 한도는 Codex 주간(제공자 제공)뿐이고, 나머지는 모른다.
  */
-function perSource(usage, now, limits = {}) {
+function perSource(usage, now, limits = {}, files = {}) {
   const events = usage.events || [];
   const ids = [...new Set(events.map((e) => e.src))];
   const out = {};
@@ -185,7 +185,7 @@ function perSource(usage, now, limits = {}) {
      *
      * 그래서 역산하지 않고 알려준 퍼센트를 그대로 쓴다.
      */
-    const off = officialOf(usage, id, now);
+    const off = officialOf(usage, id, now, files);
     // 리셋 요일을 알면 그 창으로 센다. 모르면 롤링 7일 —
     // 둘은 다른 값이므로 화면에도 어느 쪽인지 밝힌다.
     const wk =
@@ -257,8 +257,8 @@ const pctLeft = (used, limit) =>
  * 겪었던 일이다. 그래서 더 최신인 쪽을 고르고, 어디서 왔는지와
  * 얼마나 묵었는지를 함께 넘긴다.
  */
-function codexOfficial(usage, now) {
-  const cache = codexQuota();
+function codexOfficial(usage, now, file) {
+  const cache = codexQuota(file);
   const log = (usage.quota || {}).codex || null;
 
   const out = [];
@@ -306,10 +306,10 @@ function codexOfficial(usage, now) {
  *   claude : 데스크톱 앱이 적어 두는 plan-usage-history.json (15분마다 갱신)
  *   codex  : 세션 로그의 rate_limits, 없으면 opencodex 캐시
  */
-function officialOf(usage, id, now) {
-  if (id === "claude") return claudeQuota();
+function officialOf(usage, id, now, files = {}) {
+  if (id === "claude") return claudeQuota(files.claude);
   if (id !== "codex") return null;
-  const list = codexOfficial(usage, now);
+  const list = codexOfficial(usage, now, files.codex);
   if (!list || !list.length) return null;
   const o = list[0]; // 최신 먼저 정렬돼 있다
   return {
@@ -382,18 +382,64 @@ function autoLimits(usage, id, now) {
   return Object.keys(out).length ? out : null;
 }
 
-function summarize(usage, now = Date.now(), limits = {}) {
+function summarize(usage, now = Date.now(), limits = {}, files = {}) {
   const events = usage.events || [];
   return {
     block: currentBlock(events, now),
     week: rollingWeek(events, now),
-    codex: codexQuota(),
-    perSource: perSource(usage, now, limits),
+    codex: codexQuota(files.codex),
+    perSource: perSource(usage, now, limits, files),
     now,
   };
 }
 
-module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, anchoredWeek, codexQuota, claudeQuota, codexOfficial, officialOf, perSource, summarize };
+/**
+ * 쿼터 파일 상태. 설정 화면에서 "이 파일을 보고 있고 읽히는가"를 보여준다.
+ *
+ * 경로만 적어두면 오타를 알아챌 방법이 없다. 읽혔는지, 값이 언제 것인지까지 돌려준다.
+ */
+function diagnoseQuota(usage, files = {}) {
+  const now = Date.now();
+  const rows = [];
+  const push = (id, label, file, q) =>
+    rows.push({
+      id,
+      label,
+      path: file,
+      ok: Boolean(q),
+      ageMs: q ? now - (q.at ?? q.updatedAt) : null,
+      detail: q
+        ? [q.block != null ? "5시간 " + q.block + "%" : null, q.week != null ? "주간 " + q.week + "%" : null]
+            .filter(Boolean)
+            .join(" · ")
+        : null,
+    });
+
+  const cf = files.claude || path.join(os.homedir(), "AppData", "Roaming", "Claude", "plan-usage-history.json");
+  push("claude", "Claude 사용률", cf, claudeQuota(files.claude));
+
+  const kf = files.codex || path.join(os.homedir(), ".opencodex", "codex-quota-cache.json");
+  const c = codexQuota(files.codex);
+  push("codex", "Codex 쿼터 (opencodex)", kf, c ? { week: c.percent, updatedAt: c.updatedAt } : null);
+
+  // 로그에 섞여 오는 Codex 한도는 파일이 아니라 세션 로그에서 온다
+  const lg = (usage.quota || {}).codex;
+  rows.push({
+    id: "codex",
+    label: "Codex 한도 (세션 로그)",
+    path: "세션 로그 안에 포함",
+    ok: Boolean(lg),
+    ageMs: lg ? now - lg.at : null,
+    detail: lg
+      ? [lg.block ? "5시간 " + lg.block.percent + "%" : null, lg.week ? "주간 " + lg.week.percent + "%" : null]
+          .filter(Boolean)
+          .join(" · ")
+      : null,
+  });
+  return rows;
+}
+
+module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, anchoredWeek, codexQuota, claudeQuota, codexOfficial, officialOf, perSource, summarize, diagnoseQuota };
 
 // node src/main/limits.js 로 확인
 if (require.main === module) {

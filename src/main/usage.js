@@ -200,8 +200,8 @@ function split(n, lu) {
  *                        <store>/<uuid>/<uuid>/local_<uuid>/.claude/projects 처럼
  *                        UUID 단계가 여러 겹이라 고정 경로로는 못 잡고 찾아야 한다.
  */
-function claudeRoots() {
-  const roots = [];
+function claudeRoots(extra = []) {
+  const roots = [...extra];
   const env = process.env.CLAUDE_CONFIG_DIR;
   if (env) for (const p of env.split(",")) if (p.trim()) roots.push(path.join(p.trim(), "projects"));
   roots.push(path.join(HOME, ".config", "claude", "projects"));
@@ -231,9 +231,9 @@ function findEmbedded(base, depth = 0, out = []) {
 }
 
 /** Codex 로그. 보관된 세션도 실제로 쓴 토큰이므로 같이 센다. */
-function codexRoots() {
+function codexRoots(extra = []) {
   const home = process.env.CODEX_HOME || path.join(HOME, ".codex");
-  return [path.join(home, "sessions"), path.join(home, "archived_sessions")];
+  return [...extra, path.join(home, "sessions"), path.join(home, "archived_sessions")];
 }
 
 const SOURCES = [
@@ -278,7 +278,13 @@ function dayOf(iso) {
  */
 const fileCache = new Map();
 
-function collect() {
+/**
+ * 사용자가 설정에서 더해 준 경로를 앞에 끼워 넣는다.
+ *
+ * 기본 경로를 없애지는 않는다. "여기도 봐 줘"이지 "여기만 봐"가 아니다 —
+ * 잘못 지정하면 멀쩡히 읽히던 게 통째로 사라지는 쪽이 더 나쁘다.
+ */
+function collect(extraRoots = {}) {
   const byDay = new Map();
   const bySource = new Map();
   // 도구별 토큰 종류 분해. 합계만 보면 캐시 때문에 커진 건지 알 수 없다.
@@ -297,7 +303,7 @@ function collect() {
      */
     const seenPath = new Set();
     const paths = [];
-    for (const root of src.dirs()) {
+    for (const root of src.dirs(extraRoots[src.id] || [])) {
       let real;
       try {
         real = fs.realpathSync(root);
@@ -435,7 +441,40 @@ function collect() {
   };
 }
 
-module.exports = { collect, localDay, SOURCES };
+/**
+ * 경로별 상태. 설정 화면에서 "여기를 보고 있고, 몇 개가 잡혔다"를 보여준다.
+ *
+ * 경로가 틀렸는지 아닌지는 화면에 나오기 전엔 알 수가 없다.
+ * 폴더는 있는데 파일이 0개인 경우도 구분해서 알려준다.
+ */
+function diagnose(extraRoots = {}) {
+  const out = [];
+  for (const src of SOURCES) {
+    const seen = new Set();
+    for (const root of src.dirs(extraRoots[src.id] || [])) {
+      let real = null;
+      try {
+        real = fs.realpathSync(root);
+      } catch {
+        out.push({ id: src.id, label: src.label, path: root, exists: false, files: 0, dup: false });
+        continue;
+      }
+      const dup = seen.has(real);
+      seen.add(real);
+      out.push({
+        id: src.id,
+        label: src.label,
+        path: root,
+        exists: true,
+        files: dup ? 0 : walk(real, src.ext).length,
+        dup,
+      });
+    }
+  }
+  return out;
+}
+
+module.exports = { collect, diagnose, localDay, SOURCES };
 
 // node src/main/usage.js 로 바로 확인할 수 있게
 if (require.main === module) {
