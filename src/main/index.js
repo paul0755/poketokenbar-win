@@ -903,6 +903,27 @@ let petBusy = false;
 const petW = () => save.petSize ?? 128;
 
 /**
+ * 펫 창을 옮긴다. 위치만이 아니라 **크기까지 함께** 지정한다.
+ *
+ * setPosition 만 쓰던 때, 끄는 동안 창이 1319x1416 까지 부풀어 화면 위쪽을
+ * 통째로 덮고 클릭을 먹은 일이 있었다. 배율은 두 모니터 다 100% 였으니
+ * DPI 탓이 아니고, 우리 코드에 크기를 바꾸는 곳도 없었다. 원인이 무엇이든
+ * 위치만 주는 호출로는 크기가 보장되지 않는다 — 매번 같이 박아 둔다.
+ *
+ * 화면 밖으로도 못 나가게 가둔다. 저장된 자리가 y=-636 이 된 적이 있는데
+ * 그러면 다음에 켤 때 보이지도 않는다.
+ */
+function movePet(win, x, y) {
+  if (!win || win.isDestroyed()) return;
+  const w = petW();
+  const area = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) }).workArea;
+  const nx = Math.min(Math.max(area.x, Math.round(x)), area.x + area.width - w);
+  const ny = Math.min(Math.max(area.y, Math.round(y)), area.y + area.height - w);
+  win.setBounds({ x: nx, y: ny, width: w, height: w });
+  return { x: nx, y: ny };
+}
+
+/**
  * 배회 강도. 기본은 "가끔" — 데스크톱 펫이 쉬지 않고 돌아다니면
  * 귀여운 게 아니라 작업에 거슬린다. 대부분의 시간은 가만히 있어야 한다.
  *
@@ -931,7 +952,10 @@ function petTargets() {
  * 저장된 자리를 기준으로 순서대로 비켜 놓는다.
  */
 function startPos(nth) {
-  const area = screen.getPrimaryDisplay().workArea;
+  // 저장된 자리가 속한 화면을 기준으로 한다. 주 모니터로 고정하면
+  // 보조 모니터에 뒀던 펫이 매번 주 모니터로 끌려온다.
+  const base0 = save.petPos || { x: 0, y: 0 };
+  const area = screen.getDisplayNearestPoint({ x: base0.x, y: base0.y }).workArea;
   const base = save.petPos || {
     x: area.x + area.width - petW() - 40,
     y: area.y + area.height - petW() - 60,
@@ -976,9 +1000,17 @@ function createPet(id, nth) {
 
   w.on("moved", () => {
     if (w.isDestroyed()) return;
+    /*
+     * 끄는 동안에는 아무것도 하지 않는다.
+     *
+     * 여기서 writeSave() 를 부르고 있었다. 드래그 한 번에 moved 가 수십 번
+     * 오는데 그때마다 동기 디스크 쓰기를 하니 메인이 밀렸고, setPosition 이
+     * 커서를 못 따라가 펫이 뒤처져 보였다. 위로 끌면 아래로 처지는 게
+     * 그래서였다. 자리는 놓을 때 한 번만 저장한다.
+     */
+    if (rec.dragging) return;
     const p = w.getPosition();
     if (rec.selfPos && p[0] === rec.selfPos.x && p[1] === rec.selfPos.y) return; // 우리가 옮긴 것
-    // 마지막으로 사용자가 놓은 자리를 기준점으로 기억한다
     save.petPos = { x: p[0], y: p[1] };
     writeSave();
     rec.target = null; // 사용자가 놓은 자리에서 다시 시작한다
@@ -1028,8 +1060,7 @@ function startWander(id) {
     const step = (d) => Math.sign(d) * Math.min(Math.abs(d), cfg.px);
     const nx = Math.round(p[0] + step(dx));
     const ny = Math.round(p[1] + step(dy));
-    rec.selfPos = { x: nx, y: ny };
-    rec.win.setPosition(nx, ny);
+    rec.selfPos = movePet(rec.win, nx, ny) || { x: nx, y: ny };
     push(rec.win, { facing: dx < 0 ? "left" : "right" }); // 진행 방향으로 뒤집게
   }, cfg.ms);
 }
@@ -1302,21 +1333,57 @@ app.whenReady().then(async () => {
     return null;
   };
 
-  ipcMain.on("pet-drag", (e, { x, y }) => {
+  /**
+   * 끌기 시작. 그 창의 현재 자리를 기억해 둔다.
+   *
+   * 렌더러가 보내온 화면 좌표에서 잡은 지점을 빼는 방식이었는데, 창 좌표와
+   * 화면 좌표 사이에 조금이라도 어긋남이 있으면 그대로 오차가 된다.
+   * 시작 자리 + 움직인 거리로 계산하면 그 어긋남이 상쇄된다.
+   */
+  ipcMain.on("pet-drag-start", (e) => {
     const id = petIdOf(e);
     const rec = id && pets.get(id);
     if (!rec || rec.win.isDestroyed()) return;
+    const p = rec.win.getPosition();
+    rec.dragFrom = { x: p[0], y: p[1] };
+    rec.dragging = true;
     stopWander(id); // 끄는 동안 우리가 끼어들면 안 된다
-    rec.win.setPosition(Math.round(x), Math.round(y));
+  });
+
+  ipcMain.on("pet-drag", (e, { dx, dy }) => {
+    const id = petIdOf(e);
+    const rec = id && pets.get(id);
+    if (!rec || rec.win.isDestroyed() || !rec.dragFrom) return;
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return; // NaN 이 오면 창이 엉뚱해진다
+    /*
+     * 마우스는 초당 수십~수백 번 움직인다. 그때마다 창을 옮기면 합성기가
+     * 못 따라가고, 실제로 창 크기가 망가진 적이 있다. 다음 프레임에 한 번만
+     * 적용한다 — 눈에는 차이가 없고 호출은 몇 배로 줄어든다.
+     */
+    rec.pending = { x: rec.dragFrom.x + dx, y: rec.dragFrom.y + dy };
+    if (rec.raf) return;
+    rec.raf = setTimeout(() => {
+      rec.raf = null;
+      const p = rec.pending;
+      if (!p || rec.win.isDestroyed()) return;
+      rec.selfPos = movePet(rec.win, p.x, p.y) || null;
+    }, 16);
   });
 
   ipcMain.on("pet-drag-end", (e) => {
     const id = petIdOf(e);
     const rec = id && pets.get(id);
-    if (!rec || rec.win.isDestroyed()) return;
+    if (!rec) return;
+    rec.dragging = false;
+    rec.dragFrom = null;
+    if (rec.raf) { clearTimeout(rec.raf); rec.raf = null; }
+    if (rec.win.isDestroyed()) return;
+    // 마지막 위치를 확실히 반영하고 크기도 다시 박는다
+    if (rec.pending) rec.selfPos = movePet(rec.win, rec.pending.x, rec.pending.y) || null;
+    rec.pending = null;
     const p = rec.win.getPosition();
     save.petPos = { x: p[0], y: p[1] };
-    writeSave();
+    writeSave(); // 놓을 때 한 번만
     startWander(id); // 놓은 자리에서 다시 시작
   });
 

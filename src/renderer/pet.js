@@ -47,15 +47,11 @@ let drag = null;
 
 window.addEventListener("mousedown", (e) => {
   if (e.button !== 0) return;
-  drag = {
-    // 창 안에서 어디를 잡았는지. 이걸 빼야 커서가 그 지점을 계속 물고 간다.
-    grabX: e.clientX,
-    grabY: e.clientY,
-    startX: e.screenX,
-    startY: e.screenY,
-    moved: 0,
-  };
+  // 누른 지점만 기억한다. 창 안 어디를 잡았는지는 메인이 알 필요가 없다 —
+  // 시작 자리 + 움직인 거리로 계산하므로 잡은 지점은 저절로 상쇄된다.
+  drag = { startX: e.screenX, startY: e.screenY, moved: 0 };
   document.body.classList.add("dragging");
+  window.ptb.petDragStart();
 });
 
 window.addEventListener("mousemove", (e) => {
@@ -65,7 +61,8 @@ window.addEventListener("mousemove", (e) => {
     Math.abs(e.screenX - drag.startX) + Math.abs(e.screenY - drag.startY),
   );
   if (drag.moved <= CLICK_SLOP) return; // 아직 클릭일 수 있다
-  window.ptb.petDrag({ x: e.screenX - drag.grabX, y: e.screenY - drag.grabY });
+  // 누른 지점에서 얼마나 움직였는지만 보낸다. 창 자리는 메인이 안다.
+  window.ptb.petDrag({ dx: e.screenX - drag.startX, dy: e.screenY - drag.startY });
 });
 
 window.addEventListener("mouseup", () => {

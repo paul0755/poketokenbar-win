@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld("ptb", {
 
   // 데스크톱 펫 전용
   petClick: () => ipcRenderer.send("pet-click"),
-  petDrag: (pos) => ipcRenderer.send("pet-drag", pos),
+  petDragStart: () => ipcRenderer.send("pet-drag-start"),
+  petDrag: (d) => ipcRenderer.send("pet-drag", d),
   petDragEnd: () => ipcRenderer.send("pet-drag-end"),
 });
