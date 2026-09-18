@@ -148,20 +148,30 @@ function claudeQuota(file) {
     for (const x of s) if (x && typeof x.t === "number" && (!last || x.t > last.t)) last = x;
     if (!last || !last.u) return null;
     const pct = (v) => (typeof v === "number" && v >= 0 && v <= 100 ? v : null);
-    /*
-     * fh(5시간)는 쓰지 않는다.
-     *
-     * 창이 리셋되면 0으로 떨어진 뒤 다시 오르지 않는다. 앱 메뉴가 22% 라고
-     * 말하는 동안 이 값은 3시간 반째 0 이었다. 우리가 늦게 읽는 게 아니라
-     * 파일에 안 쌓인다. 틀린 값으로 막대를 그리느니 안 그리는 게 낫다.
-     *
-     * sd(주간)는 하루 종일 단조 증가했고 메뉴와도 지연 범위 안에서 맞는다
-     * (15% vs 18%, 14분 차). 이쪽만 쓴다.
-     */
+    const block = pct(last.u.fh);
     const week = pct(last.u.sd);
-    if (week == null) return null;
-    const ageMs = Date.now() - last.t;
-    return { block: null, week, at: last.t, ageMs, stale: ageMs > 3600000 };
+    if (block == null && week == null) return null;
+
+    /*
+     * 나이는 "쓴 시각" 이 아니라 "값이 마지막으로 바뀐 시각" 으로 잰다.
+     *
+     * 앱은 15분마다 파일을 쓰지만 값은 사용량 메뉴를 열 때만 새로 받아온다.
+     * 실제로 fh·sd 가 3시간 반 동안 같은 값으로 얼어 있다가 메뉴를 연 순간
+     * 한꺼번에 뛰었다. 쓴 시각으로 재면 "4분 전 값" 이라고 말하면서 3시간
+     * 묵은 값을 막대로 그리게 된다.
+     */
+    let changedAt = last.t;
+    for (let i = s.length - 1; i > 0; i--) {
+      const a = s[i - 1],
+        b = s[i];
+      if (!a || !a.u || !b || !b.u) continue;
+      if (a.u.fh !== b.u.fh || a.u.sd !== b.u.sd) {
+        changedAt = b.t;
+        break;
+      }
+    }
+    const ageMs = Date.now() - changedAt;
+    return { block, week, at: changedAt, writtenAt: last.t, ageMs, stale: ageMs > 3600000 };
   } catch {
     return null; // 데스크톱 앱을 안 쓰거나 아직 기록이 없다
   }
