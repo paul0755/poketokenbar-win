@@ -15,7 +15,6 @@ const SAVE = path.join(app.getPath("userData"), "save.json");
 
 let tray = null;
 let win = null; // 팝오버
-let pet = null; // 데스크톱 펫
 let lastStats = null;
 let lastUsage = null; // 마지막 스캔 결과. 설정 화면의 경로 진단에 쓴다
 
@@ -485,6 +484,18 @@ function push(target, s) {
   if (target && !target.isDestroyed()) target.webContents.send("stats", s);
 }
 
+/**
+ * 떠 있는 펫 전부에 밀어준다.
+ *
+ * 한 마리이던 시절의 전역 pet 하나에 밀고 있었는데, 여러 마리로 바꾸면서
+ * 그 변수가 null 로 남았다. push(null) 은 조용히 아무것도 안 해서
+ * 펫은 창을 만들 때 받은 값에 그대로 멈춰 있었다 — 알이 부화해도
+ * 계속 알이었다. 조용히 실패하는 쪽이 제일 찾기 어렵다.
+ */
+function pushPets(s) {
+  for (const rec of pets.values()) push(rec.win, s);
+}
+
 let prevSnap = null;
 
 /** 상태가 바뀐 순간에만 알린다. 자세한 판단은 notify.js가 한다. */
@@ -525,7 +536,7 @@ async function refresh(force = false) {
   if (!force && lastStats && Date.now() - lastScanAt < 3000) {
     // 최근 결과를 그대로 다시 밀어준다. 화면은 갱신되고 디스크는 안 건드린다.
     push(win, lastStats);
-    push(pet, lastStats);
+    pushPets(lastStats);
     return;
   }
   refreshing = true;
@@ -534,7 +545,7 @@ async function refresh(force = false) {
     lastStats = s;
     sendNotifications(s);
     push(win, s);
-    push(pet, s);
+    pushPets(s);
     try {
       applyTray(s);
     } catch (e) {

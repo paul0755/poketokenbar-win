@@ -171,7 +171,7 @@ function claudeQuota(file) {
       }
     }
     const ageMs = Date.now() - changedAt;
-    return { block, week, at: changedAt, writtenAt: last.t, ageMs, stale: ageMs > 3600000 };
+    return { block, week, at: changedAt, writtenAt: last.t, ageMs };
   } catch {
     return null; // 데스크톱 앱을 안 쓰거나 아직 기록이 없다
   }
@@ -333,19 +333,44 @@ function codexOfficial(usage, now, file) {
  *   claude : 데스크톱 앱이 적어 두는 plan-usage-history.json (15분마다 갱신)
  *   codex  : 세션 로그의 rate_limits, 없으면 opencodex 캐시
  */
+/**
+ * 공식값이 묵었는지 판정한다.
+ *
+ * 시간으로만 재면 틀린다. 제공자 값은 우리가 쓸 때만 움직이므로,
+ * 쉬고 있었다면 세 시간 된 값도 여전히 정확하다. 반대로 값이 멈춘 사이
+ * 많이 썼다면 10분 된 값도 이미 틀리다.
+ *
+ * 그래서 시간이 아니라 **값이 바뀐 뒤 우리가 잰 토큰**으로 잰다.
+ * 1%가 대략 0.5~2M 이므로 5M을 넘으면 몇 % 는 이미 어긋나 있다.
+ */
+const DRIFT_TOKENS = 5_000_000;
+
+function driftSince(usage, id, at) {
+  let n = 0;
+  for (const e of usage.events || []) if (e.src === id && e.t > at) n += e.n;
+  return n;
+}
+
 function officialOf(usage, id, now, files = {}) {
-  if (id === "claude") return claudeQuota(files.claude);
+  if (id === "claude") {
+    const q = claudeQuota(files.claude);
+    if (!q) return null;
+    const drift = driftSince(usage, "claude", q.at);
+    return { ...q, drift, stale: drift > DRIFT_TOKENS };
+  }
   if (id !== "codex") return null;
   const list = codexOfficial(usage, now, files.codex);
   if (!list || !list.length) return null;
   const o = list[0]; // 최신 먼저 정렬돼 있다
+  const drift = driftSince(usage, "codex", o.at);
   return {
+    drift,
+    stale: drift > DRIFT_TOKENS,
     block: o.block ? o.block.percent : null,
     week: o.week ? o.week.percent : null,
     weekResetAt: o.week ? o.week.resetAt : null,
     at: o.at,
     ageMs: o.ageMs,
-    stale: o.stale,
     from: o.from,
   };
 }
