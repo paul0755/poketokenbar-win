@@ -148,20 +148,52 @@ let save = {
 
 let hadSave = false; // 세이브 파일이 원래 있었는가 (첫 실행 vs 이전 버전 이어받기)
 
+/**
+ * 세이브를 못 읽었는가. "파일이 없다"와는 다른 뜻이다.
+ *
+ * 이게 참이면 아무것도 새로 만들지 않고 아무것도 쓰지 않는다 —
+ * 읽지 못한 것을 첫 실행으로 오해하면 멀쩡한 진행 위에 새 알을 깐다.
+ */
+let loadFailed = false;
+
 function loadSave() {
+  let raw = null;
   try {
     // BOM이 붙은 파일(PowerShell 등 다른 도구가 쓴 경우)에서 JSON.parse가 터진다.
     // 그러면 설정이 통째로 기본값으로 떨어지는데, 오류도 안 나서 원인을 찾기 어렵다.
-    const raw = fs.readFileSync(SAVE, "utf8");
-    const clean = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
-    const loaded = JSON.parse(clean);
-    hadSave = true;
-    save = { ...save, ...loaded };
-    // bornAt이 없던 시절의 세이브는 0으로 둔다 —
-    // 지금 키우던 개체가 갑자기 알로 돌아가면 진행을 빼앗는 셈이다.
-    if (typeof loaded.bornAt !== "number") save.bornAt = 0;
-  } catch {
-    /* 첫 실행 */
+    raw = fs.readFileSync(SAVE, "utf8");
+  } catch (e) {
+    /*
+     * 파일이 없으면 진짜 첫 실행이다. 그 외(잠김·권한·설치 중 교체)는 다르다.
+     *
+     * 예전에는 둘을 같이 삼켰다. 설치 관리자가 파일을 바꾸는 중에 앱이 떠서
+     * 못 읽자 첫 실행으로 보고 알을 하나 깠고, 화면에는 없던 포켓몬 한 마리가,
+     * 디스크에는 원래 박스가 남아 서로 다른 말을 했다.
+     */
+    if (e.code !== "ENOENT") {
+      loadFailed = true;
+      console.error("[save] 읽지 못했습니다 (" + e.code + "). 이번 실행에서는 아무것도 저장하지 않습니다.");
+    }
+  }
+
+  if (raw !== null) {
+    try {
+      const clean = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
+      const loaded = JSON.parse(clean);
+      hadSave = true;
+      save = { ...save, ...loaded };
+      // bornAt이 없던 시절의 세이브는 0으로 둔다 —
+      // 지금 키우던 개체가 갑자기 알로 돌아가면 진행을 빼앗는 셈이다.
+      if (typeof loaded.bornAt !== "number") save.bornAt = 0;
+    } catch (e) {
+      // 파일은 있는데 깨졌다. 덮어쓰지 않고 따로 치워 둔 뒤 멈춘다.
+      loadFailed = true;
+      try {
+        fs.copyFileSync(SAVE, SAVE + ".corrupt-" + Date.now());
+        console.error("[save] 깨진 파일을 .corrupt-* 로 복사해 뒀습니다: " + e.message);
+      } catch {}
+      console.error("[save] 해석하지 못했습니다. 이번 실행에서는 아무것도 저장하지 않습니다.");
+    }
   }
   if (!Array.isArray(save.seen)) save.seen = [];
   if (!Array.isArray(save.graduated)) save.graduated = [];
@@ -171,10 +203,13 @@ function loadSave() {
 }
 
 function writeSave() {
+  // 못 읽고 시작한 판은 저장하지 않는다. 덮어쓰면 진짜 진행이 날아간다.
+  if (loadFailed) return;
   try {
     fs.writeFileSync(SAVE, JSON.stringify(save), "utf8");
-  } catch {
-    /* 저장 실패는 치명적이지 않다 */
+  } catch (e) {
+    // 조용히 넘어가면 "왜 진행이 안 남지"를 영영 못 찾는다.
+    console.error("[save] 쓰지 못했습니다 (" + (e.code || e.message) + ")");
   }
 }
 
@@ -330,8 +365,9 @@ async function buildStats() {
     console.log("[box] 세이브를 박스로 옮겼습니다 — " + save.box.length + "마리");
     writeSave();
   }
-  // 처음 실행이라 박스가 비었으면 한 마리 준다
-  if (!save.box.length) { hatch(0); writeSave(); }
+  // 처음 실행이라 박스가 비었으면 한 마리 준다.
+  // 못 읽고 시작한 판에서는 주지 않는다 — 있는 박스를 못 본 것일 수 있다.
+  if (!save.box.length && !loadFailed) { hatch(0); writeSave(); }
 
   // 프로필이 없던 시절의 개체를 채운다 (한 번만 걸린다)
   if (box.backfill(save.box)) writeSave();
