@@ -1219,6 +1219,25 @@ function buildMenu() {
   ]);
 }
 
+/**
+ * 한 벌만 뜨게 한다.
+ *
+ * 이게 없어서 실행할 때마다 완전히 독립된 앱이 하나씩 더 떴다. 각자
+ * 트레이 아이콘과 각자의 메모리 상태를 갖고, 같은 save.json 에 서로
+ * 덮어썼다. 설치 중에 세이브를 못 읽고 뜬 인스턴스가 계속 살아남아
+ * 화면에는 없던 포켓몬이, 파일에는 원래 박스가 있는 상태가 됐다.
+ *
+ * 트레이 앱은 창을 닫아도 살아 있으니 "이미 떠 있나"를 사용자가 알기
+ * 어렵다. 두 번째 실행은 조용히 죽고 원래 창을 띄워 준다.
+ */
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    // 또 눌렀다는 건 보고 싶다는 뜻이다
+    if (win && !win.isDestroyed()) showNearTray();
+  });
+
 app.whenReady().then(async () => {
   loadSave();
 
@@ -1429,3 +1448,4 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", (e) => e.preventDefault()); // 트레이 앱은 창이 없어도 산다
+}
