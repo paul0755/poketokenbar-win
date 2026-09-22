@@ -66,6 +66,7 @@ npm run dist
 | 출처 | 파일 | 조건 |
 |---|---|---|
 | Claude | `%APPDATA%/Claude/plan-usage-history.json` | **데스크톱 앱**을 쓸 때. CLI만 쓰면 없습니다 |
+| Claude (스토어판) | `%LOCALAPPDATA%/Packages/Claude_*/LocalCache/Roaming/Claude/…` | MSIX 설치본은 여기에 씁니다 |
 | Codex | `~/.opencodex/codex-quota-cache.json` | opencodex 프록시를 쓸 때 |
 | Codex | 세션 로그의 `rate_limits` | 응답에 값이 실려 올 때 |
 

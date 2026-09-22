@@ -127,9 +127,14 @@ function codexQuota(file) {
 /**
  * Claude 공식 사용률.
  *
- * Claude 데스크톱 앱이 제 사용률을 여기에 적어 둔다:
- *   %APPDATA%/Claude/plan-usage-history.json
+ * Claude 데스크톱 앱이 제 사용률을 적어 둔다:
  *   { samples: [ { t: 밀리초, org: "...", u: { fh: 5시간%, sd: 7일% } } ] }
+ *
+ * 어디에 적는지는 설치 방식에 따라 다르다. 일반 설치본은 %APPDATA%/Claude 지만,
+ * MSIX(스토어) 설치본은 %APPDATA% 가 가상화되어 제 패키지 컨테이너 안에 쓴다.
+ * 그쪽에서는 %APPDATA%/Claude 를 아무리 봐도 파일이 없다 — 같은 경로가
+ * 프로세스마다 다른 곳을 가리키기 때문인데, 밖에서는 알아챌 방법이 없다.
+ * 그래서 두 곳을 다 후보로 두고 최근에 쓰인 쪽을 쓴다.
  *
  * fh = five hour, sd = seven day, 둘 다 "쓴 비율"이다. 15분쯤마다 한 줄씩
  * 쌓이고 창이 리셋되면 0으로 떨어진다. 제공자가 알려준 값이라 계산이 아니다.
@@ -137,8 +142,39 @@ function codexQuota(file) {
  * 로그에는 한도가 없어서 이 값을 못 구하는 줄 알았는데, 앱이 이미
  * 받아 두고 있었다. 크리덴셜도 네트워크도 필요 없다 — 이미 디스크에 있다.
  */
+function claudeQuotaCandidates() {
+  const home = os.homedir();
+  const out = [path.join(home, "AppData", "Roaming", "Claude", "plan-usage-history.json")];
+  const pkgs = path.join(home, "AppData", "Local", "Packages");
+  try {
+    for (const n of fs.readdirSync(pkgs)) {
+      if (!/^Claude_/i.test(n)) continue;
+      out.push(path.join(pkgs, n, "LocalCache", "Roaming", "Claude", "plan-usage-history.json"));
+    }
+  } catch {}
+  return out;
+}
+
+/** 후보 중 가장 최근에 쓰인 파일. 둘 다 있으면 오래된 쪽은 이미 멈춘 것이다. */
+function claudeQuotaFile(file) {
+  if (file) return file;
+  const cands = claudeQuotaCandidates();
+  let best = null;
+  let bestAt = -1;
+  for (const f of cands) {
+    try {
+      const st = fs.statSync(f);
+      if (st.mtimeMs > bestAt) {
+        bestAt = st.mtimeMs;
+        best = f;
+      }
+    } catch {}
+  }
+  return best || cands[0];
+}
+
 function claudeQuota(file) {
-  const f = file || path.join(os.homedir(), "AppData", "Roaming", "Claude", "plan-usage-history.json");
+  const f = claudeQuotaFile(file);
   try {
     const raw = fs.readFileSync(f, "utf8");
     const j = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw);
@@ -467,7 +503,7 @@ function diagnoseQuota(usage, files = {}) {
         : null,
     });
 
-  const cf = files.claude || path.join(os.homedir(), "AppData", "Roaming", "Claude", "plan-usage-history.json");
+  const cf = claudeQuotaFile(files.claude);
   push("claude", "Claude 사용률", cf, claudeQuota(files.claude));
 
   const kf = files.codex || path.join(os.homedir(), ".opencodex", "codex-quota-cache.json");
@@ -491,7 +527,7 @@ function diagnoseQuota(usage, files = {}) {
   return rows;
 }
 
-module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, anchoredWeek, codexQuota, claudeQuota, codexOfficial, officialOf, perSource, summarize, diagnoseQuota };
+module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, anchoredWeek, codexQuota, claudeQuota, claudeQuotaFile, codexOfficial, officialOf, perSource, summarize, diagnoseQuota };
 
 // node src/main/limits.js 로 확인
 if (require.main === module) {
