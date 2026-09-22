@@ -86,6 +86,13 @@ GET https://raw.githubusercontent.com/PokeAPI/sprites/...
 **저장하는 것** — `%APPDATA%\PokeTokenBar\` 에 `save.json`(진행 상황)과
 `sprites/`(이미지 캐시)만 만듭니다.
 
+이 폴더는 **설정 › 저장 폴더 바꾸기**에서 옮길 수 있습니다. 다른 드라이브에
+두거나 통째로 백업하고 싶을 때, 그리고 `%APPDATA%` 가 가상화되는 환경
+(MSIX/AppX 샌드박스 안에서 도는 도구 등)에서 같은 경로가 서로 다른 파일을
+가리키는 걸 피하고 싶을 때 씁니다. 바꾸면 쓰던 세이브를 한 번 가져오고,
+다시 켜야 적용됩니다. `POKETOKENBAR_DATA` 환경변수로도 지정할 수 있으며
+이쪽이 우선합니다.
+
 ---
 
 ## 되는 것

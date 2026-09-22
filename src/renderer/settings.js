@@ -35,6 +35,13 @@ window.ptb.onSettings((s) => {
   $("pollMinutes").value = String(s.pollMinutes);
   $("autoLaunch").checked = s.autoLaunch;
   $("dataPath").textContent = s.dataPath || "";
+  $("pickData").disabled = !!s.dataByEnv;
+  $("resetData").disabled = !!s.dataByEnv || !s.dataOverride;
+  if (s.dataByEnv) {
+    $("dataDirNote").textContent = "POKETOKENBAR_DATA 환경변수로 지정되어 있습니다. 여기서는 못 바꿉니다.";
+  } else if (s.dataOverride) {
+    $("dataDirNote").textContent = "기본 폴더 대신 위 경로를 쓰는 중입니다. 기본값: " + (s.dataDefault || "");
+  }
   ready = true;
 });
 
@@ -261,6 +268,17 @@ document.addEventListener("click", async (e) => {
 loadPaths();
 
 $("openData").onclick = () => window.ptb.openDataFolder();
+
+async function changeData(reset) {
+  const r = await window.ptb.setDataDir({ reset });
+  if (!r || !r.ok) {
+    if (r && r.reason) $("dataDirNote").textContent = r.reason;
+    return;
+  }
+  $("dataDirNote").textContent = r.dir + " — 앱을 다시 켜면 적용됩니다.";
+}
+$("pickData").onclick = () => changeData(false);
+$("resetData").onclick = () => changeData(true);
 $("reset").onclick = () => window.ptb.resetProgress();
 $("close").onclick = () => window.ptb.closeSettings();
 window.addEventListener("keydown", (e) => {

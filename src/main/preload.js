@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld("ptb", {
   // 역산 결과를 보여줘야 하므로 invoke
   calibrateLimit: (a) => ipcRenderer.invoke("calibrate-limit", a),
   openDataFolder: () => ipcRenderer.send("open-data-folder"),
+  setDataDir: (a) => ipcRenderer.invoke("set-data-dir", a),
 
   // 읽을 경로
   pathReport: () => ipcRenderer.invoke("path-report"),

@@ -10,6 +10,62 @@ const box = require("./box");
 const profile = require("./profile");
 const notify = require("./notify");
 
+/**
+ * 데이터 폴더.
+ *
+ * 기본값은 Electron이 주는 userData(%APPDATA%\PokeTokenBar)다. 그런데 그 경로는
+ * 샌드박스 안에서 도는 프로그램에게는 다른 곳을 가리킨다. Windows가 조용히
+ * 사본으로 돌리기 때문인데, 경로 문자열도 realpath도 똑같이 나와서 아무도
+ * 틀렸다고 말해 주지 않는다. 같은 파일을 서로 다르게 읽고 각자 맞다고 우긴다.
+ *
+ * 그래서 폴더를 AppData 밖으로 뺄 수 있게 둔다. 다른 드라이브에 두거나
+ * 통째로 백업하고 싶을 때도 쓸모가 있다.
+ *
+ *   1) POKETOKENBAR_DATA 환경변수
+ *   2) 실행 파일 옆의 data-dir.txt 첫 줄
+ */
+const DATA_DIR_FILE = path.join(path.dirname(app.getPath("exe")), "data-dir.txt");
+const DEFAULT_DATA = app.getPath("userData");
+
+function dataDirOverride() {
+  const fromEnv = (process.env.POKETOKENBAR_DATA || "").trim();
+  if (fromEnv) return fromEnv;
+  try {
+    const first = fs.readFileSync(DATA_DIR_FILE, "utf8").split(/\r?\n/)[0].trim();
+    if (first) return first;
+  } catch {}
+  return "";
+}
+
+(function applyDataDir() {
+  const dir = dataDirOverride();
+  if (!dir) return;
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    app.setPath("userData", dir);
+  } catch (e) {
+    // 못 쓰는 폴더가 적혀 있다고 앱이 안 뜨면 곤란하다. 기본 폴더로 돌아간다.
+    console.error("[data] 지정한 폴더를 쓸 수 없어 기본 폴더로 갑니다 (" + (e.code || e.message) + "): " + dir);
+  }
+})();
+
+(function seedDataDir() {
+  // 옮긴 폴더가 비어 있으면 원래 쓰던 세이브를 한 번 가져온다.
+  // 이게 없으면 폴더를 바꾼 순간 알부터 다시 키우게 된다.
+  const to = app.getPath("userData");
+  if (to === DEFAULT_DATA) return;
+  const src = path.join(DEFAULT_DATA, "save.json");
+  const dst = path.join(to, "save.json");
+  try {
+    if (!fs.existsSync(dst) && fs.existsSync(src)) {
+      fs.copyFileSync(src, dst);
+      console.log("[data] 쓰던 세이브를 새 폴더로 가져왔습니다: " + dst);
+    }
+  } catch (e) {
+    console.error("[data] 세이브를 옮기지 못했습니다 (" + (e.code || e.message) + ")");
+  }
+})();
+
 const CACHE = path.join(app.getPath("userData"), "sprites");
 const SAVE = path.join(app.getPath("userData"), "save.json");
 
@@ -147,6 +203,14 @@ let save = {
 };
 
 let hadSave = false; // 세이브 파일이 원래 있었는가 (첫 실행 vs 이전 버전 이어받기)
+/*
+ * 읽어들인 순간의 원문.
+ *
+ * 기동 중에 세이브는 여러 번 다시 쓰인다(이전 버전 이어받기·프로필 채우기·
+ * 토큰 적립). 그래서 나중에 "원본을 남겨 두자"며 파일을 복사하면 이미 우리가
+ * 손댄 뒤의 것이 남는다. 사용자가 켜기 전에 뭐가 있었는지는 여기에만 있다.
+ */
+let rawAtLoad = null;
 
 /**
  * 세이브를 못 읽었는가. "파일이 없다"와는 다른 뜻이다.
@@ -181,6 +245,7 @@ function loadSave() {
       const clean = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
       const loaded = JSON.parse(clean);
       hadSave = true;
+      rawAtLoad = raw;
       save = { ...save, ...loaded };
       // bornAt이 없던 시절의 세이브는 0으로 둔다 —
       // 지금 키우던 개체가 갑자기 알로 돌아가면 진행을 빼앗는 셈이다.
@@ -205,9 +270,19 @@ function loadSave() {
 function writeSave() {
   // 못 읽고 시작한 판은 저장하지 않는다. 덮어쓰면 진짜 진행이 날아간다.
   if (loadFailed) return;
+  /*
+   * 임시 파일에 다 쓴 뒤 이름을 바꾼다.
+   *
+   * writeFileSync 는 먼저 파일을 비우고 쓴다. 그 사이에 앱이 죽거나 다른
+   * 인스턴스가 읽으면 반쪽짜리를 보게 되고, 그걸 "빈 세이브"로 읽은 쪽이
+   * 알을 까서 덮어쓴다. rename 은 원자적이라 중간 상태가 없다.
+   */
+  const tmp = SAVE + ".tmp";
   try {
-    fs.writeFileSync(SAVE, JSON.stringify(save), "utf8");
+    fs.writeFileSync(tmp, JSON.stringify(save), "utf8");
+    fs.renameSync(tmp, SAVE);
   } catch (e) {
+    try { fs.rmSync(tmp, { force: true }); } catch {}
     // 조용히 넘어가면 "왜 진행이 안 남지"를 영영 못 찾는다.
     console.error("[save] 쓰지 못했습니다 (" + (e.code || e.message) + ")");
   }
@@ -367,7 +442,24 @@ async function buildStats() {
   }
   // 처음 실행이라 박스가 비었으면 한 마리 준다.
   // 못 읽고 시작한 판에서는 주지 않는다 — 있는 박스를 못 본 것일 수 있다.
-  if (!save.box.length && !loadFailed) { hatch(0); writeSave(); }
+  if (!save.box.length && !loadFailed) {
+    /*
+     * 세이브를 읽었는데 박스가 비어 있다 — 우리가 모르는 상태다.
+     * 여기서 알을 까면 그 파일을 그대로 덮어쓴다. 키우던 게 있었는지
+     * 없었는지 확인할 방법이 영영 사라진다. 먼저 남긴다.
+     */
+    if (hadSave) {
+      try {
+        const at = SAVE + ".pre-hatch-" + Date.now();
+        fs.writeFileSync(at, rawAtLoad ?? "", "utf8");
+        console.error("[save] 박스가 빈 세이브를 읽었습니다. 덮어쓰기 전에 " + path.basename(at) + " 로 남겨 둡니다.");
+      } catch (e) {
+        console.error("[save] 덮어쓰기 전 보존에 실패했습니다 (" + (e.code || e.message) + ")");
+      }
+    }
+    hatch(0);
+    writeSave();
+  }
 
   // 프로필이 없던 시절의 개체를 채운다 (한 번만 걸린다)
   if (box.backfill(save.box)) writeSave();
@@ -823,6 +915,9 @@ function settingsPayload() {
     pollMinutes: save.pollMinutes,
     autoLaunch: save.autoLaunch,
     dataPath: app.getPath("userData"),
+    dataDefault: DEFAULT_DATA,
+    dataOverride: dataDirOverride(),
+    dataByEnv: !!(process.env.POKETOKENBAR_DATA || "").trim(),
   };
 }
 
@@ -1329,6 +1424,33 @@ app.whenReady().then(async () => {
   ipcMain.on("set-settings", (_e, patch) => applySettings(patch || {}));
   ipcMain.on("close-settings", () => setWin && !setWin.isDestroyed() && setWin.close());
   ipcMain.on("open-data-folder", () => shell.openPath(app.getPath("userData")));
+
+  /**
+   * 데이터 폴더를 바꾼다. 실행 파일 옆의 data-dir.txt 에 적어 두고
+   * 다음 실행부터 적용한다 — 돌고 있는 상태에서 밑을 바꾸면 창마다
+   * 다른 세이브를 들고 있게 된다.
+   */
+  ipcMain.handle("set-data-dir", async (_e, { reset } = {}) => {
+    if ((process.env.POKETOKENBAR_DATA || "").trim()) {
+      return { ok: false, reason: "POKETOKENBAR_DATA 환경변수가 우선합니다. 그걸 지우고 다시 시도하세요." };
+    }
+    let dir = "";
+    if (!reset) {
+      const r = await dialog.showOpenDialog(setWin || win, {
+        title: "데이터 폴더 고르기",
+        properties: ["openDirectory", "createDirectory"],
+      });
+      if (r.canceled || !r.filePaths.length) return { ok: false };
+      dir = r.filePaths[0];
+    }
+    try {
+      if (dir) fs.writeFileSync(DATA_DIR_FILE, dir, "utf8");
+      else fs.rmSync(DATA_DIR_FILE, { force: true });
+    } catch (e) {
+      return { ok: false, reason: "설정을 쓰지 못했습니다 (" + (e.code || e.message) + ")" };
+    }
+    return { ok: true, dir: dir || DEFAULT_DATA };
+  });
   ipcMain.on("reset-progress", resetProgress);
 
   /* ---- 읽을 경로 ---- */
