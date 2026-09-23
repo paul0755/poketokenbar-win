@@ -153,6 +153,15 @@
   .track > i.warn { background: var(--orange); }
   .track > i.hot { background: var(--red); }
   .note { font-size: 10px; color: var(--dim); margin-top: 4px; }
+  .limfoot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .limfoot .when { flex: 1; font-size: 10px; color: var(--dim); }
+  .mini {
+    font-size: 10.5px; padding: 3px 9px; border-radius: 7px;
+    border: 1px solid var(--line); background: var(--card);
+    color: var(--muted); cursor: pointer;
+  }
+  .mini:hover:not(:disabled) { background: #4a4e5a; color: #fff; }
+  .mini:disabled { opacity: 0.45; cursor: default; }
 
   /* ---------- 상점 ---------- */
   .wallet { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; margin-top: 4px; }
@@ -333,6 +342,10 @@
     <div class="lim">
       <h4>한도<span class="peak" id="limSrc"></span></h4>
       <div id="spans"></div>
+      <div class="limfoot">
+        <span class="when" id="scanWhen"></span>
+        <button class="mini" id="refreshNow">↻ 새로고침</button>
+      </div>
     </div>
   </section>
 

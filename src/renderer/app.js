@@ -178,6 +178,7 @@ function renderHome(s) {
   }
 
   renderLimits(s.limits, srcPick, cur && cur.label);
+  renderScanWhen();
   renderBox(s);
 }
 
@@ -614,7 +615,31 @@ $("fGot").onclick = () => setDexFilter("got");
 window.ptb.onStats((s) => {
   lastStats = s;
   renderHome(s);
+  $("refreshNow").disabled = false;
 });
+
+/**
+ * 언제 읽은 값인지.
+ *
+ * 새로고침은 디스크를 다시 읽을 뿐이다. Claude 가 제 사용률을 15분마다
+ * 파일에 쓰므로, 눌러도 공식 퍼센트가 그대로일 수 있다. 그때 "고장났나"
+ * 싶지 않으려면 무엇이 언제 읽혔는지가 보여야 한다.
+ */
+function renderScanWhen() {
+  const at = lastStats && lastStats.scannedAt;
+  if (!at) return void ($("scanWhen").textContent = "");
+  const m = Math.round((Date.now() - at) / 60000);
+  $("scanWhen").textContent = m < 1 ? "방금 읽음" : m < 60 ? m + "분 전에 읽음" : "1시간 넘게 지남";
+}
+
+$("refreshNow").onclick = () => {
+  $("refreshNow").disabled = true;
+  $("scanWhen").textContent = "읽는 중…";
+  window.ptb.refreshNow();
+};
+
+// 눌러서 읽은 뒤에도 시간은 흐른다. 표시만 따로 갱신한다.
+setInterval(renderScanWhen, 30_000);
 
 $("petToggle").onclick = () => window.ptb.togglePet();
 $("gear").onclick = () => window.ptb.openSettings();

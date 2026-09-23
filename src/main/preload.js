@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("ptb", {
   petId,
   onStats: (cb) => ipcRenderer.on("stats", (_e, data) => cb(data)),
   request: () => ipcRenderer.send("request-stats"),
+  refreshNow: () => ipcRenderer.send("refresh-now"),
   nextLine: () => ipcRenderer.send("next-line"),
   togglePet: () => ipcRenderer.send("toggle-pet"),
   quit: () => ipcRenderer.send("quit"),

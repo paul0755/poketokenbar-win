@@ -670,6 +670,9 @@ async function refresh(force = false) {
   refreshing = true;
   try {
     const s = await buildStats();
+    // 언제 읽은 값인지 화면이 말할 수 있어야 한다.
+    // "왜 안 바뀌지"의 절반은 갱신이 안 된 건지 값이 그대로인 건지 모르는 데서 온다.
+    s.scannedAt = Date.now();
     lastStats = s;
     sendNotifications(s);
     push(win, s);
@@ -1352,6 +1355,8 @@ app.whenReady().then(async () => {
 
   // on 핸들러는 event 객체를 첫 인자로 넘긴다. 그대로 두면 force=truthy가 된다.
   ipcMain.on("request-stats", () => refresh());
+  // 사용자가 직접 부르는 갱신은 3초 창을 건너뛰고 디스크를 다시 읽는다
+  ipcMain.on("refresh-now", () => refresh(true));
   /**
    * 한도 보정 — 퍼센트를 받아 한도를 역산한다.
    *
