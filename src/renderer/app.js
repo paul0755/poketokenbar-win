@@ -496,6 +496,19 @@ function renderLimits(L, srcId, srcLabel) {
         : "설정 › 한도 맞추기에서 지금 몇 %인지 넣으면 막대가 나옵니다"));
   }
 
+  /*
+   * "방금 읽음" 과 "공식 값 4시간 전" 이 나란히 놓이면 서로 모순돼 보인다.
+   * 둘은 다른 것을 가리킨다 — 하나는 우리가 파일을 읽은 시각이고,
+   * 다른 하나는 그 파일에 적힌 값의 나이다. 새로고침은 파일을 다시 읽을 뿐,
+   * 도구가 제 사용률을 새로 쓰게 만들 수는 없다. 그 말을 여기서 한다.
+   */
+  if (p.officialAgeMs != null && p.officialAgeMs > 30 * 60 * 1000) {
+    rows.push(
+      `<div class="note">공식 사용률은 ${srcLabel || "도구"}가 파일에 쓸 때 바뀝니다 —
+        새로고침해도 ${hm(p.officialAgeMs)} 전 값 그대로입니다.</div>`,
+    );
+  }
+
   el.innerHTML = rows.join("");
 }
 
@@ -629,7 +642,8 @@ function renderScanWhen() {
   const at = lastStats && lastStats.scannedAt;
   if (!at) return void ($("scanWhen").textContent = "");
   const m = Math.round((Date.now() - at) / 60000);
-  $("scanWhen").textContent = m < 1 ? "방금 읽음" : m < 60 ? m + "분 전에 읽음" : "1시간 넘게 지남";
+  $("scanWhen").textContent =
+    m < 1 ? "방금 다시 읽음" : m < 60 ? m + "분 전에 읽음" : "1시간 넘게 안 읽음";
 }
 
 $("refreshNow").onclick = () => {
