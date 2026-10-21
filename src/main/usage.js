@@ -236,6 +236,98 @@ function codexRoots(extra = []) {
   return [...extra, path.join(home, "sessions"), path.join(home, "archived_sessions")];
 }
 
+/**
+ * opencodex 프록시가 요청마다 남기는 기록.
+ *
+ * Codex 사용량이 두 군데로 갈린다. CLI 가 직접 쓰면 ~/.codex/sessions 에
+ * 남지만, 프록시를 통해 쓰면 거기엔 한 줄도 안 남고 여기에만 남는다.
+ * 실제로 그래서 GPT 를 하루 종일 쓰고도 화면에는 0 이 떠 있었다.
+ *
+ * 한 줄에 요청 하나다:
+ *   { requestId, timestamp, model, usage: { inputTokens, outputTokens,
+ *     totalTokens, cachedInputTokens, cacheReadInputTokens, ... } }
+ *
+ * 돌려주는 값은 이 기록들의 시각 목록이다 — 세션 로그에서 같은 요청을
+ * 또 세지 않으려면 어느 시각에 프록시 기록이 있는지 알아야 한다.
+ */
+function readOpenCodex(add) {
+  const f = path.join(HOME, ".opencodex", "usage.jsonl");
+  let st;
+  try {
+    st = fs.statSync(f);
+  } catch {
+    return []; // 프록시를 안 쓰는 구성이다
+  }
+
+  const key = "opencodex:" + f;
+  const hit = fileCache.get(key);
+  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size) {
+    for (const r of hit.rows) add(r.iso, r.n, r.id, r.parts);
+    return hit.ts;
+  }
+
+  let text;
+  try {
+    text = fs.readFileSync(f, "utf8");
+  } catch {
+    return [];
+  }
+
+  const rows = [];
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    let j;
+    try {
+      j = JSON.parse(line);
+    } catch {
+      continue; // 쓰는 중인 마지막 줄은 잘려 있을 수 있다
+    }
+    const u = j.usage || {};
+    const n = j.totalTokens ?? u.totalTokens ?? 0;
+    if (!(n > 0) || !Number.isFinite(j.timestamp)) continue;
+    const cached = u.cachedInputTokens || 0;
+    rows.push({
+      iso: new Date(j.timestamp).toISOString(),
+      n,
+      id: j.requestId || String(j.timestamp),
+      parts: {
+        // inputTokens 에는 캐시분이 포함돼 있다. 빼지 않으면 합이 두 번 잡힌다.
+        in: Math.max(0, (u.inputTokens || 0) - cached),
+        out: u.outputTokens || 0,
+        cacheW: u.cacheCreationInputTokens || 0,
+        cacheR: u.cacheReadInputTokens || cached,
+      },
+    });
+  }
+
+  const ts = rows.map((r) => Date.parse(r.iso)).sort((a, b) => a - b);
+  fileCache.set(key, { mtime: st.mtimeMs, size: st.size, rows, ts });
+  for (const r of rows) add(r.iso, r.n, r.id, r.parts);
+  return ts;
+}
+
+/**
+ * 정렬된 시각 목록에 t 와 가까운 게 있는가.
+ *
+ * 창을 10초로 잡았더니 같은 요청을 두 번 셌다. 프록시는 요청을 보낸 시각을,
+ * 세션 로그는 응답이 끝난 시각을 적는데 한 요청이 25초씩 걸린다. 창을 넓혀
+ * 가며 재 보니 2분부터 이중 집계가 0으로 떨어지고 그 뒤로는 더 넓혀도 값이
+ * 안 변한다 — 프록시 이전 기록은 그대로 남는다.
+ */
+function nearTester(sorted, windowMs = 180_000) {
+  return (t) => {
+    let lo = 0;
+    let hi = sorted.length - 1;
+    while (lo <= hi) {
+      const m = (lo + hi) >> 1;
+      if (Math.abs(sorted[m] - t) <= windowMs) return true;
+      if (sorted[m] < t) lo = m + 1;
+      else hi = m - 1;
+    }
+    return false;
+  };
+}
+
 const SOURCES = [
   { id: "claude", label: "Claude Code", dirs: claudeRoots, ext: ".jsonl", read: readClaude },
   { id: "codex", label: "Codex", dirs: codexRoots, ext: ".jsonl", read: readCodex },
@@ -317,6 +409,13 @@ function collect(extraRoots = {}) {
     files += paths.length;
     let srcTotal = 0;
     const seen = new Set(); // 중복 레코드 방지 (재시도·세션 재개)
+    /*
+     * 프록시를 거친 요청은 세션 로그와 프록시 기록 양쪽에 남는다.
+     * 둘 다 세면 그 구간이 두 배가 된다 — 재 보니 세션 로그의 48%가
+     * 프록시 기록과 ±2초 안에 겹쳤다. 프록시 쪽을 먼저 넣고,
+     * 세션 로그에서 같은 시각의 기록은 건너뛴다.
+     */
+    let suppress = null;
 
     /**
      * 파서가 찾은 공식 한도 중 가장 최근 것만 남긴다.
@@ -335,8 +434,10 @@ function collect(extraRoots = {}) {
       }
       const day = dayOf(iso);
       if (!day) return;
-      byDay.set(day, (byDay.get(day) ?? 0) + n);
       const t = Date.parse(iso);
+      // 프록시 기록에서 이미 센 요청이면 여기서 끝낸다 (일자 합계도 건드리지 않는다)
+      if (suppress && Number.isFinite(t) && suppress(t)) return;
+      byDay.set(day, (byDay.get(day) ?? 0) + n);
       if (Number.isFinite(t)) events.push({ t, n, src: src.id });
       if (parts) {
         const d = detail.get(src.id) ?? { in: 0, out: 0, cacheW: 0, cacheR: 0 };
@@ -346,6 +447,14 @@ function collect(extraRoots = {}) {
       srcTotal += n;
       total += n;
     };
+
+    if (src.id === "codex") {
+      const ts = readOpenCodex(add);
+      if (ts.length) {
+        suppress = nearTester(ts);
+        files += 1;
+      }
+    }
 
     for (const f of paths) {
       /*

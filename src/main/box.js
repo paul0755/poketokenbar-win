@@ -101,12 +101,35 @@ function active(save) {
  * 누적 전체가 델타로 잡혀 한 번에 마스터가 된다. 그래서 기준점이
  * 없을 때는 적립하지 않고 기준점만 세운다.
  */
+/**
+ * 한 번에 적립을 허용할 최대량.
+ *
+ * 기록 출처를 새로 붙이면 과거분이 통째로 한 번에 들어온다. opencodex
+ * 기록을 붙였을 때 430M 이 그랬다 — 몇 시간 키운 아이가 그 한 번으로
+ * 최종 진화까지 끝나버린다. 실제로 쓴 토큰이긴 하지만, 한 번에 쏟아지는
+ * 건 성장이 아니라 사고다.
+ *
+ * 그렇다고 고정값으로 막으면 앱을 오래 꺼 뒀다가 켰을 때 진짜 사용분까지
+ * 버린다. 그래서 지난 적립 이후 흐른 시간만큼 허용한다.
+ */
+const BASE_ALLOW = 50_000_000;
+const ALLOW_PER_HOUR = 60_000_000;
+
 function accrue(save, total) {
   const prev = save.lastTotal;
+  const prevAt = save.lastTotalAt;
+  const now = Date.now();
   save.lastTotal = total;
+  save.lastTotalAt = now;
   if (typeof prev !== "number") return 0; // 기준점만 세우고 이번엔 넘어간다
   const delta = Math.max(0, total - prev);
   if (!delta) return 0;
+
+  const hours = typeof prevAt === "number" ? Math.max(0, (now - prevAt) / 3_600_000) : 0;
+  if (delta > BASE_ALLOW + ALLOW_PER_HOUR * hours) {
+    // 기준점만 옮기고 넘어간다. 다음부터는 평소대로 적립된다.
+    return 0;
+  }
   const a = active(save);
   if (a) a.raw = (a.raw || 0) + delta;
   return delta;
