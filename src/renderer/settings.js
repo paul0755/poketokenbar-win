@@ -35,6 +35,14 @@ window.ptb.onSettings((s) => {
   $("pollMinutes").value = String(s.pollMinutes);
   $("autoLaunch").checked = s.autoLaunch;
   $("dataPath").textContent = s.dataPath || "";
+  /*
+   * 공식 값이 들어오고 있으면 여기에 아무것도 넣을 필요가 없다.
+   * 그 말을 안 해 두면 "자동으로 가져온다더니 왜 입력란이 있냐"가 된다.
+   */
+  const auto = (s.autoSources || []).join(" · ");
+  $("calibNeed").innerHTML = auto
+    ? `✅ <b>${auto}</b> 는 공식 사용률을 읽고 있습니다 — 여기에 넣지 않아도 막대가 나옵니다.`
+    : "⚠️ 지금은 어느 도구에서도 공식 사용률을 못 읽고 있습니다. 아래에 넣으면 막대가 나옵니다.";
   $("pickData").disabled = !!s.dataByEnv;
   $("resetData").disabled = !!s.dataByEnv || !s.dataOverride;
   if (s.dataByEnv) {

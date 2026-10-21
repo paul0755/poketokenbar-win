@@ -130,11 +130,18 @@ function codexQuota(file) {
  * Claude 데스크톱 앱이 제 사용률을 적어 둔다:
  *   { samples: [ { t: 밀리초, org: "...", u: { fh: 5시간%, sd: 7일% } } ] }
  *
- * 어디에 적는지는 설치 방식에 따라 다르다. 일반 설치본은 %APPDATA%/Claude 지만,
- * MSIX(스토어) 설치본은 %APPDATA% 가 가상화되어 제 패키지 컨테이너 안에 쓴다.
- * 그쪽에서는 %APPDATA%/Claude 를 아무리 봐도 파일이 없다 — 같은 경로가
- * 프로세스마다 다른 곳을 가리키기 때문인데, 밖에서는 알아챌 방법이 없다.
- * 그래서 두 곳을 다 후보로 두고 최근에 쓰인 쪽을 쓴다.
+ * 어디에 적는지는 설치 방식과 버전에 따라 다르다. 한 곳만 박아 두면,
+ * 앱이 데이터를 옮기는 날 막대가 조용히 사라지고 사용자는 "자동이라더니"
+ * 하며 수동 입력란을 보게 된다. 실제로 그렇게 됐다. 그래서 아는 자리를
+ * 전부 후보로 두고 가장 최근에 쓰인 쪽을 쓴다.
+ *
+ *   %APPDATA%/Claude/                              일반 설치본
+ *   %LOCALAPPDATA%/Packages/Claude_<패키지>/LocalCache/Roaming/Claude/
+ *                                                  MSIX(스토어) 설치본.
+ *                                                  %APPDATA% 가 가상화되어
+ *                                                  밖에서는 안 보인다
+ *   %LOCALAPPDATA%/Claude-Data/<패키지>/           2026-10 이후. 옛 자리에는
+ *                                                  .user-data-left 표식만 남는다
  *
  * fh = five hour, sd = seven day, 둘 다 "쓴 비율"이다. 15분쯤마다 한 줄씩
  * 쌓이고 창이 리셋되면 0으로 떨어진다. 제공자가 알려준 값이라 계산이 아니다.
@@ -144,14 +151,25 @@ function codexQuota(file) {
  */
 function claudeQuotaCandidates() {
   const home = os.homedir();
+  const local = path.join(home, "AppData", "Local");
   const out = [path.join(home, "AppData", "Roaming", "Claude", "plan-usage-history.json")];
-  const pkgs = path.join(home, "AppData", "Local", "Packages");
+
+  const pkgs = path.join(local, "Packages");
   try {
     for (const n of fs.readdirSync(pkgs)) {
       if (!/^Claude_/i.test(n)) continue;
       out.push(path.join(pkgs, n, "LocalCache", "Roaming", "Claude", "plan-usage-history.json"));
     }
   } catch {}
+
+  // 2026-10 이후 자리. 패키지 이름은 설치마다 다르므로 하위 폴더를 훑는다.
+  const moved = path.join(local, "Claude-Data");
+  try {
+    for (const n of fs.readdirSync(moved)) {
+      out.push(path.join(moved, n, "plan-usage-history.json"));
+    }
+  } catch {}
+
   return out;
 }
 
@@ -265,9 +283,26 @@ function perSource(usage, now, limits = {}, files = {}) {
      * 묵은 공식값으로 막대를 그리지 않는다. 그 뒤로 쓴 게 반영 안 된
      * 값이라 지금 몇 %인지는 모르는 것이다.
      */
-    const fresh = off && !off.stale;
-    const blockPct = fresh && off.block != null ? 100 - off.block : null;
-    const weekPct = fresh && off.week != null ? 100 - off.week : null;
+    /*
+     * 묵었는지는 창마다 따로 재야 한다.
+     *
+     * 5M 하나로 재다가 주간 막대가 억울하게 사라졌다. 재 보니 주간은 1%가
+     * 약 180M인데 15.9M 흘렀다고 숨기고 있었다 — 창의 0.09%다. 반대로
+     * 5시간은 1%가 약 1.8M이라 같은 15.9M이면 벌써 9% 어긋난 값이다.
+     *
+     * 그래서 "그 창에서 1%가 몇 토큰인지"로 환산해 2%까지만 봐준다.
+     * 공식 퍼센트가 0이거나 우리가 잰 게 없으면 환산을 못 하므로,
+     * 그때만 예전처럼 고정값으로 재고 넘어간다.
+     */
+    const driftOk = (usedInWindow, pctUsed) => {
+      if (!off) return false;
+      if (!(pctUsed > 0) || !(usedInWindow > 0)) return off.drift <= DRIFT_TOKENS;
+      return off.drift <= Math.max(DRIFT_TOKENS, 2 * (usedInWindow / pctUsed));
+    };
+    const blockFresh = off && off.block != null && driftOk(block ? block.used : 0, off.block);
+    const weekFresh = off && off.week != null && driftOk(week, off.week);
+    const blockPct = blockFresh ? 100 - off.block : null;
+    const weekPct = weekFresh ? 100 - off.week : null;
 
     out[id] = {
       block,
@@ -299,7 +334,9 @@ function perSource(usage, now, limits = {}, files = {}) {
        */
       officialAgeMs: blockPct != null || weekPct != null ? off.ageMs : null,
       // 묵어서 막대를 못 그린 경우에도 무엇이 있었는지는 알려준다
-      officialStale: off && off.stale ? off : null,
+      // 묵어서 막대를 못 그린 경우에도 무엇이 있었는지는 알려준다.
+      // 주간 줄에서 쓰이므로 주간이 막힌 경우만 가리킨다.
+      officialStale: off && off.week != null && !weekFresh ? off : null,
     };
   }
   return out;
@@ -392,7 +429,8 @@ function officialOf(usage, id, now, files = {}) {
     const q = claudeQuota(files.claude);
     if (!q) return null;
     const drift = driftSince(usage, "claude", q.at);
-    return { ...q, drift, stale: drift > DRIFT_TOKENS };
+    // 묵음 판정은 창 크기를 알아야 해서 perSource 에서 한다. 여기서는 양만 잰다.
+    return { ...q, drift };
   }
   if (id !== "codex") return null;
   const list = codexOfficial(usage, now, files.codex);
@@ -401,7 +439,6 @@ function officialOf(usage, id, now, files = {}) {
   const drift = driftSince(usage, "codex", o.at);
   return {
     drift,
-    stale: drift > DRIFT_TOKENS,
     block: o.block ? o.block.percent : null,
     week: o.week ? o.week.percent : null,
     weekResetAt: o.week ? o.week.resetAt : null,

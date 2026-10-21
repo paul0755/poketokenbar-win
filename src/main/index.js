@@ -917,11 +917,30 @@ function settingsPayload() {
     wanderLevel: save.wanderLevel,
     pollMinutes: save.pollMinutes,
     autoLaunch: save.autoLaunch,
+    autoSources: officialSources(),
     dataPath: app.getPath("userData"),
     dataDefault: DEFAULT_DATA,
     dataOverride: dataDirOverride(),
     dataByEnv: !!(process.env.POKETOKENBAR_DATA || "").trim(),
   };
+}
+
+/**
+ * 지금 공식 사용률이 들어오는 도구들.
+ *
+ * 설정 화면의 "한도 맞추기"는 공식값이 없을 때를 위한 대비책인데,
+ * 들어오고 있는데도 입력란만 보이면 "자동이라더니"가 된다. 어느 쪽인지 밝힌다.
+ */
+function officialSources() {
+  const files = save.quotaFiles || {};
+  const out = [];
+  try {
+    if (limits.claudeQuota(files.claude)) out.push("Claude");
+  } catch {}
+  try {
+    if (limits.codexQuota(files.codex) || ((lastUsage && lastUsage.quota) || {}).codex) out.push("Codex");
+  } catch {}
+  return out;
 }
 
 function pushSettings() {
