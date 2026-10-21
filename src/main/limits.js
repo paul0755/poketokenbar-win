@@ -334,9 +334,14 @@ function perSource(usage, now, limits = {}, files = {}) {
        */
       officialAgeMs: blockPct != null || weekPct != null ? off.ageMs : null,
       // 묵어서 막대를 못 그린 경우에도 무엇이 있었는지는 알려준다
-      // 묵어서 막대를 못 그린 경우에도 무엇이 있었는지는 알려준다.
-      // 주간 줄에서 쓰이므로 주간이 막힌 경우만 가리킨다.
+      /*
+       * 묵어서 막대를 못 그린 경우에도 무엇이 있었는지는 알려준다.
+       *
+       * 막대가 조용히 사라지면 "고장났나"가 된다. 실제로 그렇게 물어 왔다.
+       * 창마다 사정이 다르므로 따로 넘긴다.
+       */
       officialStale: off && off.week != null && !weekFresh ? off : null,
+      officialBlockStale: off && off.block != null && !blockFresh ? off : null,
     };
   }
   return out;

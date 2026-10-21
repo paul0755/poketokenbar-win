@@ -472,8 +472,17 @@ function renderLimits(L, srcId, srcLabel) {
         : `${fmt(p.block.used)} 사용 · 시간당 ${fmt(p.block.perHour)}`;
     rows.push(limitRow("5시간", bSub, p.blockLeftPct, [amount, tag(p.blockFrom)].filter(Boolean).join(" · ")));
   } else if (p.block) {
+    /*
+     * 공식값이 있었는데 쓸 수 없는 경우와, 아예 없는 경우는 다른 상황이다.
+     * 뭉뚱그려 "한도를 알면 막대가 나옵니다" 라고만 하면, 공식값을 읽고
+     * 있는데도 막대가 없는 사람은 영문을 모른다.
+     */
+    const st = p.officialBlockStale;
     rows.push(usageRow("5시간", bSub, fmt(p.block.used),
-      `시간당 ${fmt(p.block.perHour)} · ${p.block.count}건 — 한도를 알면 막대가 나옵니다`));
+      st
+        ? `공식값은 ${age(st.ageMs, false)}(${st.block}% 사용) — 그 뒤 ${fmt(st.drift)}을 더 써서
+           지금 몇 %인지는 알 수 없습니다. Claude 앱에서 사용량을 한 번 열면 갱신됩니다.`
+        : `시간당 ${fmt(p.block.perHour)} · ${p.block.count}건 — 한도를 알면 막대가 나옵니다`));
   } else {
     rows.push(usageRow("5시간", "", "쉬는 중", "5시간 넘게 요청이 없었습니다"));
   }
