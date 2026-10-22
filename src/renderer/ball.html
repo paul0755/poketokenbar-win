@@ -22,6 +22,18 @@
   #ball.open { animation: open .4s ease-out; }
   @keyframes open { 0% { scale: 1; } 40% { scale: 1.25; filter: brightness(2); } 100% { scale: 1; } }
   #ball.caught { filter: brightness(.8) drop-shadow(0 3px 4px rgba(0, 0, 0, .5)); }
+  /* 볼 종류 — 위쪽 반구 색과 무늬만 바꾼다 */
+  body[data-ball="great"] #top { fill: #3a7bd5; }
+  body[data-ball="great"] .stripe { display: block; fill: #e3373b; }
+  body[data-ball="ultra"] #top { fill: #2b2b33; }
+  body[data-ball="ultra"] .hband { display: block; fill: #ffcb05; }
+  .stripe, .hband { display: none; }
+  /* 지금 던지면 잡힐 확률. 약하게 만들면 오른다 */
+  #odds {
+    position: fixed; left: 2px; top: 2px; padding: 1px 4px; border-radius: 6px;
+    color: #fff; background: rgba(20, 21, 26, .8); font-size: 9px;
+  }
+  body.fly #odds, body.busy #odds { display: none; }
   #n {
     position: fixed; right: 4px; bottom: 4px; padding: 2px 5px; border-radius: 99px;
     color: #14151a; background: #ffcb05; box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
@@ -33,12 +45,15 @@
 </style>
 <svg id="ball" viewBox="0 0 100 100" aria-hidden="true">
   <circle cx="50" cy="50" r="46" fill="#f2f3f5" stroke="#1b1c22" stroke-width="6" />
-  <path d="M4 50 A46 46 0 0 1 96 50 Z" fill="#e3373b" stroke="#1b1c22" stroke-width="6" />
+  <path id="top" d="M4 50 A46 46 0 0 1 96 50 Z" fill="#e3373b" stroke="#1b1c22" stroke-width="6" />
+  <path class="stripe" d="M24 16 Q30 30 26 44 L34 44 Q38 28 32 12 Z M76 16 Q70 30 74 44 L66 44 Q62 28 68 12 Z" />
+  <path class="hband" d="M20 20 L36 44 L28 44 L14 26 Z M80 20 L64 44 L72 44 L86 26 Z" />
   <rect x="4" y="46" width="92" height="8" fill="#1b1c22" />
   <circle cx="50" cy="50" r="13" fill="#f2f3f5" stroke="#1b1c22" stroke-width="6" />
   <circle cx="50" cy="50" r="5" fill="#f2f3f5" stroke="#1b1c22" stroke-width="3" />
   <path d="M22 26 Q30 16 42 14" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".55" />
 </svg>
 <div id="n"></div>
+<div id="odds"></div>
 <div id="star">✨</div>
 <script src="ball.js"></script>

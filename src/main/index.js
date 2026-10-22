@@ -226,6 +226,8 @@ const SHOP = [
   { id: "rare-candy", name: "이상한사탕", cost: 1, desc: "키우는 아이를 1000만 만큼 자라게 한다", icon: "🍬" },
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
   { id: "tm", name: "기술머신", cost: 3, desc: "키우는 아이가 배울 수 있는 기술머신 기술 하나를 가르친다", icon: "💿" },
+  { id: "great-ball", name: "슈퍼볼 3개", cost: 1, desc: "야생 포켓몬이 1.5배 잘 잡힌다", icon: "🔵" },
+  { id: "ultra-ball", name: "하이퍼볼 3개", cost: 2, desc: "야생 포켓몬이 2배 잘 잡힌다", icon: "🟡" },
   { id: "charm", name: "반짝이는 부적", cost: 60, desc: "이로치 확률 2배. 한 번만 살 수 있다", icon: "✨", once: true },
 ];
 
@@ -310,6 +312,8 @@ let save = {
   wildLevel: "rare",
   wildDay: null,
   wildCount: 0,
+  /** 상점에서 산 볼. 몬스터볼은 출현마다 공짜로 주니 여기 없다 */
+  balls: { great: 0, ultra: 0 },
   /**
    * 사용자가 더해 준 경로.
    *
@@ -523,6 +527,12 @@ function buy(itemId) {
     a.tmMoves = [...(a.tmMoves || []), id];
     const learned = profile.build(a, eff).tmMoves.find((m) => m.id === id);
     msg = poke.describe(eff, a.line, { shiny: a.shiny }).name + "이(가) " + (learned ? learned.name : "새 기술") + "을(를) 배웠습니다";
+  } else if (itemId === "great-ball" || itemId === "ultra-ball") {
+    const key = itemId === "great-ball" ? "great" : "ultra";
+    save.balls = save.balls || { great: 0, ultra: 0 };
+    save.balls[key] = (save.balls[key] || 0) + 3;
+    msg = BALLS[key].name + " 3개를 샀습니다 (가진 수 " + save.balls[key] + ")";
+    if (wildNow) ballInfo();
   } else if (itemId === "charm") { save.charm = true; msg = "이로치 확률이 2배가 됩니다"; }
 
   writeSave();
@@ -1557,6 +1567,35 @@ function duelSay(ev) {
 }
 
 /**
+ * 사건 목록을 두 창에 나눠 재생한다. send[i](msg) 가 i 쪽 창에 보낸다.
+ * 펫끼리 결투와 야생 약하게 만들기가 같이 쓴다 — 받는 쪽이 펫 창이든 야생 창이든
+ * 같은 duel.js 가 그린다.
+ */
+async function playDuel(send, r) {
+  for (const ev of r.log) {
+    if (ev.t === "move") {
+      send[ev.side]({ t: "move", move: ev.move });
+      await wait(ev.move.damageClass === "status" ? 1000 : 750);
+    } else if (ev.t === "hp") {
+      send[ev.side]({ t: "hp", hp: ev.hp, max: ev.max });
+      const s = duelSay(ev);
+      if (s) send[s.side]({ t: "say", text: s.text, kind: s.kind });
+      await wait(500);
+    } else if (ev.t === "faint") {
+      send[ev.side]({ t: "faint" });
+      await wait(900);
+    } else if (ev.side >= 0) {
+      if (ev.status !== undefined) send[ev.side]({ t: "status", status: ev.status && ev.status !== "unconfused" ? ev.status : null });
+      const s = duelSay(ev);
+      if (s && s.text) {
+        send[s.side]({ t: "say", text: s.text, kind: s.kind });
+        await wait(650);
+      }
+    }
+  }
+}
+
+/**
  * 바탕화면에서 싸운다.
  *
  * 승패와 보상은 결투 탭과 똑같이 startBattle 이 정한다(하루 상한 포함).
@@ -1596,31 +1635,11 @@ async function desktopBattle(idA, idB, level) {
     const f = r.fighters;
 
     // 서로 마주 본다 — 왼쪽(A)이 뒤집혀 오른쪽을 본다
-    ids.forEach((id, i) => duelSend(id, { t: "start", flip: i === 0, name: f[i].name, level: f[i].level, hp: f[i].maxHp, max: f[i].maxHp }));
+    ids.forEach((id, i) => duelSend(id, { t: "start", flip: i === 0, name: f[i].name, level: f[i].level, hp: f[i].hp, max: f[i].maxHp }));
     await duelWalk(recs, [{ x: x0, y: y0 }, { x: x0 + w + gap, y: y0 }]);
     await wait(500);
 
-    for (const ev of r.log) {
-      if (ev.t === "move") {
-        duelSend(ids[ev.side], { t: "move", move: ev.move });
-        await wait(ev.move.damageClass === "status" ? 1000 : 750);
-      } else if (ev.t === "hp") {
-        duelSend(ids[ev.side], { t: "hp", hp: ev.hp, max: ev.max });
-        const s = duelSay(ev);
-        if (s) duelSend(ids[s.side], { t: "say", text: s.text, kind: s.kind });
-        await wait(500);
-      } else if (ev.t === "faint") {
-        duelSend(ids[ev.side], { t: "faint" });
-        await wait(900);
-      } else if (ev.side >= 0) {
-        if (ev.status !== undefined) duelSend(ids[ev.side], { t: "status", status: ev.status && ev.status !== "unconfused" ? ev.status : null });
-        const s = duelSay(ev);
-        if (s && s.text) {
-          duelSend(ids[s.side], { t: "say", text: s.text, kind: s.kind });
-          await wait(650);
-        }
-      }
-    }
+    await playDuel(ids.map((id) => (m) => duelSend(id, m)), r);
 
     ids.forEach((id, i) => duelSend(id, { t: "end", result: r.winner == null ? "draw" : r.winner === i ? "win" : "lose" }));
     // 보상은 알림으로. 팝오버는 닫혀 있다
@@ -1657,6 +1676,40 @@ let wildTimer = null;
 /** 이만큼 아무 입력이 없으면 자리를 비운 것으로 본다. 그때는 나오지 않고 미룬다 */
 const WILD_AWAY_SEC = 300;
 const BALL_W = 64;
+
+/**
+ * 볼. 보정은 원작 그대로다. 몬스터볼은 출현마다 공짜(wild.BALLS_PER_ENCOUNTER),
+ * 슈퍼볼·하이퍼볼은 상점에서 사서 가방(save.balls)에 둔다.
+ */
+const BALLS = {
+  poke: { name: "몬스터볼", mul: 1 },
+  great: { name: "슈퍼볼", mul: 1.5 },
+  ultra: { name: "하이퍼볼", mul: 2 },
+};
+const BALL_ORDER = ["poke", "great", "ultra"];
+
+/** 지금 이 볼을 몇 개 던질 수 있나 */
+function ballsLeft(W, key) {
+  if (key === "poke") return W.balls;
+  return ((save.balls || {})[key]) || 0;
+}
+
+/** 볼 창에 지금 고른 볼·남은 수·잡힐 확률을 알린다 */
+function ballInfo() {
+  const W = wildNow;
+  if (!W) return;
+  ballSend({ t: "set", key: W.ballKey, name: BALLS[W.ballKey].name, n: ballsLeft(W, W.ballKey), p: wildOdds(W) });
+}
+
+/** 남은 볼이 있는 다음 종류로. 없으면 그대로 */
+function nextBall(W, from = W.ballKey) {
+  const i = BALL_ORDER.indexOf(from);
+  for (let k = 1; k <= BALL_ORDER.length; k++) {
+    const key = BALL_ORDER[(i + k) % BALL_ORDER.length];
+    if (ballsLeft(W, key) > 0) return key;
+  }
+  return from;
+}
 
 /** 오늘 더 나올 수 있는 횟수 */
 function wildLeftToday() {
@@ -1766,7 +1819,11 @@ async function spawnWild() {
   const y = Math.round(area.y + area.height * 0.3 + Math.random() * Math.max(0, area.height * 0.7 - w));
   const start = { x: fromLeft ? area.x - w : area.x + area.width, y };
   const spot = { x: Math.round(area.x + w + Math.random() * Math.max(0, area.width - 3 * w)), y };
-  const home = { x: area.x + area.width - BALL_W - 24, y: area.y + area.height - BALL_W - 16 };
+  /*
+   * 볼은 화면 아래 가운데에 둔다. 처음엔 오른쪽 아래였는데, 거기는 "나타났다!" 알림이
+   * 몇 초 동안 덮는 자리다 — 알림을 보고 볼을 찾으면 볼이 알림 밑에 있었다.
+   */
+  const home = { x: Math.round(area.x + area.width / 2 - BALL_W / 2), y: area.y + area.height - BALL_W - 16 };
 
   wildNow = {
     ...r,
@@ -1777,6 +1834,7 @@ async function spawnWild() {
     home,
     ballPos: { ...home },
     balls: wild.BALLS_PER_ENCOUNTER,
+    ballKey: "poke",
     busy: false,
     win: overlayWindow("wild.html", w, w, start.x, start.y),
     ball: overlayWindow("ball.html", BALL_W, BALL_W, home.x, home.y),
@@ -1785,14 +1843,14 @@ async function spawnWild() {
   await Promise.all([loaded(W.win), loaded(W.ball)]);
   if (wildNow !== W) return { ok: false };
   wildSend({ t: "init", url: sprite ? pathToFileURL(sprite).href : null, name: d.name, shiny: r.shiny, isNew });
-  ballSend({ t: "count", n: W.balls });
+  ballInfo();
   W.win.showInactive();
   W.ball.showInactive();
 
   if (save.notifyEnabled && Notification.isSupported()) {
     new Notification({
       title: `야생 ${r.shiny ? "★ " : ""}${battle.josa(d.name, "이가")} 나타났다!`,
-      body: (isNew ? "처음 보는 포켓몬입니다. " : "") + "오른쪽 아래 몬스터볼을 잡고 던져 보세요",
+      body: (isNew ? "처음 보는 포켓몬입니다. " : "") + "화면 아래 몬스터볼을 잡고 던져 보세요",
       silent: false,
     }).show();
   }
@@ -1843,7 +1901,13 @@ async function flyBall(vx, vy) {
   const MAX = 42;
   const sp = Math.hypot(vx, vy);
   if (sp > MAX) { vx = (vx / sp) * MAX; vy = (vy / sp) * MAX; }
+  if (ballsLeft(W, W.ballKey) <= 0) {
+    // 고른 볼이 없다 — 던지지 않고 제자리로
+    slideBall(W.home, 300).then(() => wildNow === W && ballSend({ t: "land" }));
+    return;
+  }
   W.busy = true;
+  W.thrown = W.ballKey;
   ballSend({ t: "fly" });
   let x = W.ballPos.x;
   let y = W.ballPos.y;
@@ -1883,13 +1947,16 @@ async function hitWild() {
   await slideBall({ x: W.pos.x + w / 2 - BALL_W / 2, y: W.pos.y + w - BALL_W }, 260);
   await wait(400);
 
-  const res = wild.throwBall(W.rate);
+  const st = W.state || {};
+  const res = wild.throwBall(W.rate, BALLS[W.thrown].mul, st.hp ?? 1, CATCH_STATUS[st.status] || 1);
   for (let i = 0; i < res.shakes; i++) {
     if (wildNow !== W) return;
     ballSend({ t: "shake" });
     await wait(950);
   }
   if (wildNow !== W) return;
+  if (W.thrown === "poke") W.balls -= 1;
+  else { save.balls[W.thrown] = Math.max(0, (save.balls[W.thrown] || 0) - 1); writeSave(); }
 
   if (res.caught) {
     ballSend({ t: "caught" });
@@ -1902,21 +1969,112 @@ async function hitWild() {
   // 튀어나왔다
   ballSend({ t: "open" });
   wildSend({ t: "out", text: res.shakes === 2 ? "아깝다! 조금만 더…" : "튀어나왔다!" });
-  W.balls -= 1;
   await wait(900);
   if (wildNow !== W) return;
-  if (W.balls <= 0) return wildFlee("볼이 다 떨어졌다… 도망쳤다");
+  if (!BALL_ORDER.some((k) => ballsLeft(W, k) > 0)) return wildFlee("볼이 다 떨어졌다… 도망쳤다");
   if (Math.random() < wild.fleeChance(W.rate)) return wildFlee("도망쳐 버렸다!");
-  ballSend({ t: "count", n: W.balls });
+  if (ballsLeft(W, W.ballKey) <= 0) W.ballKey = nextBall(W);
+  ballInfo();
   await slideBall(W.home, 400);
   if (wildNow !== W) return;
   ballSend({ t: "land" });
   W.busy = false;
 }
 
+/**
+ * 상태이상 포획 보정 (5세대). 잠듦·얼음 2.5배, 마비·화상·독 1.5배.
+ * 혼란은 주요 상태이상이 아니라 보정이 없다.
+ */
+const CATCH_STATUS = { sleep: 2.5, freeze: 2.5, paralysis: 1.5, burn: 1.5, poison: 1.5 };
+
+/** 지금 던지면 얼마나 잡히나 — 볼 창에 보여 준다 */
+function wildOdds(W, ballKey = W.ballKey || "poke") {
+  const st = W.state || {};
+  return wild.odds(W.rate, BALLS[ballKey].mul, st.hp ?? 1, CATCH_STATUS[st.status] || 1).total;
+}
+
+/**
+ * 내 펫으로 약하게 만든다 — 바탕화면에서 펫을 끌어 야생 위에 놓으면 시작한다.
+ *
+ * 원작의 핵심이다. 체력이 가득이면 a = 포획률 × 볼 / 3 이지만, 빨간 체력이면
+ * 거의 세 배가 된다. 잠들게 하거나 마비시키면 더 잘 잡힌다.
+ *
+ * 펫은 야생 체력이 40% 아래로 떨어지면 공격을 멈춘다. 쓰러뜨릴 것 같은 기술은
+ * 웬만하면 안 고르고 상태이상 기술을 즐겨 쓴다(battle.js gentle). 그래도 급소로
+ * 넘칠 수 있다 — 쓰러지면 잡을 수 없다. 그 긴장이 재미다.
+ *
+ * 둘 다 Lv.50 이다. 야생은 레벨이 없다(부화한 모습으로 나온다). 깎인 체력과
+ * 상태이상은 야생이 들고 있다가 다음 결투와 포획에 그대로 쓴다.
+ */
+async function wildBattle(petId) {
+  const W = wildNow;
+  const pm = box.find(save.box, petId);
+  const rec = pets.get(petId);
+  if (!W || W.busy || W.fleeing || duel || !pm || !rec) return false;
+  const grown = box.effOf(pm, growthSpeed());
+  if (!poke.stageFor(grown)) return false; // 알은 못 싸운다
+
+  W.busy = true;
+  W.walkId = (W.walkId || 0) + 1; // 걷던 걸음을 멈춘다
+  // 야생의 개체값·성격은 처음 싸울 때 정해 두고 계속 쓴다 — 잡으면 이 아이가 박스에 들어간다
+  W.mon = W.mon || box.make(W.line, W.nature, W.shiny);
+  const r = battle.run(pm, grown, W.mon, poke.STAGES[1].at, Math.random, {
+    level: 50,
+    gentle: 0,
+    init: [null, W.state || null],
+    stop: (F) => F[1].hp <= F[1].maxHp * 0.4,
+  });
+  if (!r) { W.busy = false; return false; }
+
+  duel = { ids: [petId], temp: [] }; // 싸우는 동안 syncPets 가 이 펫을 건드리지 않게
+  try {
+    stopWander(petId);
+    const w = petW();
+    const gap = Math.round(w * 0.1);
+    // 야생 옆에 선다. 왼쪽에 자리가 없으면 오른쪽에
+    const left = W.pos.x - w - gap >= W.area.x;
+    const to = { x: left ? W.pos.x - w - gap : W.pos.x + w + gap, y: W.pos.y };
+    const f = r.fighters;
+    const wildDuel = (m) => !W.win.isDestroyed() && W.win.webContents.send("duel", m);
+    duelSend(petId, { t: "start", flip: left, name: f[0].name, level: f[0].level, hp: f[0].hp, max: f[0].maxHp });
+    wildDuel({ t: "start", flip: !left, name: "야생 " + f[1].name, level: f[1].level, hp: f[1].hp, max: f[1].maxHp });
+    await duelWalk([rec], [to]);
+    await wait(400);
+
+    await playDuel([(m) => duelSend(petId, m), wildDuel], r);
+
+    const e = r.end[1];
+    if (e.hp <= 0) {
+      // 쓰러뜨렸다 — 잡을 수 없다
+      duelSend(petId, { t: "end", result: "win" });
+      await wait(1200);
+      duelSend(petId, { t: "clear" });
+      W.busy = false;
+      wildFlee("쓰러져서 잡을 수 없다…");
+      return true;
+    }
+    W.state = { hp: e.hp / e.max, status: e.status };
+    duelSend(petId, { t: "end", result: r.end[0].hp <= 0 ? "lose" : "stay" });
+    if (r.end[0].hp > 0) duelSend(petId, { t: "say", text: "지금 던져!", kind: "win" });
+    wildDuel({ t: "end", result: "stay" });
+    ballInfo(); // 깎인 만큼 잡힐 확률이 올랐다
+    await wait(2200);
+    duelSend(petId, { t: "clear" });
+  } catch (err) {
+    console.error("[wild-battle]", err.message);
+    duelSend(petId, { t: "clear" });
+  } finally {
+    duel = null;
+    syncPets();
+    if (wildNow === W && !W.fleeing) W.busy = false;
+  }
+  return true;
+}
+
 /** 잡았다 — 박스에 넣는다. 이미 부화한 모습이다 */
 function catchWild(W) {
-  const m = box.make(W.line, W.nature, W.shiny);
+  // 싸워 본 아이면 그때 정해진 개체값·성격 그대로 들어간다
+  const m = W.mon || box.make(W.line, W.nature, W.shiny);
   m.fed = poke.STAGES[1].at;
   m.maxStage = 1;
   m.wild = true; // 알이 아니라 바탕화면에서 잡은 아이
@@ -2077,6 +2235,15 @@ app.whenReady().then(async () => {
     W.drag.push({ ...p, t: Date.now() });
     if (W.drag.length > 12) W.drag.shift();
     placeBall(p.x - BALL_W / 2, p.y - BALL_W / 2);
+  });
+  // 끌지 않고 누르기만 하면 볼 종류를 바꾼다
+  ipcMain.on("ball-click", () => {
+    const W = wildNow;
+    if (!W || W.busy) return;
+    W.drag = null;
+    W.ballKey = nextBall(W);
+    ballInfo();
+    slideBall(W.home, 1);
   });
   ipcMain.on("ball-drag-end", (_e, p) => {
     const W = wildNow;
@@ -2299,6 +2466,13 @@ app.whenReady().then(async () => {
      * 겹친 정도는 중심 사이 거리로 잰다 — 살짝 스친 걸로 싸움이 나면 펫을 옮기기가 겁난다.
      */
     const w = petW();
+    // 야생 위에 놓았나 — 그러면 잡으려고 약하게 만든다
+    if (wildNow && !wildNow.busy && !wildNow.fleeing && Math.hypot(wildNow.pos.x - p[0], wildNow.pos.y - p[1]) < w * 0.6) {
+      wildBattle(id).then((ok) => {
+        if (!ok) startWander(id);
+      });
+      return;
+    }
     let other = null;
     for (const [oid, o] of pets) {
       if (oid === id || o.win.isDestroyed() || !o.win.isVisible()) continue;

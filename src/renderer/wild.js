@@ -4,6 +4,8 @@
  * 볼에 빨려 들어감, 튀어나옴, 도망.
  */
 const mon = document.getElementById("mon");
+// 내 펫을 끌어다 놓으면 싸운다. 그리는 건 펫 창과 같은 duel.js
+window.ptbDuel.attach({ img: mon, body: document.getElementById("body"), flipClass: "right" });
 
 function say(text) {
   const el = document.getElementById("say");
@@ -32,9 +34,11 @@ window.ptb.onWild((d) => {
       break;
     case "absorb":
       replay("absorb");
+      document.body.classList.add("inball");
       break;
     case "out":
       replay("out");
+      document.body.classList.remove("inball");
       if (d.text) say(d.text);
       break;
     case "say":

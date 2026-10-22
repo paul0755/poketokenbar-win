@@ -1,6 +1,8 @@
 <!doctype html>
 <meta charset="utf-8" />
 <title>wild</title>
+<link rel="stylesheet" href="moves.css" />
+<link rel="stylesheet" href="duel.css" />
 <style>
   /* 펫 창과 같은 투명 창. 내 펫과 헷갈리지 않게 머리 위에 "야생"을 단다 */
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
@@ -42,9 +44,17 @@
   }
   #say.on { animation: say 1.6s ease forwards; }
   @keyframes say { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
-  body.gone #tag, body.gone #mon { transition: opacity .6s; opacity: 0; }
+  body.gone #tag, body.gone #mon, body.gone #duelHud { transition: opacity .6s; opacity: 0; }
+  /* 몸 연출(moves.css)은 감싼 #body 에 건다 — #mon 의 뒤집기·bob 과 안 싸우게 */
+  #body { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+  /* 싸우는 동안에는 HP 막대(duel.css)가 이름을 대신한다 */
+  body.duel #tag { display: none; }
+  /* 볼 안에 들어가 있는 동안에는 HP 막대도 같이 숨는다 — 볼 위에 막대만 떠 있으면 어색하다 */
+  body.inball #duelHud { opacity: 0; }
 </style>
 <div id="tag"><span class="w">야생</span><span id="nm"></span></div>
 <div id="say"></div>
-<img id="mon" alt="" />
+<div id="body"><img id="mon" alt="" /></div>
+<script src="moves.js"></script>
+<script src="duel.js"></script>
 <script src="wild.js"></script>

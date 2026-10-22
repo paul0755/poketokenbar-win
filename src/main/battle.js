@@ -162,11 +162,16 @@ function statTarget(mv, change) {
  * 할 만한 보조가 있으면 가끔 쓴다". 늘 최선만 고르면 매번 같은 기술만 나와서
  * 보는 재미가 없다 — 점수에 비례해 뽑는다.
  */
-function choose(me, foe, rng) {
+function choose(me, foe, rng, gentle = false) {
   const scored = me.moves.map((mv) => {
     if (mv.c !== "status") {
       const e = effectiveness(mv.t, foe.types);
       if (e === 0) return [mv, 0];
+      /*
+       * 잡으려고 약하게만 만들 때(gentle) — 쓰러뜨릴 것 같은 기술은 거의 안 고른다.
+       * 원작에서 사람이 약한 기술을 골라 쓰는 것과 같다. 그래도 급소·난수로 넘칠 수 있다.
+       */
+      if (gentle && damage(me, foe, mv, () => 1, false).amount >= foe.hp) return [mv, 1];
       const stab = me.types.includes(mv.t) ? 1.5 : 1;
       const phys = mv.c === "physical";
       const ratio = eff(me, phys ? "atk" : "spa") / Math.max(1, eff(foe, phys ? "def" : "spd"));
@@ -178,7 +183,7 @@ function choose(me, foe, rng) {
     // 보조 기술 — 지금 쓸 의미가 있을 때만
     let sc = 0;
     if (mv.hl && me.hp < me.maxHp * 0.5) sc = 120;
-    if (mv.ail && MAJOR.has(mv.ail) && !foe.status) sc = Math.max(sc, 70);
+    if (mv.ail && MAJOR.has(mv.ail) && !foe.status) sc = Math.max(sc, gentle ? 140 : 70); // 잡을 땐 상태이상이 제일 좋다
     if (mv.ail === "confusion" && !foe.confused) sc = Math.max(sc, 45);
     for (const [stat, ch] of mv.st || []) {
       const who = statTarget(mv, ch) === "self" ? me : foe;
@@ -215,6 +220,17 @@ function choose(me, foe, rng) {
 function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
   const F = [fighter(monA, grownA, opts.level), fighter(monB, grownB, opts.level)];
   if (!F[0] || !F[1]) return null;
+  /*
+   * 이어서 싸우기 — opts.init[i] = { hp: 남은 비율, status }.
+   * 야생 포켓몬은 한 번 깎인 체력을 다음 결투까지 들고 간다. 처음부터 다시 차면
+   * "약하게 만들어 잡는다"가 성립하지 않는다.
+   */
+  (opts.init || []).forEach((st, i) => {
+    if (!st || !F[i]) return;
+    if (typeof st.hp === "number") F[i].hp = Math.max(1, Math.min(F[i].maxHp, Math.round(F[i].maxHp * st.hp)));
+    if (st.status) { F[i].status = st.status; if (st.status === "sleep") F[i].sleep = 2; }
+  });
+  const hp0 = F.map((f) => f.hp);
   const log = [];
   const say = (e) => log.push(e);
   const nm = (i) => F[i].name;
@@ -351,9 +367,10 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
   say({ t: "info", side: -1, text: `${nm(0)} Lv.${F[0].level} VS ${nm(1)} Lv.${F[1].level}` });
 
   let turn = 0;
+  let stopped = false;
   while (F[0].hp > 0 && F[1].hp > 0 && turn < MAX_TURNS) {
     turn++;
-    const picks = [choose(F[0], F[1], rng), choose(F[1], F[0], rng)];
+    const picks = [choose(F[0], F[1], rng, opts.gentle === 0), choose(F[1], F[0], rng, opts.gentle === 1)];
     // 우선도 → 스피드 → 동률이면 동전
     const pr = (i) => (picks[i] ? picks[i].pr || 0 : 0);
     let order = [0, 1];
@@ -371,13 +388,17 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
       setHp(i, f.hp - Math.max(1, Math.floor(f.maxHp / 8)), `${josa(nm(i), "은는")} ${f.status === "burn" ? "화상" : "독"} 데미지를 입었다!`);
     }
     F[0].flinch = F[1].flinch = false;
+    // 멈출 때 — 야생을 잡으려고 약하게만 만들 때. 둘 다 서 있을 때만 멈춘다
+    if (opts.stop && F[0].hp > 0 && F[1].hp > 0 && opts.stop(F)) { stopped = true; break; }
   }
 
   for (const i of [0, 1]) if (F[i].hp <= 0) say({ t: "faint", side: i, text: `${josa(nm(i), "은는")} 쓰러졌다!` });
 
   // 둘 다 서 있으면(턴 제한) 남은 체력 비율로, 둘 다 쓰러졌으면(반동) 무승부
   let winner = null;
-  if (F[0].hp > 0 && F[1].hp <= 0) winner = 0;
+  if (stopped) {
+    if (opts.stopText) say({ t: "info", side: -1, text: opts.stopText(F) });
+  } else if (F[0].hp > 0 && F[1].hp <= 0) winner = 0;
   else if (F[1].hp > 0 && F[0].hp <= 0) winner = 1;
   else if (F[0].hp > 0 && F[1].hp > 0) {
     const r0 = F[0].hp / F[0].maxHp;
@@ -385,12 +406,16 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
     if (r0 !== r1) winner = r0 > r1 ? 0 : 1;
     say({ t: "info", side: -1, text: `${MAX_TURNS}턴이 지나 판정으로 결정합니다.` });
   }
-  say({ t: "info", side: -1, text: winner == null ? "무승부!" : `${nm(winner)}의 승리!` });
+  if (!stopped) say({ t: "info", side: -1, text: winner == null ? "무승부!" : `${nm(winner)}의 승리!` });
 
   return {
     winner,
+    stopped,
     turns: turn,
-    fighters: F.map((f) => ({ id: f.id, name: f.name, level: f.level, maxHp: f.maxHp })),
+    // hp 는 시작할 때 체력 — 이어서 싸우면 가득이 아니다
+    fighters: F.map((f, i) => ({ id: f.id, name: f.name, level: f.level, maxHp: f.maxHp, hp: hp0[i] })),
+    // 끝났을 때 상태. 야생은 이걸 들고 다음 결투·포획으로 간다
+    end: F.map((f) => ({ hp: f.hp, max: f.maxHp, status: f.status })),
     log,
   };
 }

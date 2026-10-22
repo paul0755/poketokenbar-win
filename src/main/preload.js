@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld("ptb", {
   ballDragStart: (p) => ipcRenderer.send("ball-drag-start", p),
   ballDrag: (p) => ipcRenderer.send("ball-drag", p),
   ballDragEnd: (p) => ipcRenderer.send("ball-drag-end", p),
+  ballClick: () => ipcRenderer.send("ball-click"),
 
   // 상점
   openShop: () => ipcRenderer.send("open-shop"),
