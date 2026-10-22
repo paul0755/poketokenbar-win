@@ -64,6 +64,19 @@ function rollAbility(dexId) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+/**
+ * 알기술. 원작에서는 부모에게서 물려받는다 — 우리에겐 부모가 없으니 받는 순간
+ * 종이 물려받을 수 있는 것 중 1~2개를 정한다. 개체값처럼 저장해 두고 진화해도 간다.
+ * PokéAPI 는 알기술을 라인의 첫 형태에만 적어 두므로 첫 형태 기준으로 굴린다.
+ */
+function rollEggMoves(dexId) {
+  const pool = [...((SPECIES[dexId] || {}).egg || [])];
+  const n = Math.min(pool.length, Math.random() < 0.5 ? 1 : 2);
+  const out = [];
+  while (out.length < n) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  return out;
+}
+
 /* ---------------- 계산 ---------------- */
 
 /**
@@ -116,6 +129,24 @@ const STAT_LABEL = {
 
 const STAT_NAME = { hp: "HP", atk: "공격", def: "방어", spa: "특공", spd: "특방", spe: "스피드" };
 
+/** 기술 하나를 화면과 펫이 쓰는 꼴로. src 는 어디서 배웠나: level | egg | tm */
+function moveInfo(id, lv, src) {
+  const m = MOVES[id] || {};
+  const t = m.t != null ? TYPES[m.t] : null;
+  return {
+    id,
+    name: m.n || String(id),
+    level: lv,
+    src,
+    type: t ? t.n : null,
+    typeKey: t ? t.k : null,
+    power: m.p ?? null,
+    accuracy: m.a ?? null,
+    pp: m.pp ?? null,
+    damageClass: m.c || null,
+  };
+}
+
 /**
  * 지금 레벨에서 쓸 수 있는 기술 넷.
  *
@@ -128,21 +159,26 @@ function movesOf(dexId, level) {
   return s.moves
     .filter(([, lv]) => lv <= level)
     .slice(-4)
-    .map(([id, lv]) => {
-      const m = MOVES[id] || {};
-      const t = m.t != null ? TYPES[m.t] : null;
-      return {
-        name: m.n || String(id),
-        level: lv,
-        type: t ? t.n : null,
-        typeKey: t ? t.k : null,
-        power: m.p ?? null,
-        accuracy: m.a ?? null,
-        pp: m.pp ?? null,
-        damageClass: m.c || null,
-      };
-    })
+    .map(([id, lv]) => moveInfo(id, lv, "level"))
     .reverse(); // 최근에 배운 것이 위로
+}
+
+/**
+ * 기술머신으로 더 가르칠 수 있는 것. 이미 아는 기술(레벨업 넷·알기술·가르친 것)은 뺀다.
+ * 지금 모습 기준이다 — 진화하면 배울 수 있는 기술머신이 늘어나는 종이 있다.
+ */
+function tmCandidates(mon, grown) {
+  const line = poke.LINES[mon.line];
+  if (!line) return [];
+  const dexId = line.ids[poke.stageFor(grown)];
+  const s = SPECIES[dexId];
+  if (!s || !s.tm) return [];
+  const known = new Set([
+    ...movesOf(dexId, levelOf(grown)).map((m) => m.id),
+    ...(mon.eggMoves || []),
+    ...(mon.tmMoves || []),
+  ]);
+  return s.tm.filter((id) => !known.has(id));
 }
 
 /**
@@ -186,9 +222,12 @@ function build(mon, grown) {
     ivTotal: ivs.reduce((a, b) => a + b, 0),
     ivMax: 186,
     moves: movesOf(dexId, level),
+    eggMoves: (mon.eggMoves || []).map((id) => moveInfo(id, null, "egg")),
+    tmMoves: (mon.tmMoves || []).map((id) => moveInfo(id, null, "tm")),
+    tmLeft: tmCandidates(mon, grown).length,
     // 다음 레벨까지
     levelUpAt: level >= 100 ? null : level * PER_LEVEL,
   };
 }
 
-module.exports = { levelOf, rollIVs, rollGender, rollAbility, statsOf, movesOf, build, PER_LEVEL };
+module.exports = { levelOf, rollIVs, rollGender, rollAbility, rollEggMoves, statsOf, movesOf, tmCandidates, build, PER_LEVEL };

@@ -52,6 +52,8 @@ function make(line, nature, shiny) {
     ivs: profile.rollIVs(),
     gender: baseDex ? profile.rollGender(baseDex) : "무성",
     ability: baseDex ? profile.rollAbility(baseDex) : 0,
+    eggMoves: baseDex ? profile.rollEggMoves(baseDex) : [],
+    tmMoves: [], // 상점의 기술머신으로 가르친 것
     raw: 0, // 이 아이가 먹은 실제 토큰
     fed: 0, // 사탕으로 넣은 양
     maxStage: 0,
@@ -80,6 +82,9 @@ function backfill(box) {
     if (!Array.isArray(m.ivs) || m.ivs.length !== 6) { m.ivs = profile.rollIVs(); dirty = true; }
     if (!m.gender) { m.gender = baseDex ? profile.rollGender(baseDex) : "무성"; dirty = true; }
     if (typeof m.ability !== "number") { m.ability = baseDex ? profile.rollAbility(baseDex) : 0; dirty = true; }
+    // 알기술이 생기기 전에 태어난 아이들. 빈 배열과 구분하려고 배열인지를 본다
+    if (!Array.isArray(m.eggMoves)) { m.eggMoves = baseDex ? profile.rollEggMoves(baseDex) : []; dirty = true; }
+    if (!Array.isArray(m.tmMoves)) { m.tmMoves = []; dirty = true; }
   }
   return dirty;
 }

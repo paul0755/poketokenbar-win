@@ -252,18 +252,22 @@ function profileHtml(p) {
     )
     .join("");
 
-  const moves = p.moves.length
-    ? p.moves
-        .map(
-          (m) => `
+  const mvRow = (m) => `
         <div class="mv">
           <span class="ty t-${m.typeKey || "normal"}">${m.type || "?"}</span>
           <span class="n">${m.name}</span>
           <span class="p">${m.power ? "위력 " + m.power : m.damageClass === "status" ? "변화" : "—"}</span>
-        </div>`,
-        )
-        .join("")
+        </div>`;
+  const moves = p.moves.length
+    ? p.moves.map(mvRow).join("")
     : '<div class="meta">아직 배운 기술이 없습니다.</div>';
+  // 레벨업 넷과 섞지 않는다. 어디서 배운 기술인지가 원작에서도 중요한 구분이다
+  // 원작의 알기술(eggMoves)이다. 화면에서는 "태어날 때부터 지닌 기술"이라는 뜻으로 패시브스킬이라 부른다
+  const eggMoves = (p.eggMoves || []).length ? `<h5>패시브스킬</h5>${p.eggMoves.map(mvRow).join("")}` : "";
+  const tmMoves = (p.tmMoves || []).length
+    ? `<h5>기술머신</h5>${p.tmMoves.map(mvRow).join("")}`
+    : "";
+  const tmLeft = p.tmLeft ? `<div class="meta">상점의 기술머신으로 ${p.tmLeft}개를 더 가르칠 수 있습니다.</div>` : "";
 
   return `
     <div class="prof">
@@ -280,6 +284,9 @@ function profileHtml(p) {
       ${stats}
       <h5>기술</h5>
       ${moves}
+      ${eggMoves}
+      ${tmMoves}
+      ${tmLeft}
     </div>`;
 }
 

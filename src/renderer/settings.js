@@ -32,6 +32,7 @@ window.ptb.onSettings((s) => {
   if ((L.claude || {}).resetDay != null) anchorSet = true;
   $("trayIcon").value = s.trayIcon || "logo";
   $("wanderLevel").value = s.wanderLevel;
+  $("moveLevel").value = s.moveLevel || "rare";
   $("pollMinutes").value = String(s.pollMinutes);
   $("autoLaunch").checked = s.autoLaunch;
   $("dataPath").textContent = s.dataPath || "";
@@ -163,6 +164,7 @@ $("calClaudeWeekGo").onclick = () => calibrate("claude", "week", "calClaudeWeek"
 
 on("trayIcon", "change", () => send({ trayIcon: $("trayIcon").value }));
 on("wanderLevel", "change", () => send({ wanderLevel: $("wanderLevel").value }));
+on("moveLevel", "change", () => send({ moveLevel: $("moveLevel").value }));
 on("pollMinutes", "change", () => send({ pollMinutes: Number($("pollMinutes").value) }));
 
 // 슬라이더는 끄는 동안 숫자만 갱신하고, 손을 뗄 때 저장한다.

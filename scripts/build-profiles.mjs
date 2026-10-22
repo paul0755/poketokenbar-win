@@ -1,6 +1,6 @@
 /**
  * PokéAPI에서 개체 프로필 데이터를 받아
- *   src/main/species.json   종별 타입·종족값·특성·성별비·레벨업 기술
+ *   src/main/species.json   종별 타입·종족값·특성·성별비·레벨업 기술·알기술·기술머신
  *   src/main/moves.json     기술 사전 (이름·타입·위력·분류)
  *   src/main/abilities.json 특성 사전 (이름·설명)
  * 를 만든다.
@@ -8,8 +8,12 @@
  * lines.json 에 실제로 등장하는 도감 번호만 받는다 — 안 쓰는 500종을
  * 받아 두면 파일만 두 배가 되고 읽는 쪽은 그대로다.
  *
- * 기술은 5세대(black-white) 레벨업 기술만 쓴다. 스프라이트가 5세대라
+ * 기술은 5세대(black-white) 것만 쓴다. 스프라이트가 5세대라
  * 다른 세대 기술을 섞으면 "그 시절에 없던 기술"이 나온다.
+ *
+ *   moves  레벨업 [[id, 레벨]]
+ *   egg    알기술 [id]  — PokéAPI 는 라인의 첫 형태에만 적어 둔다. 진화형에는 없다
+ *   tm     기술머신 [id] — 비전머신 포함. 가르치는 건 상점에서 한다
  *
  * 한국어가 없으면 영어로 둔다. 지어내지 않는다.
  *
@@ -85,15 +89,21 @@ const rows = await mapLimit(
       return st ? st.base_stat : 0;
     });
 
-    // 레벨업 기술만, 우리 세대 것만. 같은 기술이 여러 번 나오면 가장 낮은 레벨을 쓴다.
+    // 우리 세대 것만. 레벨업은 같은 기술이 여러 번 나오면 가장 낮은 레벨을 쓴다.
     const byMove = new Map();
+    const egg = new Set();
+    const tm = new Set();
     for (const m of p.moves) {
       for (const d of m.version_group_details) {
-        if (d.move_learn_method.name !== "level-up") continue;
         if (d.version_group.name !== VERSION_GROUP) continue;
         const id = idOf(m.move.url);
-        const lv = d.level_learned_at || 1;
-        if (!byMove.has(id) || byMove.get(id) > lv) byMove.set(id, lv);
+        const how = d.move_learn_method.name;
+        if (how === "egg") egg.add(id);
+        else if (how === "machine") tm.add(id);
+        else if (how === "level-up") {
+          const lv = d.level_learned_at || 1;
+          if (!byMove.has(id) || byMove.get(id) > lv) byMove.set(id, lv);
+        }
       }
     }
     const moves = [...byMove.entries()].sort((a, b) => a[1] - b[1]).map(([id, lv]) => [id, lv]);
@@ -108,6 +118,8 @@ const rows = await mapLimit(
       // -1은 무성. 0~8은 암컷이 나올 확률을 8분의 몇으로 나타낸 값.
       genderRate: typeof s.gender_rate === "number" ? s.gender_rate : -1,
       moves,
+      egg: [...egg].sort((a, b) => a - b),
+      tm: [...tm].sort((a, b) => a - b),
     };
   },
   "종",
@@ -119,7 +131,7 @@ console.log(`종 ${Object.keys(species).length}개`);
 
 /* ---------------- 기술 · 특성 · 타입 사전 ---------------- */
 
-const moveIds = [...new Set(Object.values(species).flatMap((s) => s.moves.map((m) => m[0])))];
+const moveIds = [...new Set(Object.values(species).flatMap((s) => [...s.moves.map((m) => m[0]), ...s.egg, ...s.tm]))];
 const abilityIds = [...new Set(Object.values(species).flatMap((s) => s.abilities.map((a) => a.id)))];
 const typeIds = [...new Set(Object.values(species).flatMap((s) => s.types))];
 
@@ -183,5 +195,7 @@ const noKoMove = Object.values(moves).filter((m) => /^[a-z-]+$/.test(m.n)).lengt
 const noKoAbility = Object.values(abilities).filter((a) => /^[a-z-]+$/.test(a.n)).length;
 console.log("\n점검");
 console.log(`  레벨업 기술이 없는 종  ${noMoves.length}개` + (noMoves.length ? " → " + noMoves.slice(0, 5).map((s) => s.dex).join(",") : ""));
+console.log(`  알기술이 있는 종      ${Object.values(species).filter((s) => s.egg.length).length}개`);
+console.log(`  기술머신이 있는 종    ${Object.values(species).filter((s) => s.tm.length).length}개`);
 console.log(`  한국어 없는 기술      ${noKoMove}/${Object.keys(moves).length}`);
 console.log(`  한국어 없는 특성      ${noKoAbility}/${Object.keys(abilities).length}`);

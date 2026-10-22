@@ -110,6 +110,7 @@ const SHOP = [
   { id: "egg-legend", name: "전설 알", cost: 18, desc: "★4 이상 확정", icon: "🥚" },
   { id: "rare-candy", name: "이상한사탕", cost: 1, desc: "키우는 아이를 1000만 만큼 자라게 한다", icon: "🍬" },
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
+  { id: "tm", name: "기술머신", cost: 3, desc: "키우는 아이가 배울 수 있는 기술머신 기술 하나를 가르친다", icon: "💿" },
   { id: "charm", name: "반짝이는 부적", cost: 60, desc: "이로치 확률 2배. 한 번만 살 수 있다", icon: "✨", once: true },
 ];
 
@@ -160,6 +161,11 @@ let save = {
   petVisible: false,
   petPos: null,
   wanderLevel: "rare",
+  /**
+   * 펫이 기술을 쓰는 빈도. "off" | "rare" | "often"
+   * 언제 쓰는지는 펫 창이 정한다 (renderer/pet.js). 여기선 얼마나 자주인지만.
+   */
+  moveLevel: "rare",
 
   /* ---- 설정 ---- */
   /**
@@ -377,6 +383,17 @@ function buy(itemId) {
     if (!a) { save.candySpent -= cost; return { ok: false, reason: "키우는 아이가 없습니다" }; }
     a.fed = (a.fed || 0) + CANDY_FEED;
     msg = poke.describe(box.effOf(a, growthSpeed()), a.line, { shiny: a.shiny }).name + "이(가) 자랐습니다";
+  } else if (itemId === "tm") {
+    const a = box.active(save);
+    const eff = box.effOf(a, growthSpeed());
+    // 알에게는 가르칠 수 없다. 기술을 쓰지도 않는다
+    if (!a || poke.stageFor(eff) === 0) { save.candySpent -= cost; return { ok: false, reason: "알에게는 가르칠 수 없습니다" }; }
+    const pool = profile.tmCandidates(a, eff);
+    if (!pool.length) { save.candySpent -= cost; return { ok: false, reason: "더 배울 수 있는 기술머신이 없습니다" }; }
+    const id = pool[Math.floor(Math.random() * pool.length)];
+    a.tmMoves = [...(a.tmMoves || []), id];
+    const learned = profile.build(a, eff).tmMoves.find((m) => m.id === id);
+    msg = poke.describe(eff, a.line, { shiny: a.shiny }).name + "이(가) " + (learned ? learned.name : "새 기술") + "을(를) 배웠습니다";
   } else if (itemId === "charm") { save.charm = true; msg = "이로치 확률이 2배가 됩니다"; }
 
   writeSave();
@@ -547,6 +564,7 @@ async function buildStats() {
     growthPct: save.growthPct ?? 100,
     trayIcon: save.trayIcon ?? "logo",
     petSize: save.petSize,
+    moveLevel: save.moveLevel ?? "rare",
     candy: candy(u.total),
     charm: Boolean(save.charm),
     shiny: Boolean(act && act.shiny),
@@ -919,6 +937,7 @@ function settingsPayload() {
     warnPercent: save.warnPercent,
     petSize: save.petSize,
     wanderLevel: save.wanderLevel,
+    moveLevel: save.moveLevel ?? "rare",
     pollMinutes: save.pollMinutes,
     autoLaunch: save.autoLaunch,
     autoSources: officialSources(),
