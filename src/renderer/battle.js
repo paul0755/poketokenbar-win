@@ -62,18 +62,109 @@
     last = s;
     if (!playing) fillPick(s);
     renderBag(s);
+    renderFriend(s);
   });
+
+  /* ---------------- 친선 배틀 ----------------
+     내 코드 만들기 → 친구에게 보내기, 친구 코드 붙여 넣기 → 싸우기.
+     계산·검사는 메인(friend.js)이 한다. 여기서는 고르고, 보여 주고, 재생한다. */
+
+  function renderFriend(s) {
+    const f = s.friend || {};
+    const list = fighters(s);
+    const sel = $("frMine");
+    const keep = sel.value || (f.team && f.team.monId) || (list.find((m) => m.active) || {}).id;
+    sel.innerHTML = list.map((m) => `<option value="${m.id}">${m.name} Lv.${m.profile.level}</option>`).join("");
+    if (list.some((m) => m.id === keep)) sel.value = keep;
+    if (document.activeElement !== $("frName") && !$("frName").value) $("frName").value = f.trainer || "";
+    if (f.team) {
+      $("frMyBox").hidden = false;
+      $("frMyCode").value = f.team.code;
+      const who = list.find((m) => m.id === f.team.monId);
+      $("frMyNote").textContent = `등록한 팀: ${who ? who.name : "놓아준 아이"} — 이 코드를 친구에게 보내세요. 등록한 뒤 자라도 코드는 그대로입니다.`;
+    }
+    const r = f.record || {};
+    $("frRec").textContent = r.w || r.l || r.d ? `${r.w}승 ${r.l}패${r.d ? " " + r.d + "무" : ""}` : "";
+    updateGo();
+  }
+
+  let foeOk = false;
+  const updateGo = () => ($("frGo").disabled = playing || !foeOk || !(last && last.friend && last.friend.team));
+
+  $("frMake").onclick = async () => {
+    const r = await window.ptb.friendRegister({ id: $("frMine").value, trainer: $("frName").value });
+    if (!r || !r.ok) return void ($("frMyNote").textContent = (r && r.reason) || "만들지 못했습니다");
+    $("frMyBox").hidden = false;
+    $("frMyCode").value = r.code;
+    $("frMyNote").textContent = "코드를 만들었습니다. 복사해서 친구에게 보내세요.";
+  };
+  $("frCopy").onclick = async () => {
+    const t = $("frMyCode").value;
+    try {
+      await navigator.clipboard.writeText(t);
+    } catch {
+      $("frMyCode").select();
+      document.execCommand("copy");
+    }
+    window.toast && toast("코드를 복사했습니다");
+  };
+
+  // 붙여 넣으면 바로 누구인지 보여 준다. 잘못 붙였으면 무엇이 틀렸는지 말한다
+  let inspectTimer = null;
+  $("frTheirs").addEventListener("input", () => {
+    clearTimeout(inspectTimer);
+    inspectTimer = setTimeout(async () => {
+      const code = $("frTheirs").value.trim();
+      foeOk = false;
+      $("frFoe").hidden = true;
+      if (!code) { $("frInfo").textContent = ""; return updateGo(); }
+      const r = await window.ptb.friendInspect(code);
+      if (!r || !r.ok) {
+        $("frInfo").textContent = (r && r.reason) || "읽지 못했습니다";
+      } else if (r.self) {
+        $("frInfo").textContent = "내 코드입니다. 친구에게 받은 코드를 넣어 주세요.";
+      } else {
+        foeOk = true;
+        $("frFoe").hidden = false;
+        $("frFoeImg").src = r.url || "";
+        $("frFoeTxt").textContent = `${r.trainer ? r.trainer + "의 " : "친구의 "}${r.name}${r.shiny ? " ★" : ""} (${r.stage})`;
+        $("frInfo").textContent = last && last.friend && last.friend.team ? "" : "싸우려면 위에서 내 팀부터 등록해 주세요.";
+      }
+      updateGo();
+    }, 250);
+  });
+
+  $("frGo").onclick = async () => {
+    if (playing) return;
+    playing = true;
+    fast = false;
+    $("btlGo").disabled = $("btlDesk").disabled = true;
+    updateGo();
+    $("btlSkip").hidden = false;
+    try {
+      const r = await window.ptb.friendBattle($("frTheirs").value.trim());
+      if (!r || !r.ok) return void ($("frInfo").textContent = (r && r.reason) || "결투를 시작하지 못했습니다");
+      $("arena").scrollIntoView({ behavior: "smooth", block: "start" });
+      await play(r);
+    } finally {
+      playing = false;
+      $("btlSkip").hidden = true;
+      if (last) fillPick(last);
+      updateGo();
+    }
+  };
 
   /* ---------------- 재생 ---------------- */
 
   function setSide(i, m, f) {
     const k = SIDE[i];
     const box = $("side" + k);
-    box.querySelector(".nm").textContent = f.name;
+    box.querySelector(".nm").textContent = f.label || f.name;
     box.querySelector(".lv").textContent = "Lv." + f.level;
     box.querySelector(".st").textContent = "";
     const img = box.querySelector("img");
-    img.src = (m && (m.animUrl || m.url)) || "";
+    // 친선 배틀의 친구 아이는 내 박스에 없다 — 메인이 그림 주소를 같이 준다
+    img.src = (m && (m.animUrl || m.url)) || f.url || "";
     img.classList.toggle("flip", DIR[i] > 0);
     $("body" + k).className = "fbody";
     setHp(i, f.maxHp, f.maxHp, true);
@@ -141,7 +232,10 @@
       }
     }
 
-    if (r.reward) {
+    if (r.friendly) {
+      line(r.winner == null ? "무승부!" : r.winner === 0 ? "친선 배틀에서 이겼다!" : "친선 배틀에서 졌다…", "rw");
+      line("친선 배틀은 보상이 없습니다. 같은 두 코드로는 몇 번을 해도 같은 결과입니다.", "sys");
+    } else if (r.reward) {
       line(`🎁 ${r.reward.name}(${r.reward.flavorName})을 얻었다!`, "rw");
       window.toast && toast(`${r.reward.name}을(를) 얻었습니다`);
     } else if (r.winner != null && !r.rewardsLeft) {

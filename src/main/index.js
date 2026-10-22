@@ -12,6 +12,7 @@ const notify = require("./notify");
 const backup = require("./backup");
 const battle = require("./battle");
 const wild = require("./wild");
+const friend = require("./friend");
 const BERRIES = require("./berries.json");
 
 /**
@@ -193,6 +194,84 @@ function startBattle(idA, idB, level) {
   return { ok: true, ...r, reward, rewardsLeft: battleRewardsLeft() };
 }
 
+/* ---------------- 친선 배틀 (friend.js) ---------------- */
+
+/** 내 팀 등록 — 이 코드를 친구에게 보낸다 */
+function friendRegister(id, trainer) {
+  const m = box.find(save.box, id);
+  if (!m) return { ok: false, reason: "없는 아이입니다" };
+  const grown = box.effOf(m, growthSpeed());
+  if (!poke.stageFor(grown)) return { ok: false, reason: "알은 등록할 수 없습니다" };
+  save.trainerName = String(trainer || "").trim().slice(0, 16);
+  const code = friend.encode(m, grown, save.trainerName);
+  save.friendTeam = { code, monId: id, at: Date.now() };
+  writeSave();
+  refresh(true);
+  return { ok: true, code };
+}
+
+/** 받은 코드 미리 보기 — 붙여 넣자마자 누구인지 보여 준다 */
+async function friendInspect(code) {
+  const d = friend.decode(code);
+  if (d.error) return { ok: false, reason: d.error };
+  const desc = poke.describe(d.grown, d.mon.line, { shiny: d.mon.shiny });
+  const sp = await poke.spriteWithFallback(desc, CACHE, "anim");
+  return {
+    ok: true,
+    trainer: d.trainer,
+    name: desc.name,
+    stage: desc.stage.label,
+    shiny: d.mon.shiny,
+    url: sp ? pathToFileURL(sp).href : null,
+    self: Boolean(save.friendTeam && save.friendTeam.code === d.code),
+  };
+}
+
+/**
+ * 친선 배틀. 등록한 내 코드와 친구 코드로 싸운다 — 둘 다 Lv.50, 씨앗은 두 코드에서.
+ * 누가 왼쪽인지도 코드로 정해서 양쪽 PC가 같은 판을 돌린다. 화면에는 늘 내가
+ * 왼쪽에 서도록 결과만 뒤집어 넘긴다. 보상은 없다 — 가짜 코드로 열매를 찍을 수 있다.
+ */
+async function friendBattle(code) {
+  if (!save.friendTeam) return { ok: false, reason: "먼저 내 팀을 등록해 코드를 만들어 주세요" };
+  const mine = friend.decode(save.friendTeam.code);
+  if (mine.error) return { ok: false, reason: "등록한 내 코드가 이 버전과 맞지 않습니다. 다시 등록해 주세요" };
+  const theirs = friend.decode(code);
+  if (theirs.error) return { ok: false, reason: theirs.error };
+  if (theirs.code === mine.code) return { ok: false, reason: "내 코드입니다. 친구의 코드를 넣어 주세요" };
+
+  const [i, j] = friend.order(mine.code, theirs.code);
+  const sides = [mine, theirs];
+  const L = sides[i];
+  const R = sides[j];
+  const r = battle.run(L.mon, L.grown, R.mon, R.grown, friend.rng(friend.seedOf(mine.code, theirs.code)), { level: 50 });
+  if (!r) return { ok: false, reason: "결투를 시작하지 못했습니다" };
+
+  // 내가 오른쪽이었으면 화면용으로 뒤집는다 — 계산은 그대로, 보는 쪽만 바뀐다
+  const flip = i === 1;
+  const sw = (k) => (flip && k >= 0 ? 1 - k : k);
+  const fighters = flip ? [r.fighters[1], r.fighters[0]] : r.fighters;
+  const log = flip ? r.log.map((e) => ({ ...e, side: sw(e.side) })) : r.log;
+  const winner = r.winner == null ? null : sw(r.winner);
+
+  const urls = await Promise.all(
+    [mine, theirs].map(async (x) => {
+      const p = await poke.spriteWithFallback(poke.describe(x.grown, x.mon.line, { shiny: x.mon.shiny }), CACHE, "anim");
+      return p ? pathToFileURL(p).href : null;
+    }),
+  );
+  fighters[0] = { ...fighters[0], url: urls[0], label: (mine.trainer ? mine.trainer + "의 " : "") + fighters[0].name };
+  fighters[1] = { ...fighters[1], url: urls[1], label: (theirs.trainer ? theirs.trainer + "의 " : "친구의 ") + fighters[1].name };
+
+  const rec = save.friendRecord || (save.friendRecord = { w: 0, l: 0, d: 0 });
+  if (winner == null) rec.d++;
+  else if (winner === 0) rec.w++;
+  else rec.l++;
+  writeSave();
+  refresh(true);
+  return { ok: true, friendly: true, winner, turns: r.turns, fighters, log, reward: null, rewardsLeft: battleRewardsLeft() };
+}
+
 /**
  * 나무열매 먹이기. 싫어하는 맛이면 안 먹는다 — 열매도 그대로 남는다.
  */
@@ -312,6 +391,13 @@ let save = {
   wildLevel: "rare",
   wildDay: null,
   wildCount: 0,
+  /**
+   * 친선 배틀. friendTeam 은 등록해 둔 내 팀 코드 — 친구에게 보낸 바로 그 코드로 싸워야
+   * 두 PC에서 같은 결투가 나온다. 등록한 뒤에 아이가 자라도 코드는 그대로다.
+   */
+  trainerName: "",
+  friendTeam: null, // { code, monId, at }
+  friendRecord: { w: 0, l: 0, d: 0 },
   /** 방해 금지 시간. 이 사이에는 저절로 나오지 않는다 (wild.js inQuiet) */
   wildQuiet: { enabled: false, from: 22, to: 8 },
   /** 상점에서 산 볼. 몬스터볼은 출현마다 공짜로 주니 여기 없다 */
@@ -718,6 +804,7 @@ async function buildStats() {
     limits: limits.summarize(u, Date.now(), save.limits || {}, save.quotaFiles || {}),
     box: boxList,
     berries: berryBag(),
+    friend: { team: save.friendTeam, trainer: save.trainerName || "", record: save.friendRecord || { w: 0, l: 0, d: 0 } },
     battleRewardsLeft: battleRewardsLeft(),
     battleRewardsMax: BATTLE_REWARDS_PER_DAY,
     activeId: act ? act.id : null,
@@ -2272,6 +2359,9 @@ app.whenReady().then(async () => {
     flyBall(vx, vy);
   });
   ipcMain.handle("feed-berry", (_e, { id, key } = {}) => feedBerry(id, key));
+  ipcMain.handle("friend-register", (_e, { id, trainer } = {}) => friendRegister(id, trainer));
+  ipcMain.handle("friend-inspect", (_e, code) => friendInspect(code));
+  ipcMain.handle("friend-battle", (_e, code) => friendBattle(code));
   ipcMain.handle("release", (_e, id) => {
     const m = box.find(save.box, id);
     if (!m) return { ok: false, reason: "없는 아이" };

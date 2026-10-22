@@ -37,6 +37,10 @@ contextBridge.exposeInMainWorld("ptb", {
   battle: (a) => ipcRenderer.invoke("battle", a),
   feedBerry: (a) => ipcRenderer.invoke("feed-berry", a),
   battleDesktop: (a) => ipcRenderer.invoke("battle-desktop", a),
+  // 친선 배틀 — 코드 만들기 · 받은 코드 보기 · 싸우기
+  friendRegister: (a) => ipcRenderer.invoke("friend-register", a),
+  friendInspect: (code) => ipcRenderer.invoke("friend-inspect", code),
+  friendBattle: (code) => ipcRenderer.invoke("friend-battle", code),
   // 펫 창 전용 — 바탕화면 결투 장면
   onDuel: (cb) => ipcRenderer.on("duel", (_e, d) => cb(d)),
   wildSpawn: () => ipcRenderer.invoke("wild-spawn"),
