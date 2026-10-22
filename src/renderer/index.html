@@ -302,7 +302,8 @@
     background: var(--accent); color: #14151a; border: 0;
   }
   .btlrow button:disabled { background: #33363f; color: var(--dim); cursor: default; }
-  .btlrow #btlSkip { flex: 0 0 auto; background: var(--card2); color: var(--muted); border: 1px solid var(--line); }
+  .btlrow #btlSkip, .btlrow #btlDesk { flex: 0 0 auto; background: var(--card2); color: var(--muted); border: 1px solid var(--line); }
+  .btlrow #btlDesk:not(:disabled):hover { color: var(--text); border-color: var(--accent); }
   .arena { display: flex; gap: 8px; margin-top: 10px; }
   .arena .side { flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 8px; }
   .arena .hd { display: flex; align-items: baseline; gap: 5px; font-size: 11.5px; }
@@ -439,6 +440,7 @@
     <div class="note">
       박스의 두 아이를 싸움 붙입니다. 능력치·상성·기술은 원작 규칙 그대로입니다.
       이기면 나무열매를 받습니다(하루 5번).
+      바탕화면에서 펫을 끌어 다른 펫 위에 놓아도 싸웁니다.
     </div>
     <div class="btlpick">
       <select id="btlA"></select><span class="vs">VS</span><select id="btlB"></select>
@@ -451,6 +453,7 @@
     </div>
     <div class="btlrow">
       <button id="btlGo">결투 시작</button>
+      <button id="btlDesk" title="두 펫이 바탕화면에서 마주 서서 싸웁니다">바탕화면에서</button>
       <button id="btlSkip" hidden>건너뛰기</button>
     </div>
     <div class="note" id="btlNote"></div>

@@ -1409,9 +1409,12 @@ function syncPets() {
   const want = petTargets();
   petBusy = true;
 
-  for (const id of [...pets.keys()]) if (!want.includes(id)) destroyPet(id);
+  // 싸우는 중인 둘은 건드리지 않는다. 결투가 끝나면 이 함수가 다시 불려 정리한다
+  const fighting = (id) => Boolean(duel && duel.ids.includes(id));
+  for (const id of [...pets.keys()]) if (!want.includes(id) && !fighting(id)) destroyPet(id);
 
   want.forEach((id, nth) => {
+    if (fighting(id)) return;
     let rec = pets.get(id);
     if (!rec || rec.win.isDestroyed()) {
       if (!save.petVisible) return; // 숨긴 상태면 만들지 않는다
@@ -1463,6 +1466,169 @@ function setWanderLevel(level) {
   save.wanderLevel = level;
   writeSave();
   for (const id of pets.keys()) startWander(id);
+}
+
+/* ---------------- 바탕화면 결투 ---------------- */
+
+/**
+ * 지금 바탕화면에서 싸우는 중인 판. null 이면 없다.
+ *   ids   싸우는 두 아이
+ *   temp  결투 때문에 잠깐 띄운 창 — 끝나면 다시 거둔다
+ *
+ * 싸우는 동안에는 syncPets 가 이 둘을 건드리면 안 된다. 띄울 목록(petTargets)에
+ * 없는 아이를 데려왔으면 그대로 두면 결투 도중에 창이 사라진다.
+ */
+let duel = null;
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** 펫 창에 결투 장면 하나를 보낸다 */
+function duelSend(id, msg) {
+  const rec = pets.get(id);
+  if (rec && !rec.win.isDestroyed()) rec.win.webContents.send("duel", msg);
+}
+
+/** 창이 다 뜰 때까지. 막 만든 창에 장면을 보내면 받을 사람이 없다 */
+function whenLoaded(rec) {
+  if (!rec.win.webContents.isLoading()) return Promise.resolve();
+  return new Promise((r) => rec.win.webContents.once("did-finish-load", () => setTimeout(r, 300)));
+}
+
+/** 두 창을 나란히 세울 자리까지 걸어가게 한다. 순간이동하면 누가 누군지 놓친다 */
+async function duelWalk(recs, to) {
+  const from = recs.map((r) => {
+    const p = r.win.getPosition();
+    return { x: p[0], y: p[1] };
+  });
+  const N = 30;
+  for (let k = 1; k <= N; k++) {
+    const t = k / N;
+    const e = 1 - Math.pow(1 - t, 2);
+    recs.forEach((rec, i) => {
+      if (rec.win.isDestroyed() || rec.dragging) return;
+      const x = Math.round(from[i].x + (to[i].x - from[i].x) * e);
+      const y = Math.round(from[i].y + (to[i].y - from[i].y) * e);
+      rec.selfPos = movePet(rec.win, x, y) || { x, y };
+    });
+    await wait(16);
+  }
+}
+
+const STAT_SHORT = { atk: "공격", def: "방어", spa: "특공", spd: "특방", spe: "스피드", acc: "명중", eva: "회피" };
+const AIL_SHORT = { paralysis: "마비!", burn: "화상!", poison: "독!", sleep: "잠들었다", freeze: "얼었다!", confusion: "혼란!" };
+
+/**
+ * 로그 한 줄을 펫 머리 위에 띄울 짧은 말로. 창이 펫 크기만 해서 이름이 들어간
+ * 문장은 다 안 들어간다. 못 줄이는 줄은 null — 띄우지 않는다.
+ */
+function duelSay(ev) {
+  const t = ev.text || "";
+  if (ev.eff > 1) return { side: ev.side, text: "효과가 굉장했다!", kind: "good" };
+  if (ev.eff < 1) return { side: ev.side, text: "효과가 별로…", kind: "bad" };
+  if (ev.stat) return { side: ev.side, text: STAT_SHORT[ev.stat] + " " + (ev.change > 0 ? "↑" : "↓").repeat(Math.min(3, Math.abs(ev.change))), kind: ev.change > 0 ? "up" : "down" };
+  if (ev.status) return { side: ev.side, text: AIL_SHORT[ev.status] || "", kind: "bad" };
+  if (/맞지 않았다/.test(t)) return { side: ev.side, text: "빗나갔다!", kind: "bad" };
+  if (/효과가 없는/.test(t)) return { side: ev.side, text: "효과가 없다…", kind: "bad" };
+  if (/급소/.test(t)) return { side: ev.side, text: "급소!", kind: "good" };
+  if (/흡수/.test(t)) return { side: ev.side, text: "흡수", kind: "up" };
+  if (/반동/.test(t)) return { side: ev.side, text: "반동!", kind: "bad" };
+  if (/화상 데미지/.test(t)) return { side: ev.side, text: "화상", kind: "bad" };
+  if (/독 데미지/.test(t)) return { side: ev.side, text: "독", kind: "bad" };
+  if (/회복/.test(t)) return { side: ev.side, text: "회복!", kind: "up" };
+  if (/잠들어/.test(t)) return { side: ev.side, text: "쿨쿨…", kind: "" };
+  if (/풀이 죽어/.test(t)) return { side: ev.side, text: "풀이 죽었다", kind: "bad" };
+  if (/몸이 저려/.test(t)) return { side: ev.side, text: "몸이 저리다!", kind: "bad" };
+  if (/얼어붙어/.test(t)) return { side: ev.side, text: "꽁꽁", kind: "bad" };
+  if (/자신을 공격/.test(t)) return { side: ev.side, text: "자기를 때렸다!", kind: "bad" };
+  if (/아무 일도/.test(t)) return { side: ev.side, text: "…", kind: "" };
+  if (/눈을 떴다|녹았다|풀렸다/.test(t)) return { side: ev.side, text: "회복!", kind: "up" };
+  return null;
+}
+
+/**
+ * 바탕화면에서 싸운다.
+ *
+ * 승패와 보상은 결투 탭과 똑같이 startBattle 이 정한다(하루 상한 포함).
+ * 여기서는 그 사건 목록을 두 펫 창에 나눠 재생하기만 한다.
+ */
+async function desktopBattle(idA, idB, level) {
+  if (duel) return { ok: false, reason: "이미 바탕화면에서 결투 중입니다" };
+  const r = startBattle(idA, idB, level);
+  if (!r.ok) return r;
+  const ids = [idA, idB];
+  duel = { ids, temp: [] };
+  if (win && !win.isDestroyed() && win.isVisible()) win.hide(); // 바탕화면이 보여야 한다
+
+  try {
+    petBusy = true;
+    const recs = ids.map((id, n) => {
+      let rec = pets.get(id);
+      if (!rec || rec.win.isDestroyed()) {
+        rec = createPet(id, n);
+        duel.temp.push(id);
+      }
+      stopWander(id);
+      rec.win.showInactive();
+      return rec;
+    });
+    setTimeout(() => (petBusy = false), 250);
+    await Promise.all(recs.map(whenLoaded));
+    ids.forEach(stopWander); // 막 만든 창은 createPet 이 배회를 켜 둔다
+
+    // 자리 — A 가 있던 화면에서, A 자리 근처에 나란히. 화면 밖으로 안 나가게 가둔다
+    const w = petW();
+    const gap = Math.round(w * 0.15);
+    const pa = recs[0].win.getPosition();
+    const area = screen.getDisplayNearestPoint({ x: pa[0], y: pa[1] }).workArea;
+    const x0 = Math.min(Math.max(area.x, pa[0]), area.x + area.width - (2 * w + gap));
+    const y0 = Math.min(Math.max(area.y, pa[1]), area.y + area.height - w);
+    const f = r.fighters;
+
+    // 서로 마주 본다 — 왼쪽(A)이 뒤집혀 오른쪽을 본다
+    ids.forEach((id, i) => duelSend(id, { t: "start", flip: i === 0, name: f[i].name, level: f[i].level, hp: f[i].maxHp, max: f[i].maxHp }));
+    await duelWalk(recs, [{ x: x0, y: y0 }, { x: x0 + w + gap, y: y0 }]);
+    await wait(500);
+
+    for (const ev of r.log) {
+      if (ev.t === "move") {
+        duelSend(ids[ev.side], { t: "move", move: ev.move });
+        await wait(ev.move.damageClass === "status" ? 1000 : 750);
+      } else if (ev.t === "hp") {
+        duelSend(ids[ev.side], { t: "hp", hp: ev.hp, max: ev.max });
+        const s = duelSay(ev);
+        if (s) duelSend(ids[s.side], { t: "say", text: s.text, kind: s.kind });
+        await wait(500);
+      } else if (ev.t === "faint") {
+        duelSend(ids[ev.side], { t: "faint" });
+        await wait(900);
+      } else if (ev.side >= 0) {
+        if (ev.status !== undefined) duelSend(ids[ev.side], { t: "status", status: ev.status && ev.status !== "unconfused" ? ev.status : null });
+        const s = duelSay(ev);
+        if (s && s.text) {
+          duelSend(ids[s.side], { t: "say", text: s.text, kind: s.kind });
+          await wait(650);
+        }
+      }
+    }
+
+    ids.forEach((id, i) => duelSend(id, { t: "end", result: r.winner == null ? "draw" : r.winner === i ? "win" : "lose" }));
+    // 보상은 알림으로. 팝오버는 닫혀 있다
+    if (save.notifyEnabled && Notification.isSupported()) {
+      const who = r.winner == null ? "무승부" : f[r.winner].name + "의 승리!";
+      const body = r.reward ? `${r.reward.name}(${r.reward.flavorName})을 얻었습니다` : r.winner != null && !r.rewardsLeft ? "오늘 받을 수 있는 보상은 다 받았습니다" : "";
+      new Notification({ title: who, body, silent: true }).show();
+    }
+    await wait(3200);
+    ids.forEach((id) => duelSend(id, { t: "clear" }));
+  } catch (e) {
+    console.error("[duel]", e.message);
+    ids.forEach((id) => duelSend(id, { t: "clear" }));
+  } finally {
+    duel = null;
+    // 잠깐 데려온 아이는 거두고, 원래 있던 아이는 다시 배회한다. 띄울 목록에 맞추는 게 그거다
+    syncPets();
+  }
+  return r;
 }
 
 /* ---------------- 앱 ---------------- */
@@ -1584,6 +1750,8 @@ app.whenReady().then(async () => {
 
   /** 박스: 놓아주기 */
   ipcMain.handle("battle", (_e, { a, b, level } = {}) => startBattle(a, b, level));
+  // 바탕화면 결투는 재생이 끝난 뒤에 돌아온다. 그때 탭이 로그를 채운다
+  ipcMain.handle("battle-desktop", (_e, { a, b, level } = {}) => desktopBattle(a, b, level));
   ipcMain.handle("feed-berry", (_e, { id, key } = {}) => feedBerry(id, key));
   ipcMain.handle("release", (_e, id) => {
     const m = box.find(save.box, id);
@@ -1780,6 +1948,25 @@ app.whenReady().then(async () => {
     const p = rec.win.getPosition();
     save.petPos = { x: p[0], y: p[1] };
     writeSave(); // 놓을 때 한 번만
+    if (duel) return; // 싸우는 중이면 결투가 끝난 뒤 다시 걷는다
+
+    /*
+     * 다른 펫 위에 떨어뜨리면 결투. 메뉴를 찾아 들어가지 않아도 되는 제일 쉬운 길이다.
+     * 겹친 정도는 중심 사이 거리로 잰다 — 살짝 스친 걸로 싸움이 나면 펫을 옮기기가 겁난다.
+     */
+    const w = petW();
+    let other = null;
+    for (const [oid, o] of pets) {
+      if (oid === id || o.win.isDestroyed() || !o.win.isVisible()) continue;
+      const q = o.win.getPosition();
+      if (Math.hypot(q[0] - p[0], q[1] - p[1]) < w * 0.55) { other = oid; break; }
+    }
+    if (other) {
+      desktopBattle(id, other, 50).then((r) => {
+        if (r && !r.ok) startWander(id); // 알이라 못 싸우는 등
+      });
+      return;
+    }
     startWander(id); // 놓은 자리에서 다시 시작
   });
 

@@ -44,7 +44,7 @@
         sel.value = (rest[0] || {}).id || "";
       }
     }
-    $("btlGo").disabled = playing || list.length < 2;
+    $("btlGo").disabled = $("btlDesk").disabled = playing || list.length < 2;
     $("btlNote").textContent = list.length < 2 ? "싸울 수 있는 아이가 두 마리 이상 있어야 합니다. 알은 싸우지 않습니다." : "";
   }
 
@@ -119,7 +119,7 @@
     for (const ev of r.log) {
       if (ev.t === "move") {
         line(ev.text, "mv");
-        if (!fast) stages[ev.side].play(ev.move, { body: $("body" + SIDE[ev.side]), dir: DIR[ev.side] });
+        if (!fast) stages[ev.side].play(ev.move, { body: $("body" + SIDE[ev.side]), dir: DIR[ev.side], force: true });
         await sleep(ev.move.damageClass === "status" ? 900 : 650);
       } else if (ev.t === "hp") {
         const before = parseInt($("hpn" + SIDE[ev.side]).textContent, 10);
@@ -166,6 +166,31 @@
     } finally {
       playing = false;
       $("btlSkip").hidden = true;
+      if (last) fillPick(last);
+    }
+  };
+  /**
+   * 바탕화면에서 싸운다. 장면은 펫 창들이 그리고(main desktopBattle), 이 창은 닫힌다.
+   * 끝나고 돌아오면 로그만 채워 둔다 — 다시 열었을 때 무슨 일이 있었는지 보이게.
+   */
+  $("btlDesk").onclick = async () => {
+    if (playing) return;
+    const a = $("btlA").value;
+    const b = $("btlB").value;
+    const level = $("btlLv").value === "50" ? 50 : null;
+    if (!a || !b || a === b) return void (window.toast && toast("서로 다른 두 마리를 골라 주세요"));
+    playing = true;
+    $("btlGo").disabled = $("btlDesk").disabled = true;
+    $("btlNote").textContent = "바탕화면에서 싸우는 중…";
+    try {
+      const r = await window.ptb.battleDesktop({ a, b, level });
+      if (!r || !r.ok) return void (window.toast && toast((r && r.reason) || "결투를 시작하지 못했습니다"));
+      fast = true;
+      await play(r);
+    } finally {
+      fast = false;
+      playing = false;
+      $("btlNote").textContent = "";
       if (last) fillPick(last);
     }
   };

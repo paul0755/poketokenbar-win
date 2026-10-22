@@ -36,6 +36,9 @@ contextBridge.exposeInMainWorld("ptb", {
   // 결투 · 나무열매. 결과(사건 목록·보상)를 받아야 하므로 invoke
   battle: (a) => ipcRenderer.invoke("battle", a),
   feedBerry: (a) => ipcRenderer.invoke("feed-berry", a),
+  battleDesktop: (a) => ipcRenderer.invoke("battle-desktop", a),
+  // 펫 창 전용 — 바탕화면 결투 장면
+  onDuel: (cb) => ipcRenderer.on("duel", (_e, d) => cb(d)),
 
   // 상점
   openShop: () => ipcRenderer.send("open-shop"),

@@ -770,12 +770,13 @@
      * 기술 하나를 쓴다.
      *
      *   move  { name, typeKey, damageClass }  — profile.movesOf 가 주는 그대로
-     *   opts  { body: 움직일 요소, dir: -1(왼쪽) | 1(오른쪽), isNew }
+     *   opts  { body: 움직일 요소, dir: -1(왼쪽) | 1(오른쪽), isNew, force }
      *
      * 이미 쓰는 중이면 무시한다. 겹치면 입자가 두 배가 되어 지저분하다.
+     * 결투는 예외(force) — 턴이 빨리 돌아오면 다음 기술이 씹힌다. 정해진 순서대로 다 보여야 한다.
      */
     function play(move, opts = {}) {
-      if (!move || playing) return false;
+      if (!move || (playing && !opts.force)) return false;
       ensure();
       resize();
       playing = true;

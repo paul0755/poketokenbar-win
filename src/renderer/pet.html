@@ -58,6 +58,42 @@
   }
   #egg svg { display: block; }
 
+  /* ---- 바탕화면 결투 (pet.js) ---- */
+  #duelHud {
+    position: fixed; top: 2px; left: 6%; right: 6%;
+    font: 700 10px/1.2 "Malgun Gothic", "Segoe UI", sans-serif; color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .8);
+    pointer-events: none; opacity: 0; transition: opacity .3s;
+  }
+  body.duel #duelHud { opacity: 1; }
+  #duelHud .nm { display: flex; gap: 3px; align-items: baseline; white-space: nowrap; overflow: hidden; }
+  #duelHud .lv { color: #ffcb05; font-size: 9px; }
+  #duelHud .st { margin-left: auto; color: #ffa245; font-size: 9px; }
+  #duelHud .bar { height: 5px; margin-top: 2px; background: rgba(20, 21, 26, .75); border-radius: 99px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0, 0, 0, .4); }
+  #duelHud .bar i { display: block; height: 100%; width: 100%; background: #4ade80; transition: width .45s ease; }
+  #duelHud .bar i.yellow { background: #f5c542; }
+  #duelHud .bar i.red { background: #ff5a5a; }
+  /* 결투 중에는 기술 이름이 HP 막대 아래로 내려온다 */
+  body.duel .moveTag { top: 22px; }
+  #duelSay {
+    position: fixed; top: 42px; left: 50%; transform: translateX(-50%);
+    max-width: calc(100% - 6px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    padding: 1px 6px; border-radius: 6px; background: rgba(20, 21, 26, .82); color: #fff;
+    font: 700 10px/1.5 "Malgun Gothic", "Segoe UI", sans-serif; pointer-events: none; opacity: 0;
+  }
+  #duelSay.good { color: #ffa245; }
+  #duelSay.bad { color: #b9bec9; }
+  #duelSay.up { color: #4ade80; }
+  #duelSay.down { color: #7fb2ff; }
+  #duelSay.win { color: #14151a; background: #ffcb05; }
+  #duelSay.on { animation: say 1.5s ease forwards; }
+  @keyframes say { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
+  #pet.hit { animation: hitblink .45s steps(2, end), bob 2.6s ease-in-out infinite; }
+  @keyframes hitblink { 50% { opacity: .15; } }
+  #body.faint { transition: transform .6s ease-in, opacity .6s; transform: translateY(35%); opacity: .15; }
+  #body.cheer { animation: cheer .9s ease; }
+  @keyframes cheer { 0%, 100% { transform: none; } 25%, 75% { transform: translateY(-14%); } 50% { transform: none; } }
+
   /* ---- 기술 연출 (moves.js · moves.css) ----
      몸을 움직이는 건 감싼 #body 다. #pet 에 transform 을 걸면 좌우 뒤집기
      (scaleX(-1))와 bob 이 같은 속성을 두고 싸운다. */
