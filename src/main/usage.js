@@ -22,7 +22,31 @@ const HOME = os.homedir();
    Claude Code — ~/.claude/projects/ ** /*.jsonl
    assistant 레코드의 message.usage 에 토큰이 들어있다.
    ------------------------------------------------------------------ */
-function readClaude(text, add) {
+/**
+ * Claude Code 로그에 섞여 오는 한도 거부 기록.
+ *
+ *   { status: "rejected", rateLimitType: "five_hour"|"seven_day",
+ *     resetsAt: <초>, ... }
+ *
+ * status 는 지금까지 rejected 밖에 없었다 — 막혔을 때만 적힌다. 그래서
+ * 퍼센트는 못 얻지만 두 가지를 확실히 얻는다: 그 순간 100% 였다는 것과,
+ * 그 창이 언제 리셋되는지. 리셋 시각은 데스크톱 앱 파일에는 없는 정보다.
+ * 그게 있어야 "100% 라는 옛 값이 지금 창의 것인지"를 판정할 수 있다.
+ */
+function pickLimitHit(o) {
+  const find = (x, d = 0) => {
+    if (!x || typeof x !== "object" || d > 6) return null;
+    if (x.rateLimitType && x.status && typeof x.resetsAt === "number") return x;
+    for (const v of Object.values(x)) {
+      const r = find(v, d + 1);
+      if (r) return r;
+    }
+    return null;
+  };
+  return find(o);
+}
+
+function readClaude(text, add, note) {
   for (const line of text.split("\n")) {
     if (!line) continue;
     let o;
@@ -30,6 +54,38 @@ function readClaude(text, add) {
       o = JSON.parse(line);
     } catch {
       continue; // 마지막 줄이 잘려 있는 건 정상이다 (계속 쓰이는 파일)
+    }
+    /*
+     * 한도 거부는 assistant 메시지가 아니라 오류 쪽에 실려 온다.
+     * 토큰 집계보다 먼저 본다 — continue 아래로 내려가면 못 본다.
+     */
+    if (note && line.includes("rateLimitType")) {
+      const h = pickLimitHit(o);
+      if (h && h.status === "rejected") {
+        const at = Date.parse(o.timestamp);
+        if (Number.isFinite(at)) {
+          /*
+           * 퍼센트로 바꾸지 않는다.
+           *
+           * "거부당했으니 그 창을 100% 썼다"고 적어 봤는데 값이 서로 어긋났다.
+           * 주간 거부가 10/23까지 유효한데 데스크톱 앱은 주간 16% 사용이라고
+           * 한다. 둘 다 맞다면 그 거부는 전체 주간 한도가 아니라 모델별
+           * 한도(거부 기록의 모델은 전부 opus 였다)다. 어느 쪽인지 모르는 채로
+           * 막대를 그리면 또 틀린 값을 보여주게 된다.
+           *
+           * 확실한 것만 남긴다 — 언제 막혔고, 그 창이 언제 리셋되는지.
+           */
+          const five = h.rateLimitType === "five_hour";
+          note({
+            at,
+            hit: true,
+            blockHitAt: five ? at : null,
+            blockResetAt: five ? h.resetsAt * 1000 : null,
+            weekHitAt: five ? null : at,
+            weekResetAt: five ? null : h.resetsAt * 1000,
+          });
+        }
+      }
     }
     if (o.type !== "assistant") continue;
     const u = o.message && o.message.usage;
@@ -422,8 +478,42 @@ function collect(extraRoots = {}) {
      * 오래된 값이 새 값을 덮어쓰면 화면이 거꾸로 간다.
      */
     const note = (q) => {
-      if (!q || (!q.block && !q.week)) return;
-      if (!quota[src.id] || q.at > quota[src.id].at) quota[src.id] = q;
+      if (!q || (!q.block && !q.week && !q.hit)) return;
+      const cur = quota[src.id];
+      if (!cur) {
+        quota[src.id] = { ...q, blockAt: q.block != null ? q.at : null, weekAt: q.week != null ? q.at : null };
+        return;
+      }
+      /*
+       * 통째로 덮어쓰고 있었다. 5시간 거부 뒤에 주간 거부가 들어오면
+       * 앞의 5시간 정보가 사라진다 — 두 기록은 서로 다른 창의 소식이라
+       * 새 것이 옛 것을 대신할 수 없다. 창마다 따로 최신을 지킨다.
+       */
+      const m = { ...cur };
+      if (q.at > (cur.at ?? 0)) {
+        m.at = q.at;
+        if (q.from) m.from = q.from;
+      }
+      if (q.block != null && q.at >= (cur.blockAt ?? -1)) {
+        m.block = q.block;
+        m.blockAt = q.at;
+        if (q.blockResetAt) m.blockResetAt = q.blockResetAt;
+      }
+      if (q.week != null && q.at >= (cur.weekAt ?? -1)) {
+        m.week = q.week;
+        m.weekAt = q.at;
+        if (q.weekResetAt) m.weekResetAt = q.weekResetAt;
+      }
+      // 한도 거부는 퍼센트와 별개로, 창마다 가장 최근 것을 지킨다
+      if (q.blockHitAt && q.blockHitAt >= (cur.blockHitAt ?? -1)) {
+        m.blockHitAt = q.blockHitAt;
+        m.blockResetAt = q.blockResetAt;
+      }
+      if (q.weekHitAt && q.weekHitAt >= (cur.weekHitAt ?? -1)) {
+        m.weekHitAt = q.weekHitAt;
+        m.weekResetAt = q.weekResetAt;
+      }
+      quota[src.id] = m;
     };
 
     const add = (iso, n, dedupeKey, parts) => {

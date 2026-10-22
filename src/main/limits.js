@@ -299,7 +299,16 @@ function perSource(usage, now, limits = {}, files = {}) {
       if (!(pctUsed > 0) || !(usedInWindow > 0)) return off.drift <= DRIFT_TOKENS;
       return off.drift <= Math.max(DRIFT_TOKENS, 2 * (usedInWindow / pctUsed));
     };
-    const blockFresh = off && off.block != null && driftOk(block ? block.used : 0, off.block);
+    /*
+     * 공식값이 찍힌 뒤에 창이 리셋됐다면, 그 값은 끝난 창의 것이다.
+     * 드리프트로도 대개 걸러지지만 이건 추정이 아니라 사실이라 따로 본다.
+     */
+    const resetAfterSample =
+      off && off.blockResetAt && off.at < off.blockResetAt && off.blockResetAt <= now
+        ? off.blockResetAt
+        : null;
+    const blockFresh =
+      off && off.block != null && !resetAfterSample && driftOk(block ? block.used : 0, off.block);
     const weekFresh = off && off.week != null && driftOk(week, off.week);
     const blockPct = blockFresh ? 100 - off.block : null;
     const weekPct = weekFresh ? 100 - off.week : null;
@@ -342,6 +351,8 @@ function perSource(usage, now, limits = {}, files = {}) {
        */
       officialStale: off && off.week != null && !weekFresh ? off : null,
       officialBlockStale: off && off.block != null && !blockFresh ? off : null,
+      // 추정이 아니라 로그에 적힌 사실이다 — 그 창은 이 시각에 리셋됐다
+      officialBlockResetAt: resetAfterSample,
     };
   }
   return out;
@@ -434,8 +445,20 @@ function officialOf(usage, id, now, files = {}) {
     const q = claudeQuota(files.claude);
     if (!q) return null;
     const drift = driftSince(usage, "claude", q.at);
-    // 묵음 판정은 창 크기를 알아야 해서 perSource 에서 한다. 여기서는 양만 잰다.
-    return { ...q, drift };
+    /*
+     * 로그에서 건진 한도 거부 기록을 붙인다.
+     *
+     * 데스크톱 앱 파일에는 "몇 %" 는 있어도 "그 창이 언제 리셋되는지" 가 없다.
+     * 그게 없으면 100% 라는 값이 지금 창의 것인지 이미 끝난 창의 것인지
+     * 구별할 수 없다. 로그의 거부 기록에는 resetsAt 이 들어 있다.
+     */
+    const hit = (usage.quota || {}).claude || {};
+    return {
+      ...q,
+      drift,
+      blockHitAt: hit.blockHitAt ?? null,
+      blockResetAt: hit.blockResetAt ?? null,
+    };
   }
   if (id !== "codex") return null;
   const list = codexOfficial(usage, now, files.codex);

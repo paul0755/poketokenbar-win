@@ -383,6 +383,11 @@ $("srctabs").addEventListener("click", (e) => {
  * 틀린 게 아니라 오래된 것인데, 화면에서는 구분되지 않는다.
  * 실제로 Codex가 32%일 때 4시간 45분 묵은 37%를 최신처럼 보여준 적이 있다.
  */
+/** 시:분 — 로그에 적힌 리셋 시각처럼 "언제" 가 중요한 값에 쓴다 */
+function hhmm(ms) {
+  return new Date(ms).toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+}
+
 function age(ms, stale) {
   if (typeof ms !== "number") return "";
   const m = Math.round(ms / 60000);
@@ -479,10 +484,13 @@ function renderLimits(L, srcId, srcLabel) {
      */
     const st = p.officialBlockStale;
     rows.push(usageRow("5시간", bSub, fmt(p.block.used),
-      st
-        ? `공식값은 ${age(st.ageMs, false)}(${st.block}% 사용) — 그 뒤 ${fmt(st.drift)}을 더 써서
-           지금 몇 %인지는 알 수 없습니다. Claude 앱에서 사용량을 한 번 열면 갱신됩니다.`
-        : `시간당 ${fmt(p.block.perHour)} · ${p.block.count}건 — 한도를 알면 막대가 나옵니다`));
+      !st
+        ? `시간당 ${fmt(p.block.perHour)} · ${p.block.count}건 — 한도를 알면 막대가 나옵니다`
+        : p.officialBlockResetAt
+          ? `공식값은 ${st.block}% 사용이지만 ${hhmm(p.officialBlockResetAt)}에 창이 리셋됐습니다 —
+             끝난 창의 값이라 쓰지 않습니다.`
+          : `공식값은 ${age(st.ageMs, false)}(${st.block}% 사용) — 그 뒤 ${fmt(st.drift)}을 더 써서
+             지금 몇 %인지는 알 수 없습니다.`));
   } else {
     rows.push(usageRow("5시간", "", "쉬는 중", "5시간 넘게 요청이 없었습니다"));
   }
