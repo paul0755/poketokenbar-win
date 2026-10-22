@@ -312,6 +312,8 @@ let save = {
   wildLevel: "rare",
   wildDay: null,
   wildCount: 0,
+  /** 방해 금지 시간. 이 사이에는 저절로 나오지 않는다 (wild.js inQuiet) */
+  wildQuiet: { enabled: false, from: 22, to: 8 },
   /** 상점에서 산 볼. 몬스터볼은 출현마다 공짜로 주니 여기 없다 */
   balls: { great: 0, ultra: 0 },
   /**
@@ -1087,6 +1089,7 @@ function settingsPayload() {
     moveLevel: save.moveLevel ?? "rare",
     wildLevel: save.wildLevel ?? "rare",
     wildLeft: wildLeftToday(),
+    wildQuiet: save.wildQuiet || { enabled: false, from: 22, to: 8 },
     pollMinutes: save.pollMinutes,
     autoLaunch: save.autoLaunch,
     autoSources: officialSources(),
@@ -1132,7 +1135,7 @@ function applySettings(patch) {
   writeSave();
 
   if ("wanderLevel" in patch) for (const id of pets.keys()) startWander(id);
-  if ("wildLevel" in patch) scheduleWild(); // 바꾼 간격으로 다시 잡는다. 끄면 여기서 멈춘다
+  if ("wildLevel" in patch || "wildQuiet" in patch) scheduleWild(); // 바꾼 간격으로 다시 잡는다. 끄면 여기서 멈춘다
   if ("petSize" in patch && pets.size) {
     // 투명 창은 setSize로 크기가 제대로 안 바뀐다 — 내용이 다시 그려지지
     // 않아 사라진 것처럼 보인다. 전부 없애고 새 크기로 다시 만든다.
@@ -1731,6 +1734,9 @@ function scheduleWild(ms) {
 function tryWild() {
   wildTimer = null;
   if (!wild.PACE[save.wildLevel || "rare"]) return;
+  // 방해 금지 시간이면 끝난 뒤로 미룬다. 끝나자마자 튀어나오면 그것도 돌발이 아니라 알람이다
+  const quiet = wild.quietEndsIn(new Date(), save.wildQuiet);
+  if (quiet) return scheduleWild(quiet + Math.round((5 + Math.random() * 25) * 60_000));
   // 이미 나와 있거나 결투 중이거나 자리를 비웠으면 잠시 뒤에 다시 본다
   if (wildNow || duel || powerMonitor.getSystemIdleTime() > WILD_AWAY_SEC) return scheduleWild(10 * 60_000);
   // 오늘 몫을 다 썼으면 평소 간격 뒤에 다시 본다 — 날이 바뀌면 다시 찬다
@@ -2107,7 +2113,9 @@ function buildMenu() {
     { type: "separator" },
     {
       // 기다리지 않고 바로 불러낸다. 오늘 몫에서 빠진다
-      label: wildNow ? "🌿 야생 포켓몬이 나와 있습니다" : "🌿 야생 포켓몬 부르기 (오늘 " + wildLeftToday() + "번 남음)",
+      label: wildNow
+        ? "🌿 야생 포켓몬이 나와 있습니다"
+        : "🌿 야생 포켓몬 부르기 (" + (wild.inQuiet(new Date(), save.wildQuiet) ? "방해 금지 중 · " : "") + "오늘 " + wildLeftToday() + "번 남음)",
       enabled: !wildNow && !duel && wildLeftToday() > 0,
       click: () => spawnWild().catch((e) => console.error("[wild]", e.message)),
     },

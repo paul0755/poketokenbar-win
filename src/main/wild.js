@@ -77,9 +77,32 @@ function throwBall(captureRate, ball = 1, hp = 1, status = 1, rng = Math.random)
 }
 
 /**
+ * 방해 금지 시간 — 회의·발표 중에 바탕화면에서 포켓몬이 튀어나오면 곤란하다.
+ * 그 시간에는 저절로 나오지 않는다. 직접 부르는 건 막지 않는다(사람이 원한 거다).
+ *
+ * q = { enabled, from, to } — 시(0~23). 22시~8시처럼 자정을 넘겨도 된다.
+ * from 과 to 가 같으면 비어 있는 구간으로 본다 — "하루 종일"로 읽으면 켜는 순간
+ * 아무것도 안 나와서 고장처럼 보인다. 그럴 거면 "안 나오기"를 고르면 된다.
+ */
+function inQuiet(now, q) {
+  if (!q || !q.enabled || q.from === q.to) return false;
+  const h = now.getHours() + now.getMinutes() / 60;
+  return q.from < q.to ? h >= q.from && h < q.to : h >= q.from || h < q.to;
+}
+
+/** 방해 금지가 끝나는 시각까지(ms). 지금 방해 금지가 아니면 0 */
+function quietEndsIn(now, q) {
+  if (!inQuiet(now, q)) return 0;
+  const end = new Date(now);
+  end.setHours(q.to, 0, 0, 0);
+  if (end <= now) end.setDate(end.getDate() + 1); // 자정을 넘기는 구간
+  return end - now;
+}
+
+/**
  * 놓쳤을 때 도망칠 확률. 귀한 아이일수록 잘 도망친다 — 10% ~ 35%.
  * 볼을 다 쓰기 전에 떠날 수 있어야 "한 번에 잡아야 하는" 긴장이 생긴다.
  */
 const fleeChance = (captureRate) => 0.1 + ((255 - Math.min(255, captureRate)) / 255) * 0.25;
 
-module.exports = { PACE, STAY_MS, BALLS_PER_ENCOUNTER, nextDelay, roll, odds, throwBall, fleeChance };
+module.exports = { PACE, STAY_MS, BALLS_PER_ENCOUNTER, nextDelay, roll, odds, throwBall, fleeChance, inQuiet, quietEndsIn };

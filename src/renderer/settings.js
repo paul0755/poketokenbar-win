@@ -34,6 +34,11 @@ window.ptb.onSettings((s) => {
   $("wanderLevel").value = s.wanderLevel;
   $("moveLevel").value = s.moveLevel || "rare";
   $("wildLevel").value = s.wildLevel || "rare";
+  const q = s.wildQuiet || { enabled: false, from: 22, to: 8 };
+  $("quietOn").checked = !!q.enabled;
+  $("quietFrom").value = String(q.from);
+  $("quietTo").value = String(q.to);
+  showQuiet();
   $("pollMinutes").value = String(s.pollMinutes);
   $("autoLaunch").checked = s.autoLaunch;
   $("dataPath").textContent = s.dataPath || "";
@@ -167,6 +172,26 @@ on("trayIcon", "change", () => send({ trayIcon: $("trayIcon").value }));
 on("wanderLevel", "change", () => send({ wanderLevel: $("wanderLevel").value }));
 on("moveLevel", "change", () => send({ moveLevel: $("moveLevel").value }));
 on("wildLevel", "change", () => send({ wildLevel: $("wildLevel").value }));
+
+/* 방해 금지 시간 — 시(0~23)만 고른다. 분까지 고르게 하면 고를 게 많아지기만 한다 */
+const hourLabel = (h) => (h < 12 ? "오전 " : "오후 ") + (h % 12 === 0 ? 12 : h % 12) + "시";
+for (const id of ["quietFrom", "quietTo"]) {
+  $(id).innerHTML = Array.from({ length: 24 }, (_, h) => `<option value="${h}">${hourLabel(h)}</option>`).join("");
+}
+function showQuiet() {
+  const on = $("quietOn").checked;
+  $("quietFrom").disabled = $("quietTo").disabled = !on;
+  const f = Number($("quietFrom").value), t = Number($("quietTo").value);
+  // 같은 시각을 고르면 비어 있는 구간이다 — 켰는데 아무 일도 없으면 고장처럼 보이니 말해 준다
+  $("quietNote").textContent = on && f === t
+    ? "시작과 끝이 같으면 방해 금지가 적용되지 않습니다. 시간을 다르게 골라 주세요."
+    : `회의·발표 중에 튀어나오면 곤란할 때. 자정을 넘겨도 됩니다(예: 오후 10시 ~ 오전 8시). "지금 불러오기"처럼 직접 부르는 건 막지 않습니다.`;
+}
+const sendQuiet = () => {
+  showQuiet();
+  send({ wildQuiet: { enabled: $("quietOn").checked, from: Number($("quietFrom").value), to: Number($("quietTo").value) } });
+};
+for (const id of ["quietOn", "quietFrom", "quietTo"]) on(id, "change", sendQuiet);
 $("wildNow").onclick = async () => {
   const r = await window.ptb.wildSpawn();
   $("wildNote").textContent = r && r.ok ? "나타났습니다! 설정 창을 닫고 바탕화면을 보세요." : (r && r.reason) || "부르지 못했습니다";
