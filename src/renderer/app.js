@@ -31,7 +31,7 @@ function setTab(name) {
   for (const b of document.querySelectorAll("nav button[data-tab]")) {
     b.classList.toggle("on", b.dataset.tab === name);
   }
-  for (const id of ["home", "shop", "box", "dex"]) $("tab-" + id).hidden = id !== name;
+  for (const id of ["home", "shop", "box", "battle", "dex"]) $("tab-" + id).hidden = id !== name;
   document.querySelector(".scroll").scrollTop = 0;
   // 열 때 최신 값을 받아온다. 상점·도감은 홈과 갱신 주기가 다르다.
   if (name === "shop") window.ptb.requestShop();
@@ -201,7 +201,8 @@ function renderBox(s) {
       const tags =
         (m.active ? '<span class="tag">키우는 중</span>' : "") +
         (m.isPet ? '<span class="tag pet">바탕화면</span>' : "") +
-        (m.graduated ? '<span class="tag gr">졸업</span>' : "");
+        (m.graduated ? '<span class="tag gr">졸업</span>' : "") +
+        (m.boost > 0 ? '<span class="tag bo">2배</span>' : "");
       const goal = m.next ? `${m.next}까지 ${fmt(m.remaining)}` : "다 자랐습니다";
       const p = m.profile;
       const lv = p ? `Lv.${p.level} · ` : "";
@@ -220,7 +221,7 @@ function renderBox(s) {
             <button data-act="release" class="del">놓아주기</button>
           </div>
         </div>
-        ${openProfile === m.id ? profileHtml(p) : ""}`;
+        ${openProfile === m.id ? profileHtml(p, m, s.berries) : ""}`;
     })
     .join("");
 }
@@ -233,7 +234,7 @@ function renderBox(s) {
  * 개체값은 따로 적는다. 능력치가 낮은 게 레벨 탓인지 개체 탓인지
  * 구분이 안 되면 "개체값"을 보여주는 의미가 없다.
  */
-function profileHtml(p) {
+function profileHtml(p, m = {}, bag = []) {
   if (!p) return '<div class="prof"><div class="meta">이 종의 상세 정보가 없습니다.</div></div>';
 
   const types = (p.typeKeys || [])
@@ -269,6 +270,22 @@ function profileHtml(p) {
     : "";
   const tmLeft = p.tmLeft ? `<div class="meta">상점의 기술머신으로 ${p.tmLeft}개를 더 가르칠 수 있습니다.</div>` : "";
 
+  // 나무열매. 좋아하는/싫어하는 맛을 미리 보여 준다 — 원작에서는 몰라서 헤매는 부분이다
+  const FL = { spicy: "매운맛", dry: "떫은맛", sweet: "단맛", bitter: "쓴맛", sour: "신맛" };
+  const taste = m.likes
+    ? `<div class="meta">좋아하는 맛 <b>${FL[m.likes]}</b> · 싫어하는 맛 <b>${FL[m.dislikes]}</b></div>`
+    : '<div class="meta">맛을 가리지 않습니다.</div>';
+  const have = (bag || []).filter((b) => b.count > 0);
+  const feed = have.length
+    ? `<div class="feed">${have
+        .map((b) => `<button data-feed="${b.key}" data-id="${m.id}">${b.name} ×${b.count}${
+          b.flavor === m.likes ? '<span class="lk">좋아함</span>' : b.flavor === m.dislikes ? '<span class="dk">싫어함</span>' : ""
+        }</button>`)
+        .join("")}</div>`
+    : '<div class="meta">가진 나무열매가 없습니다. 결투에서 이기면 받습니다.</div>';
+  const boost = m.boost > 0 ? `<div class="boost">토큰 경험치 2배 — ${fmt(m.boost)} 남음</div>` : "";
+  const rec = m.record && (m.record.w || m.record.l) ? ` · 전적 ${m.record.w}승 ${m.record.l}패` : "";
+
   return `
     <div class="prof">
       <div class="hd">
@@ -287,6 +304,10 @@ function profileHtml(p) {
       ${eggMoves}
       ${tmMoves}
       ${tmLeft}
+      <h5>나무열매${rec}</h5>
+      ${taste}
+      ${feed}
+      ${boost}
     </div>`;
 }
 
@@ -297,6 +318,13 @@ $("boxList").addEventListener("click", async (e) => {
     const id = info.closest(".bx").dataset.id;
     openProfile = openProfile === id ? null : id;
     if (lastStats) renderBox(lastStats);
+    return;
+  }
+
+  const fb = e.target.closest("button[data-feed]");
+  if (fb) {
+    const r = await window.ptb.feedBerry({ id: fb.dataset.id, key: fb.dataset.feed });
+    toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
     return;
   }
 

@@ -1,8 +1,10 @@
 /**
  * PokéAPI에서 개체 프로필 데이터를 받아
  *   src/main/species.json   종별 타입·종족값·특성·성별비·레벨업 기술·알기술·기술머신
- *   src/main/moves.json     기술 사전 (이름·타입·위력·분류)
+ *   src/main/moves.json     기술 사전 (이름·타입·위력·분류 + 결투에 쓰는 효과)
  *   src/main/abilities.json 특성 사전 (이름·설명)
+ *   src/main/types.json     타입 (이름 + 공격 상성)
+ *   src/main/berries.json   결투 보상 나무열매 (이름·맛)
  * 를 만든다.
  *
  * lines.json 에 실제로 등장하는 도감 번호만 받는다 — 안 쓰는 500종을
@@ -141,6 +143,7 @@ const moveRows = await mapLimit(
   CONCURRENCY,
   async (id) => {
     const m = await getJson(`https://pokeapi.co/api/v2/move/${id}`);
+    const meta = m.meta || {};
     return {
       id,
       name: ko(m.names, m.name),
@@ -150,6 +153,18 @@ const moveRows = await mapLimit(
       pp: m.pp ?? null,
       // physical | special | status
       damageClass: m.damage_class ? m.damage_class.name : null,
+      // 결투용. 원작 효과 중 PokéAPI 가 숫자로 주는 것만 쓴다 — 설명문을 해석하지 않는다
+      priority: m.priority || 0,
+      target: m.target ? m.target.name : null,
+      ailment: meta.ailment && meta.ailment.name !== "none" ? meta.ailment.name : null,
+      ailmentChance: meta.ailment_chance || 0,
+      drain: meta.drain || 0, // 양수는 흡수, 음수는 반동
+      healing: meta.healing || 0,
+      critRate: meta.crit_rate || 0,
+      flinch: meta.flinch_chance || 0,
+      hits: meta.min_hits ? [meta.min_hits, meta.max_hits || meta.min_hits] : null,
+      statChance: meta.stat_chance || 0,
+      stats: (m.stat_changes || []).map((c) => [c.stat.name, c.change]),
     };
   },
   "기술",
@@ -165,15 +180,53 @@ const abilityRows = await mapLimit(abilityIds, CONCURRENCY, async (id) => {
 console.log(`타입 ${typeIds.length}개 받는 중…`);
 const typeRows = await mapLimit(typeIds, CONCURRENCY, async (id) => {
   const t = await getJson(`https://pokeapi.co/api/v2/type/${id}`);
-  return { id, name: ko(t.names, t.name), key: t.name };
+  const rel = t.damage_relations || {};
+  const ids = (arr) => (arr || []).map((x) => idOf(x.url));
+  return {
+    id, name: ko(t.names, t.name), key: t.name,
+    // 이 타입으로 공격했을 때. 2배 · 반감 · 무효
+    x2: ids(rel.double_damage_to), half: ids(rel.half_damage_to), zero: ids(rel.no_damage_to),
+  };
+});
+
+/*
+ * 결투 보상 나무열매. 원작의 "맛 열매" 다섯 — 맛이 하나씩이라 성격의 좋아하는
+ * 맛과 바로 짝이 맞는다. 이름은 손으로 적지 않고 받는다.
+ */
+const BERRIES = [
+  ["figy-berry", "spicy"],
+  ["wiki-berry", "dry"],
+  ["mago-berry", "sweet"],
+  ["aguav-berry", "bitter"],
+  ["iapapa-berry", "sour"],
+];
+console.log(`나무열매 ${BERRIES.length}개 받는 중…`);
+const berryRows = await mapLimit(BERRIES, CONCURRENCY, async ([key, flavor]) => {
+  const it = await getJson(`https://pokeapi.co/api/v2/item/${key}`);
+  return { key, name: ko(it.names, key), flavor };
 });
 
 const moves = {};
-for (const m of moveRows) if (m) moves[m.id] = { n: m.name, t: m.type, p: m.power, a: m.accuracy, pp: m.pp, c: m.damageClass };
+for (const m of moveRows) {
+  if (!m) continue;
+  const e = { n: m.name, t: m.type, p: m.power, a: m.accuracy, pp: m.pp, c: m.damageClass };
+  // 기본값은 적지 않는다. 500개 × 열 개 필드가 대부분 0이다
+  if (m.priority) e.pr = m.priority;
+  if (m.target) e.tg = m.target;
+  if (m.ailment) { e.ail = m.ailment; if (m.ailmentChance) e.ac = m.ailmentChance; }
+  if (m.drain) e.dr = m.drain;
+  if (m.healing) e.hl = m.healing;
+  if (m.critRate) e.cr = m.critRate;
+  if (m.flinch) e.fl = m.flinch;
+  if (m.hits) e.hits = m.hits;
+  if (m.stats.length) { e.st = m.stats; if (m.statChance) e.sc = m.statChance; }
+  moves[m.id] = e;
+}
 const abilities = {};
 for (const a of abilityRows) if (a) abilities[a.id] = { n: a.name, d: a.desc };
 const types = {};
-for (const t of typeRows) if (t) types[t.id] = { n: t.name, k: t.key };
+for (const t of typeRows) if (t) types[t.id] = { n: t.name, k: t.key, x2: t.x2, half: t.half, zero: t.zero };
+const berries = berryRows.filter(Boolean).map((b) => ({ k: b.key, n: b.name, f: b.flavor }));
 
 /* ---------------- 쓰기 ---------------- */
 
@@ -187,6 +240,7 @@ write("species.json", species);
 write("moves.json", moves);
 write("abilities.json", abilities);
 write("types.json", types);
+write("berries.json", berries);
 
 /* ---------------- 점검 ---------------- */
 

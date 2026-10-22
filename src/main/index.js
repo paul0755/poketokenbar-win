@@ -10,6 +10,8 @@ const box = require("./box");
 const profile = require("./profile");
 const notify = require("./notify");
 const backup = require("./backup");
+const battle = require("./battle");
+const BERRIES = require("./berries.json");
 
 /**
  * 데이터 폴더.
@@ -104,6 +106,118 @@ const CANDY_PER = 25_000_000;
  */
 const CANDY_FEED = 10_000_000;
 
+/* ---------------- 결투 · 나무열매 ---------------- */
+
+/**
+ * 하루에 보상을 받는 결투 횟수.
+ *
+ * 결투는 공짜 버튼이다. 보상에 상한이 없으면 눌러서 열매를 무한히 모으고,
+ * 열매가 곧 "토큰 경험치 2배"라 토큰을 안 써도 자라는 길이 열린다.
+ * 화폐는 실제로 쓴 토큰이어야 한다는 원칙(CANDY_PER)을 지킨다.
+ */
+const BATTLE_REWARDS_PER_DAY = 5;
+
+/**
+ * 나무열매 하나가 두 배로 쳐 주는 토큰 양. 좋아하는 맛이면 두 배 더 오래 간다.
+ * 하루 5천만~1억을 쓰니 보통 열매 하나가 반나절 남짓이다.
+ * 아무리 먹여도 BOOST_CAP 까지만 쌓인다 — 열매를 모아 한 번에 몰아주는 걸 막는다.
+ */
+const BOOST_PLAIN = 20_000_000;
+const BOOST_LIKED = 40_000_000;
+const BOOST_CAP = 100_000_000;
+
+/**
+ * 성격 → 좋아하는/싫어하는 맛. 원작 규칙이다: 올려 주는 능력치의 맛을 좋아하고
+ * 내리는 능력치의 맛을 싫어한다. 노력·온순처럼 보정이 없는 성격은 가리는 게 없다.
+ */
+const FLAVOR_OF_STAT = { 공격: "spicy", 방어: "sour", 특수공격: "dry", 특수방어: "bitter", 스피드: "sweet" };
+const FLAVOR_KO = { spicy: "매운맛", dry: "떫은맛", sweet: "단맛", bitter: "쓴맛", sour: "신맛" };
+function tasteOf(m) {
+  const n = poke.NATURES[m.nature ?? 0] || {};
+  if (!n.up || !n.down || n.up === n.down) return { likes: null, dislikes: null };
+  return { likes: FLAVOR_OF_STAT[n.up] || null, dislikes: FLAVOR_OF_STAT[n.down] || null };
+}
+
+const todayKey = () => usage.localDay(); // 로컬 날짜. 자정에 횟수가 다시 찬다
+
+/** 오늘 남은 보상 횟수 */
+function battleRewardsLeft() {
+  if (save.battleDay !== todayKey()) return BATTLE_REWARDS_PER_DAY;
+  return Math.max(0, BATTLE_REWARDS_PER_DAY - (save.battleRewards || 0));
+}
+
+/** 가방 — 화면에 보일 나무열매 목록 */
+const berryBag = () =>
+  BERRIES.map((b) => ({ key: b.k, name: b.n, flavor: b.f, flavorName: FLAVOR_KO[b.f], count: (save.berries || {})[b.k] || 0 }));
+
+/**
+ * 결투. 계산은 여기서 끝까지 하고 화면에는 사건 목록만 넘긴다(battle.js 참고).
+ * 승패와 보상을 렌더러가 정하지 않게.
+ */
+/**
+ * level 이 50이면 둘 다 Lv.50 으로 맞춘다. 실제 레벨로 붙이면 Lv.6 과 Lv.60 이
+ * 한 방에 끝나서 볼 게 없다 — 그래서 기본은 맞추기다. 그 외 값은 받지 않는다.
+ */
+function startBattle(idA, idB, level) {
+  const a = box.find(save.box, idA);
+  const b = box.find(save.box, idB);
+  if (!a || !b) return { ok: false, reason: "없는 아이입니다" };
+  if (a.id === b.id) return { ok: false, reason: "서로 다른 두 마리를 골라 주세요" };
+  const ga = box.effOf(a, growthSpeed());
+  const gb = box.effOf(b, growthSpeed());
+  if (!poke.stageFor(ga) || !poke.stageFor(gb)) return { ok: false, reason: "알은 싸울 수 없습니다" };
+  const r = battle.run(a, ga, b, gb, Math.random, { level: level === 50 ? 50 : null });
+  if (!r) return { ok: false, reason: "결투를 시작하지 못했습니다" };
+
+  // 전적은 개체에 남긴다. 놓아주면 같이 사라진다
+  if (r.winner != null) {
+    const w = r.winner === 0 ? a : b;
+    const l = r.winner === 0 ? b : a;
+    w.record = { w: ((w.record || {}).w || 0) + 1, l: (w.record || {}).l || 0 };
+    l.record = { w: (l.record || {}).w || 0, l: ((l.record || {}).l || 0) + 1 };
+  }
+
+  // 보상 — 승부가 났을 때만, 하루 상한까지
+  let reward = null;
+  if (r.winner != null && battleRewardsLeft() > 0) {
+    if (save.battleDay !== todayKey()) { save.battleDay = todayKey(); save.battleRewards = 0; }
+    save.battleRewards = (save.battleRewards || 0) + 1;
+    const berry = BERRIES[Math.floor(Math.random() * BERRIES.length)];
+    save.berries = save.berries || {};
+    save.berries[berry.k] = (save.berries[berry.k] || 0) + 1;
+    reward = { key: berry.k, name: berry.n, flavorName: FLAVOR_KO[berry.f] };
+  }
+  writeSave();
+  refresh(true);
+  return { ok: true, ...r, reward, rewardsLeft: battleRewardsLeft() };
+}
+
+/**
+ * 나무열매 먹이기. 싫어하는 맛이면 안 먹는다 — 열매도 그대로 남는다.
+ */
+function feedBerry(id, key) {
+  const m = box.find(save.box, id);
+  const b = BERRIES.find((x) => x.k === key);
+  if (!m || !b) return { ok: false, reason: "없는 아이나 열매입니다" };
+  if (!((save.berries || {})[key] > 0)) return { ok: false, reason: b.n + "이(가) 없습니다" };
+  const name = poke.describe(box.effOf(m, growthSpeed()), m.line, { shiny: m.shiny }).name;
+  const t = tasteOf(m);
+  if (t.dislikes === b.f) return { ok: false, reason: `${name}은(는) ${FLAVOR_KO[b.f]}을 싫어해서 먹지 않았습니다` };
+  if ((m.boost || 0) >= BOOST_CAP) return { ok: false, reason: `${name}은(는) 배가 불러서 더 먹지 못합니다` };
+  const liked = t.likes === b.f;
+  m.boost = Math.min(BOOST_CAP, (m.boost || 0) + (liked ? BOOST_LIKED : BOOST_PLAIN));
+  save.berries[key] -= 1;
+  writeSave();
+  refresh(true);
+  return {
+    ok: true,
+    liked,
+    message: liked
+      ? `${name}은(는) ${b.n}을 맛있게 먹었다! 토큰 경험치 2배가 오래 갑니다`
+      : `${name}은(는) ${b.n}을 먹었다. 토큰 경험치 2배`,
+  };
+}
+
 const SHOP = [
   { id: "egg", name: "포켓몬 알", cost: 2, desc: "평범한 알. 박스에 한 마리 늘어난다", icon: "🥚" },
   { id: "egg-super", name: "슈퍼 알", cost: 7, desc: "★3 이상 확정", icon: "🥚" },
@@ -181,6 +295,13 @@ let save = {
    * 쓴 양만 보여준다.
    */
   limits: {},
+  /**
+   * 결투 보상으로 받은 나무열매. { "figy-berry": 2, ... }
+   * battleDay/battleRewards 는 하루 보상 횟수를 센다 (BATTLE_REWARDS_PER_DAY).
+   */
+  berries: {},
+  battleDay: null,
+  battleRewards: 0,
   /**
    * 사용자가 더해 준 경로.
    *
@@ -524,6 +645,11 @@ async function buildStats() {
         rarity: r.label,
         shiny: Boolean(m.shiny),
         nature: (poke.NATURES[m.nature ?? 0] || {}).name ?? null,
+        // 결투·나무열매. 맛은 화면에서 "좋아함/싫어함"으로 보여 준다
+        likes: tasteOf(m).likes,
+        dislikes: tasteOf(m).dislikes,
+        boost: m.boost || 0,
+        record: m.record || { w: 0, l: 0 },
         caughtAt: m.caughtAt,
         graduated: Boolean(m.graduatedAt),
         active: m.id === (act && act.id),
@@ -571,6 +697,9 @@ async function buildStats() {
     tree: await buildTree(act, eff),
     limits: limits.summarize(u, Date.now(), save.limits || {}, save.quotaFiles || {}),
     box: boxList,
+    berries: berryBag(),
+    battleRewardsLeft: battleRewardsLeft(),
+    battleRewardsMax: BATTLE_REWARDS_PER_DAY,
     activeId: act ? act.id : null,
     petIds: save.petIds,
     rarity: act
@@ -1454,6 +1583,8 @@ app.whenReady().then(async () => {
   ipcMain.on("toggle-pet-member", (_e, id) => togglePetMember(id));
 
   /** 박스: 놓아주기 */
+  ipcMain.handle("battle", (_e, { a, b, level } = {}) => startBattle(a, b, level));
+  ipcMain.handle("feed-berry", (_e, { id, key } = {}) => feedBerry(id, key));
   ipcMain.handle("release", (_e, id) => {
     const m = box.find(save.box, id);
     if (!m) return { ok: false, reason: "없는 아이" };

@@ -33,6 +33,9 @@ contextBridge.exposeInMainWorld("ptb", {
   setActive: (id) => ipcRenderer.send("set-active", id),
   togglePetMember: (id) => ipcRenderer.send("toggle-pet-member", id),
   release: (id) => ipcRenderer.invoke("release", id),
+  // 결투 · 나무열매. 결과(사건 목록·보상)를 받아야 하므로 invoke
+  battle: (a) => ipcRenderer.invoke("battle", a),
+  feedBerry: (a) => ipcRenderer.invoke("feed-berry", a),
 
   // 상점
   openShop: () => ipcRenderer.send("open-shop"),

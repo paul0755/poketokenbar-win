@@ -288,12 +288,77 @@
   #toast.show { opacity: 1; }
   #toast.bad { background: #3a2626; border-color: #5a3434; }
   #toast.shiny { background: #3a2f16; border-color: #6a5420; color: var(--accent); }
+
+  /* ---------- 결투 ---------- */
+  .btlpick { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+  .btlpick select {
+    flex: 1; min-width: 0; padding: 6px 7px; font: inherit; font-size: 11px; color: var(--text);
+    background: var(--card2); border: 1px solid var(--line); border-radius: 8px;
+  }
+  .btlpick .vs { font-size: 11px; font-weight: 800; color: var(--accent); }
+  .btlrow { display: flex; gap: 6px; margin-top: 8px; }
+  .btlrow button {
+    flex: 1; padding: 8px; font: inherit; font-size: 12px; font-weight: 700; border-radius: 9px; cursor: pointer;
+    background: var(--accent); color: #14151a; border: 0;
+  }
+  .btlrow button:disabled { background: #33363f; color: var(--dim); cursor: default; }
+  .btlrow #btlSkip { flex: 0 0 auto; background: var(--card2); color: var(--muted); border: 1px solid var(--line); }
+  .arena { display: flex; gap: 8px; margin-top: 10px; }
+  .arena .side { flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 8px; }
+  .arena .hd { display: flex; align-items: baseline; gap: 5px; font-size: 11.5px; }
+  .arena .hd .nm { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .arena .hd .lv { color: var(--accent); font-weight: 700; font-size: 10.5px; }
+  .arena .hd .st { margin-left: auto; font-size: 9.5px; font-weight: 700; color: var(--orange); }
+  .arena .hpbar { height: 6px; margin-top: 5px; background: #2b2e37; border-radius: 99px; overflow: hidden; }
+  .arena .hpbar i { display: block; height: 100%; width: 100%; background: var(--green); border-radius: 99px; transition: width .45s ease; }
+  .arena .hpbar i.yellow { background: #f5c542; }
+  .arena .hpbar i.red { background: var(--red); }
+  .arena .hpn { font-size: 9.5px; color: var(--muted); text-align: right; margin-top: 2px; }
+  /* 무대. 연출 캔버스가 이 안에 깔린다 (moves.css 의 .fx 는 absolute) */
+  .arena .stage { position: relative; aspect-ratio: 1; margin-top: 4px; overflow: hidden; border-radius: 8px; background: radial-gradient(ellipse 34% 7% at 50% 92%, #2a2d36 0 70%, transparent 100%); }
+  .arena .fbody { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+  .arena .fbody img { width: 82%; height: 82%; object-fit: contain; image-rendering: pixelated; }
+  .arena .fbody img.flip { transform: scaleX(-1); }
+  .arena .fbody.hit img { animation: hitblink .45s steps(2, end); }
+  @keyframes hitblink { 50% { opacity: .15; } }
+  .arena .fbody.faint { transition: transform .6s ease-in, opacity .6s; transform: translateY(40%); opacity: 0; }
+  .btllog {
+    margin-top: 8px; max-height: 150px; overflow-y: auto; padding: 8px 10px; font-size: 10.5px; line-height: 1.6;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px; color: var(--muted);
+  }
+  .btllog:empty { display: none; }
+  .btllog .mv { color: var(--text); font-weight: 700; }
+  .btllog .good { color: var(--orange); }
+  .btllog .bad { color: var(--dim); }
+  .btllog .ft { color: var(--red); font-weight: 700; }
+  .btllog .sys { color: var(--accent); }
+  .btllog .rw { color: var(--green); font-weight: 700; }
+  .bag { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+  .berry { display: flex; flex-direction: column; align-items: center; padding: 7px 2px; background: var(--card); border: 1px solid var(--line); border-radius: 9px; font-size: 10px; }
+  .berry b { font-size: 10.5px; }
+  .berry span { color: var(--dim); font-size: 9px; }
+  .berry i { font-style: normal; font-weight: 800; color: var(--accent); margin-top: 2px; }
+  .berry.none { opacity: .45; }
+
+  /* 개체 상세의 나무열매 */
+  .feed { display: flex; flex-wrap: wrap; gap: 5px; }
+  .feed button {
+    padding: 4px 8px; font: inherit; font-size: 10px; font-weight: 600; color: var(--text);
+    background: #2b2e37; border: 1px solid var(--line); border-radius: 7px; cursor: pointer;
+  }
+  .feed button:hover { border-color: var(--accent); }
+  .feed button .lk { color: var(--green); margin-left: 3px; }
+  .feed button .dk { color: var(--red); margin-left: 3px; }
+  .boost { font-size: 10px; color: var(--green); margin-top: 6px; }
+  .bx .nm .tag.bo { background: var(--green); color: #14151a; }
 </style>
+<link rel="stylesheet" href="moves.css" />
 
 <nav>
   <button data-tab="home" class="on">홈</button>
   <button data-tab="shop">상점</button>
   <button data-tab="box">박스</button>
+  <button data-tab="battle">결투</button>
   <button data-tab="dex">도감</button>
   <span class="sp"></span>
   <button class="ico" id="gear" title="설정">⚙</button>
@@ -368,6 +433,51 @@
     <div id="boxList"></div>
   </section>
 
+  <!-- ---------------- 결투 ---------------- -->
+  <section id="tab-battle" hidden>
+    <div class="dexhead"><span class="t">결투</span><span class="c" id="btlLeft"></span></div>
+    <div class="note">
+      박스의 두 아이를 싸움 붙입니다. 능력치·상성·기술은 원작 규칙 그대로입니다.
+      이기면 나무열매를 받습니다(하루 5번).
+    </div>
+    <div class="btlpick">
+      <select id="btlA"></select><span class="vs">VS</span><select id="btlB"></select>
+    </div>
+    <div class="btlpick">
+      <select id="btlLv">
+        <option value="50" selected>Lv.50으로 맞추기 — 개체값·성격·기술로 승부</option>
+        <option value="real">실제 레벨로 — 레벨 차이 그대로</option>
+      </select>
+    </div>
+    <div class="btlrow">
+      <button id="btlGo">결투 시작</button>
+      <button id="btlSkip" hidden>건너뛰기</button>
+    </div>
+    <div class="note" id="btlNote"></div>
+    <div class="arena" id="arena" hidden>
+      <div class="side" id="sideA">
+        <div class="hd"><span class="nm"></span><span class="lv"></span><span class="st"></span></div>
+        <div class="hpbar"><i id="hpA"></i></div>
+        <div class="hpn" id="hpnA"></div>
+        <div class="stage" id="stageA"><div class="fbody" id="bodyA"><img alt="" /></div></div>
+      </div>
+      <div class="side" id="sideB">
+        <div class="hd"><span class="nm"></span><span class="lv"></span><span class="st"></span></div>
+        <div class="hpbar"><i id="hpB"></i></div>
+        <div class="hpn" id="hpnB"></div>
+        <div class="stage" id="stageB"><div class="fbody" id="bodyB"><img alt="" /></div></div>
+      </div>
+    </div>
+    <div class="btllog" id="btlLog"></div>
+
+    <h4>가방 — 나무열매</h4>
+    <div class="bag" id="bag"></div>
+    <div class="note">
+      박스에서 아이를 펼쳐 먹이면 그 아이의 <b>토큰 경험치가 2배</b>가 됩니다.
+      성격에 따라 좋아하는 맛이면 더 오래 가고, 싫어하는 맛은 먹지 않습니다.
+    </div>
+  </section>
+
   <!-- ---------------- 도감 ---------------- -->
   <section id="tab-dex" hidden>
     <div class="dexhead"><span class="t">도감</span><span class="c" id="dexCount"></span></div>
@@ -385,3 +495,5 @@
 
 <script src="egg.js"></script>
 <script src="app.js"></script>
+<script src="moves.js"></script>
+<script src="battle.js"></script>

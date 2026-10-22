@@ -55,6 +55,8 @@ function make(line, nature, shiny) {
     eggMoves: baseDex ? profile.rollEggMoves(baseDex) : [],
     tmMoves: [], // 상점의 기술머신으로 가르친 것
     raw: 0, // 이 아이가 먹은 실제 토큰
+    bonus: 0, // 나무열매로 두 배가 된 몫. raw 처럼 난이도를 탄다
+    boost: 0, // 앞으로 두 배로 쳐 줄 토큰이 얼마 남았나
     fed: 0, // 사탕으로 넣은 양
     maxStage: 0,
     caughtAt: new Date().toISOString().slice(0, 10),
@@ -62,10 +64,14 @@ function make(line, nature, shiny) {
   };
 }
 
-/** 난이도를 반영한 실효 성장량 */
+/**
+ * 난이도를 반영한 실효 성장량.
+ * 나무열매 몫(bonus)은 토큰과 같이 난이도를 탄다 — "토큰 경험치 2배"라서
+ * 토큰이 받는 대우를 그대로 받아야 한다. 사탕(fed)만 그대로 더한다.
+ */
 function effOf(m, speed = 1) {
   if (!m) return 0;
-  return Math.max(0, (m.raw || 0) * speed + (m.fed || 0));
+  return Math.max(0, ((m.raw || 0) + (m.bonus || 0)) * speed + (m.fed || 0));
 }
 
 /**
@@ -136,7 +142,15 @@ function accrue(save, total) {
     return 0;
   }
   const a = active(save);
-  if (a) a.raw = (a.raw || 0) + delta;
+  if (a) {
+    a.raw = (a.raw || 0) + delta;
+    // 나무열매가 남아 있으면 그만큼 한 번 더 쳐 준다
+    const extra = Math.min(delta, a.boost || 0);
+    if (extra > 0) {
+      a.bonus = (a.bonus || 0) + extra;
+      a.boost -= extra;
+    }
+  }
   return delta;
 }
 
