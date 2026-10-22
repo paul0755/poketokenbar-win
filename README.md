@@ -50,6 +50,7 @@ npm run dist
 |---|---|---|
 | Claude Code | `~/.claude/projects/**/*.jsonl` | ✅ |
 | Codex | `~/.codex/sessions/**/*.jsonl` | ✅ |
+| Codex (opencodex 프록시 경유) | `~/.opencodex/usage.jsonl` | ✅ (opencodex 사용 시. 세션 로그와 겹치는 요청은 한 번만 셉니다) |
 | Codex 주간 쿼터 | `~/.opencodex/codex-quota-cache.json` | ✅ (opencodex 사용 시) |
 | Gemini | — | ❌ Antigravity 로그에 토큰 수가 없음 |
 | Copilot | — | ❌ `.copilot` 전체에 토큰 필드 없음 |
@@ -100,8 +101,12 @@ GET https://raw.githubusercontent.com/PokeAPI/sprites/...
 **토큰 집계는 네트워크를 전혀 쓰지 않습니다.** 사용량 데이터를 어디로도 보내지 않고,
 분석 도구나 원격 서버도 없습니다.
 
-**저장하는 것** — `%APPDATA%\PokeTokenBar\` 에 `save.json`(진행 상황)과
-`sprites/`(이미지 캐시)만 만듭니다.
+**저장하는 것** — `%APPDATA%\PokeTokenBar\` 에 `save.json`(진행 상황),
+`backups/`(세이브 백업), `sprites/`(이미지 캐시)만 만듭니다.
+
+백업은 하루 한 번, 그날 처음 저장하기 직전의 세이브를 남깁니다(최근 7일).
+진행 초기화나 되돌리기 직전의 판도 따로 남깁니다(최근 5개).
+**설정 › 백업에서 되돌리기**에서 고르면 앱이 다시 켜지며 그 시점으로 돌아갑니다.
 
 이 폴더는 **설정 › 저장 폴더 바꾸기**에서 옮길 수 있습니다. 다른 드라이브에
 두거나 통째로 백업하고 싶을 때, 그리고 `%APPDATA%` 가 가상화되는 환경
@@ -159,7 +164,7 @@ GET https://raw.githubusercontent.com/PokeAPI/sprites/...
 - **한도 맞추기** — 아래 설명 참고
 - 알림 · 트레이 아이콘 · 펫 크기(64~320px) · 움직임
 - 갱신 주기(30초~10분) · 로그인 시 자동 시작
-- 저장 폴더 열기 · 진행 초기화
+- 저장 폴더 열기 · 백업에서 되돌리기 · 진행 초기화
 
 ---
 

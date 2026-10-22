@@ -59,6 +59,8 @@ contextBridge.exposeInMainWorld("ptb", {
   setLogRoot: (a) => ipcRenderer.invoke("set-log-root", a),
   setQuotaFile: (a) => ipcRenderer.invoke("set-quota-file", a),
   resetProgress: () => ipcRenderer.send("reset-progress"),
+  listBackups: () => ipcRenderer.invoke("list-backups"),
+  restoreBackup: (file) => ipcRenderer.invoke("restore-backup", file),
 
   // 데스크톱 펫 전용
   petClick: () => ipcRenderer.send("pet-click"),

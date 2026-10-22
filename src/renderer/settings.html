@@ -83,6 +83,8 @@
   .addrow { display: flex; gap: 6px; margin-top: 9px; }
   .addrow button { flex: 1; padding: 7px 4px; font-size: 11px; font-weight: 600; }
 
+  button:disabled { opacity: .4; cursor: default; pointer-events: none; }
+
   .danger { color: #ff8a8a; border-color: #5a2a2a; }
   .danger:hover { background: #2e1c1c; }
 </style>
@@ -300,12 +302,24 @@
   </div>
   <div class="row">
     <div class="top">
+      <span class="k">백업에서 되돌리기</span>
+    </div>
+    <div class="note">
+      하루 한 번, 그날 처음 저장하기 직전의 세이브를 최근 7일 치 남깁니다.
+      초기화하거나 되돌리기 직전의 판도 따로 남깁니다.
+    </div>
+    <div id="backupList" style="margin-top:6px"></div>
+    <div class="note" id="backupNote"></div>
+  </div>
+  <div class="row">
+    <div class="top">
       <span class="k">진행 초기화</span>
       <button id="reset" class="danger">초기화</button>
     </div>
     <div class="note">
       도감 · 졸업 기록 · 사탕을 모두 지우고 새 알부터 시작합니다.
       토큰 기록 자체는 로그에서 다시 읽으므로 지워지지 않습니다.
+      지우기 직전의 판은 위 백업에 남습니다.
     </div>
   </div>
 </div>

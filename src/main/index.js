@@ -9,6 +9,7 @@ const limits = require("./limits");
 const box = require("./box");
 const profile = require("./profile");
 const notify = require("./notify");
+const backup = require("./backup");
 
 /**
  * 데이터 폴더.
@@ -68,6 +69,7 @@ function dataDirOverride() {
 
 const CACHE = path.join(app.getPath("userData"), "sprites");
 const SAVE = path.join(app.getPath("userData"), "save.json");
+const BACKUPS = path.join(app.getPath("userData"), "backups");
 
 let tray = null;
 let win = null; // 팝오버
@@ -278,6 +280,8 @@ function writeSave() {
    * 알을 까서 덮어쓴다. rename 은 원자적이라 중간 상태가 없다.
    */
   const tmp = SAVE + ".tmp";
+  // 그날 처음 쓰는 거라면 덮기 전의 파일을 남긴다. backup.js 참고.
+  backup.daily(SAVE, BACKUPS);
   try {
     fs.writeFileSync(tmp, JSON.stringify(save), "utf8");
     fs.renameSync(tmp, SAVE);
@@ -1018,6 +1022,8 @@ function openSettings() {
  * 지워지는 건 이 앱이 만든 것(도감·졸업·뽑기권·현재 개체)뿐이다.
  */
 function resetProgress() {
+  // 버튼 한 번에 전부 사라진다. 되돌릴 길을 먼저 만들어 둔다.
+  backup.snapshot(SAVE, BACKUPS, "before-reset");
   save.box = [];
   save.activeId = null;
   save.petIds = [];
@@ -1476,6 +1482,45 @@ app.whenReady().then(async () => {
     return { ok: true, dir: dir || DEFAULT_DATA };
   });
   ipcMain.on("reset-progress", resetProgress);
+
+  /* ---- 백업 ---- */
+  ipcMain.handle("list-backups", () => backup.list(BACKUPS));
+
+  /**
+   * 백업으로 되돌린다.
+   *
+   * 세이브는 박스·펫 창·알림 스냅샷 곳곳에 메모리로 퍼져 있다. 그걸 하나하나
+   * 갈아 끼우면 어딘가 옛 값이 남는다. 파일만 바꾸고 다시 켜는 게 확실하다.
+   * 못 읽고 시작한 판(loadFailed)에서도 된다 — 오히려 그때 제일 필요하다.
+   */
+  ipcMain.handle("restore-backup", async (_e, file) => {
+    const raw = backup.read(BACKUPS, file);
+    if (!raw) return { ok: false, reason: "백업을 읽지 못했습니다." };
+    const r = await dialog.showMessageBox(setWin || win, {
+      type: "warning",
+      buttons: ["되돌리고 다시 켜기", "취소"],
+      defaultId: 1,
+      cancelId: 1,
+      title: "백업으로 되돌리기",
+      message: file + " 로 되돌립니다.",
+      detail: "지금 진행은 백업 폴더에 따로 남겨 두므로 다시 돌아올 수 있습니다. 앱이 다시 켜집니다.",
+    });
+    if (r.response !== 0) return { ok: false };
+    backup.snapshot(SAVE, BACKUPS, "before-restore");
+    const tmp = SAVE + ".tmp";
+    try {
+      fs.writeFileSync(tmp, raw, "utf8");
+      fs.renameSync(tmp, SAVE);
+    } catch (e) {
+      try { fs.rmSync(tmp, { force: true }); } catch {}
+      return { ok: false, reason: "세이브를 쓰지 못했습니다 (" + (e.code || e.message) + ")" };
+    }
+    // 이 뒤로 메모리의 옛 판이 파일을 덮지 않게 한다.
+    loadFailed = true;
+    app.relaunch();
+    app.exit(0);
+    return { ok: true };
+  });
 
   /* ---- 읽을 경로 ---- */
   ipcMain.handle("path-report", () => pathReport());

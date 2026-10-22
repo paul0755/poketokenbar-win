@@ -287,7 +287,47 @@ async function changeData(reset) {
 }
 $("pickData").onclick = () => changeData(false);
 $("resetData").onclick = () => changeData(true);
-$("reset").onclick = () => window.ptb.resetProgress();
+$("reset").onclick = () => {
+  window.ptb.resetProgress();
+  // 방금 남긴 "초기화 직전"이 바로 목록에 보여야 되돌릴 수 있다는 걸 안다
+  setTimeout(loadBackups, 300);
+};
+
+/* ---------------- 백업 ---------------- */
+
+const KIND = { daily: "매일", "before-reset": "초기화 직전", "before-restore": "되돌리기 직전" };
+const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+const when = (ms) => {
+  const d = new Date(ms);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEK[d.getDay()]}) ` +
+    `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
+
+async function loadBackups() {
+  const list = (await window.ptb.listBackups()) || [];
+  $("backupList").innerHTML = list.length
+    ? list.map((b) => `
+        <div class="pth">
+          <div class="bd">
+            <div class="p">${when(b.at)}</div>
+            <div class="m">${KIND[b.kind] || b.kind} · ${b.ok ? b.mons + "마리" : "읽을 수 없음"}</div>
+          </div>
+          <button data-restore="${b.file}" ${b.ok ? "" : "disabled"}>되돌리기</button>
+        </div>`).join("")
+    : '<div class="note">아직 없습니다. 저장할 때 하루 한 개씩 쌓입니다.</div>';
+}
+
+$("backupList").addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-restore]");
+  if (!btn) return;
+  btn.disabled = true;
+  const r = await window.ptb.restoreBackup(btn.dataset.restore);
+  btn.disabled = false;
+  // 성공하면 앱이 다시 켜지므로 여기까지 오는 건 취소나 실패뿐이다
+  if (r && r.reason) $("backupNote").textContent = r.reason;
+});
+
+loadBackups();
 $("close").onclick = () => window.ptb.closeSettings();
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") window.ptb.closeSettings();
