@@ -203,6 +203,23 @@
       없으면 막대 없이 쓴 양만 나옵니다 — 설정 › 한도 맞추기로 대신할 수 있습니다.
     </div>
     <div id="pathQuota"></div>
+    <div class="note" style="margin-top:9px">
+      <b>5시간 한도 막대를 실시간으로 보려면</b> — Claude 데스크톱 앱은 사용률을
+      앱이 켜질 때와 한도에 막혔을 때만 파일에 적습니다(하루 1~2회). 그래서 대부분은
+      몇 시간 묵은 값입니다.
+      <br /><br />
+      <code>clanker-usage</code> 를 설치하면 그 값을 실시간으로 받아 파일로 남기고,
+      이 앱이 그 파일을 읽습니다. 설치는 선택입니다 — 없으면 지금처럼 동작합니다.
+      <br /><br />
+      <b>설치 전에 알아 두실 것:</b> 그 도구는 사용률을 받아오려고
+      <code>~/.claude/.credentials.json</code> 을 읽고 토큰을 갱신합니다.
+      <b>이 앱은 인증 정보에 손대지 않습니다</b> — 그 도구가 떨궈 둔 결과 파일만 읽습니다.
+      쓸지 말지는 직접 정하세요.
+      <br /><br />
+      <code>pip install ccusage</code> → <code>ccusage daemon</code>
+      <br />
+      (npm 에도 같은 이름의 다른 도구가 있습니다. 그쪽은 토큰 집계용이라 한도가 안 나옵니다)
+    </div>
   </div>
 
   <h4>트레이</h4>

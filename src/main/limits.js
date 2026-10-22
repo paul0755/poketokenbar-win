@@ -99,6 +99,87 @@ function anchoredWeek(events, now, day, hour) {
  * 이건 계산이 아니라 제공자가 알려준 값이다. 없으면 null —
  * 없는 걸 추정해서 채우지 않는다.
  */
+/**
+ * clanker-usage 계열 도구가 떨궈 두는 사용률.
+ *
+ *   ~/.cache/clanker-usage/<공급자>/<계정>.json   (usage-v1)
+ *   { schema, provider, account, plan, status, retrieved_at,
+ *     windows: [ { name: "5-hour"|"weekly"|..., scope, used_pct, resets_at } ] }
+ *
+ * 왜 남의 도구 파일을 읽나 —
+ * 사용률 퍼센트는 공급자에게 물어봐야 알 수 있고, 물어보려면 인증 정보가
+ * 필요하다. 그 코드는 이 앱에 넣지 않기로 했다. 대신 그 일을 하는 도구가
+ * 떨궈 둔 결과만 읽는다. opencodex 쿼터 캐시를 읽는 것과 같은 방식이다.
+ *
+ * 없으면 null 이다. 안 깔았으면 예전과 똑같이 동작한다.
+ *
+ * 모델별 주간 창은 건너뛴다. 전체 주간 한도와 섞이면 "주간 16% 쓴 계정에
+ * 주간 한도 도달" 같은 모순이 화면에 뜬다 — 실제로 로그에서 그걸 봤다.
+ */
+function clankerUsage(id, file) {
+  const want = id === "claude" ? /claude/i : id === "codex" ? /codex|openai/i : new RegExp(id, "i");
+  const files = [];
+  if (file) files.push(file);
+  else {
+    const base = path.join(os.homedir(), ".cache", "clanker-usage");
+    try {
+      for (const prov of fs.readdirSync(base)) {
+        if (!want.test(prov)) continue;
+        const dir = path.join(base, prov);
+        try {
+          for (const n of fs.readdirSync(dir)) if (n.endsWith(".json")) files.push(path.join(dir, n));
+        } catch {}
+      }
+    } catch {
+      return null; // 도구를 안 쓴다
+    }
+  }
+
+  let best = null;
+  for (const f of files) {
+    let j;
+    try {
+      const raw = fs.readFileSync(f, "utf8");
+      j = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw);
+    } catch {
+      continue;
+    }
+    if (!j || !Array.isArray(j.windows)) continue;
+    if (j.status === "unavailable") continue;
+
+    const ms = (v) => (typeof v === "number" ? (v > 1e11 ? v : v * 1000) : null);
+    const pick = (re) =>
+      j.windows.find(
+        (w) =>
+          w &&
+          typeof w.used_pct === "number" &&
+          re.test(String(w.name || "")) &&
+          // 모델별 창은 제외한다 — scope 가 알려주면 그걸 믿고, 없으면 이름으로 거른다
+          !/model|opus|sonnet|haiku|gpt|gemini/i.test(String(w.name) + " " + String(w.scope || "")),
+      ) || null;
+
+    const b = pick(/^5[s-]?hour|five/i);
+    const w = pick(/^week/i);
+    if (!b && !w) continue;
+
+    const at = ms(j.retrieved_at) ?? Date.now();
+    const cand = {
+      block: b ? b.used_pct : null,
+      week: w ? w.used_pct : null,
+      blockResetAt: b ? ms(b.resets_at) : null,
+      weekResetAt: w ? ms(w.resets_at) : null,
+      at,
+      ageMs: Date.now() - at,
+      status: j.status || null,
+      plan: j.plan || null,
+      path: f,
+      from: "공식 값",
+    };
+    if (!best || cand.at > best.at) best = cand;
+  }
+  return best;
+}
+
 function codexQuota(file) {
   const f = file || path.join(os.homedir(), ".opencodex", "codex-quota-cache.json");
   try {
@@ -442,7 +523,14 @@ function driftSince(usage, id, at) {
 
 function officialOf(usage, id, now, files = {}) {
   if (id === "claude") {
-    const q = claudeQuota(files.claude);
+    /*
+     * 두 출처가 있다. 데스크톱 앱 파일은 앱이 시작할 때나 한도에 막혔을 때만
+     * 쓰이므로 몇 시간씩 묵는다. clanker-usage 는 데몬이 돌면 실시간이다.
+     * 더 최근에 찍힌 쪽을 쓴다.
+     */
+    const live = clankerUsage("claude", files.claudeLive);
+    const file0 = claudeQuota(files.claude);
+    const q = live && (!file0 || live.at > file0.at) ? live : file0;
     if (!q) return null;
     const drift = driftSince(usage, "claude", q.at);
     /*
@@ -569,7 +657,18 @@ function diagnoseQuota(usage, files = {}) {
     });
 
   const cf = claudeQuotaFile(files.claude);
-  push("claude", "Claude 사용률", cf, claudeQuota(files.claude));
+  push("claude", "Claude 사용률 (데스크톱 앱)", cf, claudeQuota(files.claude));
+
+  // 깔려 있으면 실시간이다. 없으면 "없음"으로 보이는 게 맞다 — 안내가 거기 붙는다.
+  for (const id of ["claude", "codex"]) {
+    const live = clankerUsage(id);
+    push(
+      id,
+      (id === "claude" ? "Claude" : "Codex") + " 사용률 (clanker-usage)",
+      live ? live.path : path.join(os.homedir(), ".cache", "clanker-usage", id === "claude" ? "claude-code" : "codex", "<계정>.json"),
+      live,
+    );
+  }
 
   const kf = files.codex || path.join(os.homedir(), ".opencodex", "codex-quota-cache.json");
   const c = codexQuota(files.codex);
@@ -592,7 +691,7 @@ function diagnoseQuota(usage, files = {}) {
   return rows;
 }
 
-module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, anchoredWeek, codexQuota, claudeQuota, claudeQuotaFile, codexOfficial, officialOf, perSource, summarize, diagnoseQuota };
+module.exports = { FIVE_HOURS, fiveHourBlocks, currentBlock, rollingWeek, anchoredWeek, codexQuota, claudeQuota, claudeQuotaFile, clankerUsage, codexOfficial, officialOf, perSource, summarize, diagnoseQuota };
 
 // node src/main/limits.js 로 확인
 if (require.main === module) {
