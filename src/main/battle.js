@@ -395,4 +395,4 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
   };
 }
 
-module.exports = { run, fighter, effectiveness, damage, MAX_TURNS };
+module.exports = { run, fighter, effectiveness, damage, josa, MAX_TURNS };

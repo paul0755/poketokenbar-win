@@ -39,6 +39,13 @@ contextBridge.exposeInMainWorld("ptb", {
   battleDesktop: (a) => ipcRenderer.invoke("battle-desktop", a),
   // 펫 창 전용 — 바탕화면 결투 장면
   onDuel: (cb) => ipcRenderer.on("duel", (_e, d) => cb(d)),
+  wildSpawn: () => ipcRenderer.invoke("wild-spawn"),
+  // 야생 포켓몬 · 몬스터볼 창 전용
+  onWild: (cb) => ipcRenderer.on("wild", (_e, d) => cb(d)),
+  onBall: (cb) => ipcRenderer.on("ball", (_e, d) => cb(d)),
+  ballDragStart: (p) => ipcRenderer.send("ball-drag-start", p),
+  ballDrag: (p) => ipcRenderer.send("ball-drag", p),
+  ballDragEnd: (p) => ipcRenderer.send("ball-drag-end", p),
 
   // 상점
   openShop: () => ipcRenderer.send("open-shop"),

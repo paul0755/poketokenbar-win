@@ -1,5 +1,5 @@
 "use strict";
-const { app, Tray, BrowserWindow, Menu, ipcMain, nativeImage, screen, Notification, shell, dialog } = require("electron");
+const { app, Tray, BrowserWindow, Menu, ipcMain, nativeImage, screen, Notification, shell, dialog, powerMonitor } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -11,6 +11,7 @@ const profile = require("./profile");
 const notify = require("./notify");
 const backup = require("./backup");
 const battle = require("./battle");
+const wild = require("./wild");
 const BERRIES = require("./berries.json");
 
 /**
@@ -302,6 +303,13 @@ let save = {
   berries: {},
   battleDay: null,
   battleRewards: 0,
+  /**
+   * 야생 포켓몬이 나오는 빈도. "off" | "rare" | "often" (wild.js PACE)
+   * wildDay/wildCount 는 오늘 몇 번 나왔나 — 하루 상한을 센다.
+   */
+  wildLevel: "rare",
+  wildDay: null,
+  wildCount: 0,
   /**
    * 사용자가 더해 준 경로.
    *
@@ -1067,6 +1075,8 @@ function settingsPayload() {
     petSize: save.petSize,
     wanderLevel: save.wanderLevel,
     moveLevel: save.moveLevel ?? "rare",
+    wildLevel: save.wildLevel ?? "rare",
+    wildLeft: wildLeftToday(),
     pollMinutes: save.pollMinutes,
     autoLaunch: save.autoLaunch,
     autoSources: officialSources(),
@@ -1112,6 +1122,7 @@ function applySettings(patch) {
   writeSave();
 
   if ("wanderLevel" in patch) for (const id of pets.keys()) startWander(id);
+  if ("wildLevel" in patch) scheduleWild(); // 바꾼 간격으로 다시 잡는다. 끄면 여기서 멈춘다
   if ("petSize" in patch && pets.size) {
     // 투명 창은 setSize로 크기가 제대로 안 바뀐다 — 내용이 다시 그려지지
     // 않아 사라진 것처럼 보인다. 전부 없애고 새 크기로 다시 만든다.
@@ -1631,6 +1642,295 @@ async function desktopBattle(idA, idB, level) {
   return r;
 }
 
+/* ---------------- 야생 포켓몬 ---------------- */
+
+/**
+ * 지금 나와 있는 야생 한 마리. null 이면 없다. 한 번에 한 마리만 나온다.
+ *   win · ball  야생 창 · 몬스터볼 창
+ *   pos         야생 창 자리 (매번 getPosition 을 부르지 않으려고 들고 있다)
+ *   home        볼이 놓여 있는 자리. 빗나가면 여기로 돌아온다
+ *   busy        볼이 날아가거나 흔들리는 중. 그동안은 걷지도, 볼을 잡지도 못한다
+ */
+let wildNow = null;
+let wildTimer = null;
+
+/** 이만큼 아무 입력이 없으면 자리를 비운 것으로 본다. 그때는 나오지 않고 미룬다 */
+const WILD_AWAY_SEC = 300;
+const BALL_W = 64;
+
+/** 오늘 더 나올 수 있는 횟수 */
+function wildLeftToday() {
+  const p = wild.PACE[save.wildLevel || "rare"];
+  if (!p) return 0;
+  if (save.wildDay !== todayKey()) return p.cap;
+  return Math.max(0, p.cap - (save.wildCount || 0));
+}
+
+/** 다음 출현을 잡는다. ms 를 주면 그만큼 뒤에 다시 본다(미룰 때) */
+function scheduleWild(ms) {
+  clearTimeout(wildTimer);
+  wildTimer = null;
+  const d = ms ?? wild.nextDelay(save.wildLevel || "rare");
+  if (d == null) return;
+  wildTimer = setTimeout(tryWild, d);
+}
+
+function tryWild() {
+  wildTimer = null;
+  if (!wild.PACE[save.wildLevel || "rare"]) return;
+  // 이미 나와 있거나 결투 중이거나 자리를 비웠으면 잠시 뒤에 다시 본다
+  if (wildNow || duel || powerMonitor.getSystemIdleTime() > WILD_AWAY_SEC) return scheduleWild(10 * 60_000);
+  // 오늘 몫을 다 썼으면 평소 간격 뒤에 다시 본다 — 날이 바뀌면 다시 찬다
+  if (wildLeftToday()) spawnWild().catch((e) => console.error("[wild]", e.message));
+  scheduleWild();
+}
+
+const wildSend = (msg) => wildNow && !wildNow.win.isDestroyed() && wildNow.win.webContents.send("wild", msg);
+const ballSend = (msg) => wildNow && !wildNow.ball.isDestroyed() && wildNow.ball.webContents.send("ball", msg);
+
+/** 펫 창과 같은 투명 창 */
+function overlayWindow(file, width, height, x, y) {
+  const w = new BrowserWindow({
+    width, height, x, y,
+    show: false, frame: false, transparent: true, hasShadow: false,
+    resizable: false, skipTaskbar: true, alwaysOnTop: true,
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
+  });
+  w.setAlwaysOnTop(true, "screen-saver");
+  w.loadFile(path.join(__dirname, "..", "renderer", file));
+  w.webContents.on("console-message", logConsole(file));
+  return w;
+}
+
+const loaded = (w) => new Promise((r) => (w.webContents.isLoading() ? w.webContents.once("did-finish-load", r) : r()));
+
+/** 야생 창을 걸어서 옮긴다. 걷는 중에 새로 걸으라고 하면 앞의 걸음은 멈춘다 */
+async function walkWild(to, ms) {
+  const W = wildNow;
+  if (!W) return;
+  const id = (W.walkId = (W.walkId || 0) + 1);
+  const from = { ...W.pos };
+  wildSend({ t: "face", dir: Math.sign(to.x - from.x) || 1 });
+  const N = Math.max(1, Math.round(ms / 16));
+  for (let k = 1; k <= N; k++) {
+    if (wildNow !== W || W.walkId !== id || W.win.isDestroyed()) return;
+    const t = k / N;
+    W.pos = { x: Math.round(from.x + (to.x - from.x) * t), y: Math.round(from.y + (to.y - from.y) * t) };
+    W.win.setBounds({ x: W.pos.x, y: W.pos.y, width: petW(), height: petW() });
+    await wait(16);
+  }
+}
+
+/** 볼 창을 옮긴다. 좌표는 볼의 왼쪽 위 */
+function placeBall(x, y) {
+  const W = wildNow;
+  if (!W || W.ball.isDestroyed()) return;
+  W.ballPos = { x: Math.round(x), y: Math.round(y) };
+  W.ball.setBounds({ ...W.ballPos, width: BALL_W, height: BALL_W });
+}
+
+async function slideBall(to, ms) {
+  const W = wildNow;
+  if (!W) return;
+  const from = { ...W.ballPos };
+  const N = Math.max(1, Math.round(ms / 16));
+  for (let k = 1; k <= N; k++) {
+    if (wildNow !== W) return;
+    const e = 1 - Math.pow(1 - k / N, 2);
+    placeBall(from.x + (to.x - from.x) * e, from.y + (to.y - from.y) * e);
+    await wait(16);
+  }
+}
+
+/**
+ * 한 마리 불러낸다. 자동 출현과 트레이 메뉴의 "부르기"가 같이 쓴다 —
+ * 메뉴로 부른 것도 하루 몫에서 빠진다. 안 그러면 메뉴가 공짜 알 버튼이 된다.
+ */
+async function spawnWild() {
+  if (wildNow) return { ok: false, reason: "이미 야생 포켓몬이 나와 있습니다" };
+  if (!wildLeftToday()) return { ok: false, reason: "오늘은 더 나오지 않습니다" };
+  if (save.wildDay !== todayKey()) { save.wildDay = todayKey(); save.wildCount = 0; }
+  save.wildCount = (save.wildCount || 0) + 1;
+  writeSave();
+
+  const r = wild.roll(save.charm);
+  // 부화한 모습(첫 형태)으로 나온다. 잡으면 그 모습 그대로 박스에 들어간다
+  const d = poke.describe(poke.STAGES[1].at, r.line, { shiny: r.shiny });
+  const sprite = await poke.spriteWithFallback(d, CACHE, "anim");
+  const isNew = (save.maxStage[r.line] ?? -1) < 1; // 이 종을 만난 적이 없다 — 놓치기 아까운 아이
+
+  // 커서가 있는 화면에 나온다. 보고 있는 화면이어야 알아챈다
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const w = petW();
+  const fromLeft = Math.random() < 0.5;
+  const y = Math.round(area.y + area.height * 0.3 + Math.random() * Math.max(0, area.height * 0.7 - w));
+  const start = { x: fromLeft ? area.x - w : area.x + area.width, y };
+  const spot = { x: Math.round(area.x + w + Math.random() * Math.max(0, area.width - 3 * w)), y };
+  const home = { x: area.x + area.width - BALL_W - 24, y: area.y + area.height - BALL_W - 16 };
+
+  wildNow = {
+    ...r,
+    rate: poke.rarityOf(r.line).captureRate,
+    name: d.name,
+    area,
+    pos: { ...start },
+    home,
+    ballPos: { ...home },
+    balls: wild.BALLS_PER_ENCOUNTER,
+    busy: false,
+    win: overlayWindow("wild.html", w, w, start.x, start.y),
+    ball: overlayWindow("ball.html", BALL_W, BALL_W, home.x, home.y),
+  };
+  const W = wildNow;
+  await Promise.all([loaded(W.win), loaded(W.ball)]);
+  if (wildNow !== W) return { ok: false };
+  wildSend({ t: "init", url: sprite ? pathToFileURL(sprite).href : null, name: d.name, shiny: r.shiny, isNew });
+  ballSend({ t: "count", n: W.balls });
+  W.win.showInactive();
+  W.ball.showInactive();
+
+  if (save.notifyEnabled && Notification.isSupported()) {
+    new Notification({
+      title: `야생 ${r.shiny ? "★ " : ""}${battle.josa(d.name, "이가")} 나타났다!`,
+      body: (isNew ? "처음 보는 포켓몬입니다. " : "") + "오른쪽 아래 몬스터볼을 잡고 던져 보세요",
+      silent: false,
+    }).show();
+  }
+
+  await walkWild(spot, 2600);
+  // 가만히 있지 않는다. 가끔 자리를 옮겨서 던지는 맛이 있게
+  W.wander = setInterval(() => {
+    if (wildNow !== W || W.busy) return;
+    const nx = Math.min(Math.max(area.x, W.pos.x + Math.round((Math.random() - 0.5) * 260)), area.x + area.width - w);
+    const ny = Math.min(Math.max(area.y, W.pos.y + Math.round((Math.random() - 0.5) * 120)), area.y + area.height - w);
+    walkWild({ x: nx, y: ny }, 1400);
+  }, 8000 + Math.random() * 4000);
+  W.leave = setTimeout(() => wildFlee("떠나 버렸다…"), wild.STAY_MS);
+  return { ok: true };
+}
+
+/** 끝. 창을 거두고 다음 출현을 기다린다 */
+function endWild() {
+  const W = wildNow;
+  if (!W) return;
+  clearInterval(W.wander);
+  clearTimeout(W.leave);
+  wildNow = null;
+  for (const x of [W.win, W.ball]) if (!x.isDestroyed()) x.destroy();
+}
+
+/** 도망친다 — 가까운 화면 가장자리로 뛰어 나간다 */
+async function wildFlee(text) {
+  const W = wildNow;
+  if (!W || W.fleeing) return;
+  W.fleeing = W.busy = true;
+  if (!W.ball.isDestroyed()) W.ball.hide();
+  wildSend({ t: "gone", text });
+  const w = petW();
+  const left = W.pos.x + w / 2 < W.area.x + W.area.width / 2;
+  await walkWild({ x: left ? W.area.x - w : W.area.x + W.area.width, y: W.pos.y }, 900);
+  if (wildNow === W) endWild();
+}
+
+/**
+ * 던졌다. 놓는 순간의 속도로 포물선을 그린다. 매 프레임 야생 창과 겹치는지 본다.
+ * 속도는 px/프레임(16ms). 너무 세게 던져도 화면을 한 번에 건너뛰지 않게 자른다.
+ */
+async function flyBall(vx, vy) {
+  const W = wildNow;
+  if (!W) return;
+  const G = 0.55;
+  const MAX = 42;
+  const sp = Math.hypot(vx, vy);
+  if (sp > MAX) { vx = (vx / sp) * MAX; vy = (vy / sp) * MAX; }
+  W.busy = true;
+  ballSend({ t: "fly" });
+  let x = W.ballPos.x;
+  let y = W.ballPos.y;
+  const w = petW();
+  const a = W.area;
+  for (let f = 0; f < 160; f++) {
+    if (wildNow !== W) return;
+    x += vx;
+    y += vy;
+    vy += G;
+    placeBall(x, y);
+    // 맞았나 — 공 가운데가 야생 창 안쪽(가장자리 18%를 뺀)에 들어왔나
+    const cx = x + BALL_W / 2;
+    const cy = y + BALL_W / 2;
+    const m = w * 0.18;
+    if (!W.fleeing && cx > W.pos.x + m && cx < W.pos.x + w - m && cy > W.pos.y + m && cy < W.pos.y + w - m * 0.3) {
+      return hitWild();
+    }
+    if (cx < a.x - BALL_W || cx > a.x + a.width + BALL_W || cy > a.y + a.height) break;
+    await wait(16);
+  }
+  // 빗나갔다. 볼은 잃지 않는다 — 던지는 솜씨로 볼을 잃으면 마우스가 서툰 사람만 손해다
+  await slideBall(W.home, 350);
+  if (wildNow !== W) return;
+  ballSend({ t: "land" });
+  W.busy = false;
+}
+
+/** 맞았다 — 빨려 들어가고, 떨어지고, 세 번 흔들린다 */
+async function hitWild() {
+  const W = wildNow;
+  const w = petW();
+  ballSend({ t: "hit" });
+  placeBall(W.pos.x + w / 2 - BALL_W / 2, W.pos.y + w * 0.3);
+  wildSend({ t: "absorb" });
+  await wait(600);
+  await slideBall({ x: W.pos.x + w / 2 - BALL_W / 2, y: W.pos.y + w - BALL_W }, 260);
+  await wait(400);
+
+  const res = wild.throwBall(W.rate);
+  for (let i = 0; i < res.shakes; i++) {
+    if (wildNow !== W) return;
+    ballSend({ t: "shake" });
+    await wait(950);
+  }
+  if (wildNow !== W) return;
+
+  if (res.caught) {
+    ballSend({ t: "caught" });
+    catchWild(W);
+    await wait(1800);
+    if (wildNow === W) endWild();
+    return;
+  }
+
+  // 튀어나왔다
+  ballSend({ t: "open" });
+  wildSend({ t: "out", text: res.shakes === 2 ? "아깝다! 조금만 더…" : "튀어나왔다!" });
+  W.balls -= 1;
+  await wait(900);
+  if (wildNow !== W) return;
+  if (W.balls <= 0) return wildFlee("볼이 다 떨어졌다… 도망쳤다");
+  if (Math.random() < wild.fleeChance(W.rate)) return wildFlee("도망쳐 버렸다!");
+  ballSend({ t: "count", n: W.balls });
+  await slideBall(W.home, 400);
+  if (wildNow !== W) return;
+  ballSend({ t: "land" });
+  W.busy = false;
+}
+
+/** 잡았다 — 박스에 넣는다. 이미 부화한 모습이다 */
+function catchWild(W) {
+  const m = box.make(W.line, W.nature, W.shiny);
+  m.fed = poke.STAGES[1].at;
+  m.maxStage = 1;
+  m.wild = true; // 알이 아니라 바탕화면에서 잡은 아이
+  save.box.push(m);
+  if (!save.seen.includes(W.line)) save.seen.push(W.line);
+  save.maxStage[W.line] = Math.max(save.maxStage[W.line] ?? -1, 1);
+  writeSave();
+  refresh(true);
+  pushDex();
+  if (save.notifyEnabled && Notification.isSupported()) {
+    new Notification({ title: `${W.shiny ? "★ " : ""}${battle.josa(W.name, "을를")} 잡았다!`, body: "박스에 들어갔습니다", silent: true }).show();
+  }
+}
+
 /* ---------------- 앱 ---------------- */
 
 function buildMenu() {
@@ -1647,6 +1947,12 @@ function buildMenu() {
       submenu: [lvl("가만히 있기", "off"), lvl("가끔 (기본)", "rare"), lvl("자주", "often")],
     },
     { type: "separator" },
+    {
+      // 기다리지 않고 바로 불러낸다. 오늘 몫에서 빠진다
+      label: wildNow ? "🌿 야생 포켓몬이 나와 있습니다" : "🌿 야생 포켓몬 부르기 (오늘 " + wildLeftToday() + "번 남음)",
+      enabled: !wildNow && !duel && wildLeftToday() > 0,
+      click: () => spawnWild().catch((e) => console.error("[wild]", e.message)),
+    },
     { label: "🍬 상점 (사탕 " + candy().left + ")", click: openShop },
     { label: "📖 도감 열기", click: openDex },
     { label: "⚙️ 설정", click: openSettings },
@@ -1752,6 +2058,44 @@ app.whenReady().then(async () => {
   ipcMain.handle("battle", (_e, { a, b, level } = {}) => startBattle(a, b, level));
   // 바탕화면 결투는 재생이 끝난 뒤에 돌아온다. 그때 탭이 로그를 채운다
   ipcMain.handle("battle-desktop", (_e, { a, b, level } = {}) => desktopBattle(a, b, level));
+
+  /*
+   * 몬스터볼 끌기. 펫 드래그처럼 화면 좌표만 받고 창은 여기서 옮긴다.
+   * 놓는 순간의 속도는 마지막 100ms 동안 움직인 거리로 잰다 — 마지막 한 칸만
+   * 보면 손을 떼며 멈칫한 것까지 속도가 되어 볼이 툭 떨어진다.
+   */
+  ipcMain.handle("wild-spawn", () => spawnWild());
+  const okPt = (p) => p && Number.isFinite(p.x) && Number.isFinite(p.y);
+  ipcMain.on("ball-drag-start", (_e, p) => {
+    const W = wildNow;
+    if (!W || W.busy || !okPt(p)) return;
+    W.drag = [{ ...p, t: Date.now() }];
+  });
+  ipcMain.on("ball-drag", (_e, p) => {
+    const W = wildNow;
+    if (!W || !W.drag || !okPt(p)) return;
+    W.drag.push({ ...p, t: Date.now() });
+    if (W.drag.length > 12) W.drag.shift();
+    placeBall(p.x - BALL_W / 2, p.y - BALL_W / 2);
+  });
+  ipcMain.on("ball-drag-end", (_e, p) => {
+    const W = wildNow;
+    if (!W || !W.drag) return;
+    const hist = W.drag;
+    W.drag = null;
+    if (okPt(p)) hist.push({ ...p, t: Date.now() });
+    const last = hist[hist.length - 1];
+    const first = hist.find((h) => last.t - h.t <= 100) || hist[0];
+    const dt = Math.max(1, last.t - first.t);
+    const vx = ((last.x - first.x) / dt) * 16;
+    const vy = ((last.y - first.y) / dt) * 16;
+    // 거의 안 움직였으면 던진 게 아니라 내려놓은 것이다 — 제자리로
+    if (Math.hypot(vx, vy) < 4) {
+      slideBall(W.home, 300).then(() => wildNow === W && ballSend({ t: "land" }));
+      return;
+    }
+    flyBall(vx, vy);
+  });
   ipcMain.handle("feed-berry", (_e, { id, key } = {}) => feedBerry(id, key));
   ipcMain.handle("release", (_e, id) => {
     const m = box.find(save.box, id);
@@ -1973,6 +2317,7 @@ app.whenReady().then(async () => {
   await refresh();
   if (save.petVisible) syncPets();
   restartPolling();
+  scheduleWild();
 });
 
 app.on("window-all-closed", (e) => e.preventDefault()); // 트레이 앱은 창이 없어도 산다

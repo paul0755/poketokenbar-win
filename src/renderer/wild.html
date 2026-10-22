@@ -1,0 +1,50 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>wild</title>
+<style>
+  /* 펫 창과 같은 투명 창. 내 펫과 헷갈리지 않게 머리 위에 "야생"을 단다 */
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  body {
+    display: flex; align-items: flex-end; justify-content: center;
+    user-select: none; -webkit-user-select: none; cursor: default;
+    font: 700 10px/1.4 "Malgun Gothic", "Segoe UI", sans-serif;
+  }
+  #tag {
+    position: fixed; top: 3px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px; align-items: center; white-space: nowrap;
+    padding: 1px 7px; border-radius: 99px; color: #fff;
+    background: rgba(20, 21, 26, .82); box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+  }
+  #tag .w { color: #4ade80; }
+  #tag .new { color: #14151a; background: #ffcb05; border-radius: 4px; padding: 0 4px; }
+  #mon {
+    width: 87%; height: 87%; object-fit: contain; image-rendering: pixelated;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .45));
+    animation: bob 2.6s ease-in-out infinite;
+    transition: transform .2s;
+  }
+  #mon.right { transform: scaleX(-1); }
+  @keyframes bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
+  /* 볼에 맞으면 빛나며 빨려 들어간다 */
+  #mon.absorb { animation: absorb .5s ease-in forwards; }
+  @keyframes absorb {
+    0% { filter: brightness(1); opacity: 1; scale: 1; }
+    40% { filter: brightness(3) saturate(0); opacity: 1; scale: 1; }
+    100% { filter: brightness(3) saturate(0); opacity: 0; scale: .1; }
+  }
+  /* 튀어나온다 */
+  #mon.out { animation: out .45s ease-out, bob 2.6s ease-in-out infinite .45s; }
+  @keyframes out { 0% { scale: .1; filter: brightness(3); opacity: 0; } 100% { scale: 1; filter: none; opacity: 1; } }
+  #say {
+    position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
+    white-space: nowrap; padding: 1px 6px; border-radius: 6px;
+    background: rgba(20, 21, 26, .82); color: #fff; opacity: 0;
+  }
+  #say.on { animation: say 1.6s ease forwards; }
+  @keyframes say { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
+  body.gone #tag, body.gone #mon { transition: opacity .6s; opacity: 0; }
+</style>
+<div id="tag"><span class="w">야생</span><span id="nm"></span></div>
+<div id="say"></div>
+<img id="mon" alt="" />
+<script src="wild.js"></script>

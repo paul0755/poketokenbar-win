@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>ball</title>
+<style>
+  /* 몬스터볼 하나짜리 투명 창. 잡고 휙 던진다 */
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  body {
+    display: grid; place-items: center; cursor: grab;
+    user-select: none; -webkit-user-select: none;
+    font: 800 10px/1 "Malgun Gothic", "Segoe UI", sans-serif;
+  }
+  body.dragging { cursor: grabbing; }
+  #ball { width: 62%; height: 62%; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .5)); transform-origin: 50% 85%; }
+  /* 기다리는 동안 살짝 흔들려서 "잡아 보라"고 알린다 */
+  body.idle #ball { animation: nudge 2.4s ease-in-out infinite; }
+  @keyframes nudge { 0%, 70%, 100% { rotate: 0deg; } 78% { rotate: -14deg; } 86% { rotate: 12deg; } 94% { rotate: -6deg; } }
+  body.fly #ball { animation: spin .35s linear infinite; transform-origin: 50% 50%; }
+  @keyframes spin { to { rotate: 360deg; } }
+  /* 포획 판정 — 원작처럼 좌우로 흔들린다 */
+  #ball.shake { animation: shake .7s ease-in-out; }
+  @keyframes shake { 0%, 100% { rotate: 0deg; } 25% { rotate: -22deg; } 60% { rotate: 18deg; } }
+  #ball.open { animation: open .4s ease-out; }
+  @keyframes open { 0% { scale: 1; } 40% { scale: 1.25; filter: brightness(2); } 100% { scale: 1; } }
+  #ball.caught { filter: brightness(.8) drop-shadow(0 3px 4px rgba(0, 0, 0, .5)); }
+  #n {
+    position: fixed; right: 4px; bottom: 4px; padding: 2px 5px; border-radius: 99px;
+    color: #14151a; background: #ffcb05; box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+  }
+  body.fly #n, body.busy #n { display: none; }
+  #star { position: fixed; inset: 0; display: grid; place-items: center; font-size: 22px; opacity: 0; }
+  #star.on { animation: star 1.2s ease forwards; }
+  @keyframes star { 0% { opacity: 0; scale: .4; } 25% { opacity: 1; scale: 1.2; } 100% { opacity: 0; scale: 1.6; translate: 0 -30%; } }
+</style>
+<svg id="ball" viewBox="0 0 100 100" aria-hidden="true">
+  <circle cx="50" cy="50" r="46" fill="#f2f3f5" stroke="#1b1c22" stroke-width="6" />
+  <path d="M4 50 A46 46 0 0 1 96 50 Z" fill="#e3373b" stroke="#1b1c22" stroke-width="6" />
+  <rect x="4" y="46" width="92" height="8" fill="#1b1c22" />
+  <circle cx="50" cy="50" r="13" fill="#f2f3f5" stroke="#1b1c22" stroke-width="6" />
+  <circle cx="50" cy="50" r="5" fill="#f2f3f5" stroke="#1b1c22" stroke-width="3" />
+  <path d="M22 26 Q30 16 42 14" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".55" />
+</svg>
+<div id="n"></div>
+<div id="star">✨</div>
+<script src="ball.js"></script>
