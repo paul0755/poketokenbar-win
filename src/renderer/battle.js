@@ -399,7 +399,8 @@
       $("trFoeImg").src = r.url || "";
       $("trFoeTxt").innerHTML =
         `${r.trainer ? r.trainer + "에게서 " : ""}${r.name}${r.shiny ? " ★" : ""} (${r.stage})` +
-        (r.evolvesTo ? ` <span class="evo">교환하면 ${r.evolvesTo}(으)로 진화!</span>` : "");
+        (r.evolvesTo ? ` <span class="evo">교환하면 ${r.evolvesTo}(으)로 진화!</span>` : "") +
+        (r.stone ? " · 🪨 변하지않는돌을 지니고 온다" : "");
       if (r.used) return void ($("trInfo").textContent = "이미 받은 코드입니다. 같은 코드는 한 번만 받을 수 있습니다.");
       $("trInfo").textContent = r.mine ? "내가 보낸 코드입니다. 받으면 돌아옵니다." : r.ot && r.ot !== r.trainer ? `처음 키운 트레이너: ${r.ot}` : "";
       tradeOk = true;

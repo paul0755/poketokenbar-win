@@ -31,6 +31,12 @@ const TYPES = require("./types.json");
  */
 const PER_LEVEL = 15_000_000;
 const levelOf = (grown) => Math.max(1, Math.min(100, Math.floor(grown / PER_LEVEL) + 1));
+/**
+ * 이 아이의 레벨. 모습은 grown 으로 정하지만, 변하지않는돌을 지녔으면 grown 이 진화
+ * 바로 앞에서 멈춰 있다. 원작처럼 레벨은 계속 올라야 해서 멈추지 않은 성장(lvGrown,
+ * box.withLv 가 붙인다)이 있으면 그쪽으로 센다.
+ */
+const lvOf = (mon, grown) => levelOf(Math.max(grown, (mon && mon.lvGrown) || 0));
 
 /* ---------------- 받는 순간 정해지는 것 ---------------- */
 
@@ -174,7 +180,7 @@ function tmCandidates(mon, grown) {
   const s = SPECIES[dexId];
   if (!s || !s.tm) return [];
   const known = new Set([
-    ...movesOf(dexId, levelOf(grown)).map((m) => m.id),
+    ...movesOf(dexId, lvOf(mon, grown)).map((m) => m.id),
     ...(mon.eggMoves || []),
     ...(mon.tmMoves || []),
   ]);
@@ -191,7 +197,7 @@ function build(mon, grown) {
   if (!mon) return null;
   const line = poke.LINES[mon.line];
   if (!line) return null;
-  const level = levelOf(grown);
+  const level = lvOf(mon, grown);
   const stage = poke.stageFor(grown);
   const dexId = line.ids[stage];
   const s = SPECIES[dexId];

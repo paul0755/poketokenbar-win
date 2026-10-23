@@ -68,10 +68,24 @@ function make(line, nature, shiny) {
  * 난이도를 반영한 실효 성장량.
  * 나무열매 몫(bonus)은 토큰과 같이 난이도를 탄다 — "토큰 경험치 2배"라서
  * 토큰이 받는 대우를 그대로 받아야 한다. 사탕(fed)만 그대로 더한다.
+ *
+ * 변하지않는돌을 지녔으면 holdCap(진화 바로 앞)에서 멈춘다. 모습·레벨·결투·교환이
+ * 전부 이 값을 쓰니 여기 한 곳에서 막으면 어디서도 진화하지 않는다. 먹은 토큰은
+ * raw 에 그대로 쌓인다 — 돌을 빼면 밀린 만큼 한 번에 자란다(free 로 미리 본다).
  */
-function effOf(m, speed = 1) {
+function effOf(m, speed = 1, free = false) {
   if (!m) return 0;
-  return Math.max(0, ((m.raw || 0) + (m.bonus || 0)) * speed + (m.fed || 0));
+  const e = Math.max(0, ((m.raw || 0) + (m.bonus || 0)) * speed + (m.fed || 0));
+  return !free && m.hold === "everstone" && typeof m.holdCap === "number" ? Math.min(e, m.holdCap) : e;
+}
+
+/**
+ * 레벨을 셀 때 쓸 꼴. 돌을 지녔으면 멈추지 않은 성장량을 lvGrown 으로 붙여 준다 —
+ * 모습은 effOf(멈춘 값), 레벨·기술은 lvGrown 을 쓴다(profile.lvOf). 세이브에는 넣지 않는다.
+ */
+function withLv(m, speed = 1) {
+  if (!m || m.hold !== "everstone") return m;
+  return { ...m, lvGrown: effOf(m, speed, true) };
 }
 
 /**
@@ -190,4 +204,4 @@ function migrate(save, total, natureIndexByName) {
   return true;
 }
 
-module.exports = { newId, make, effOf, find, active, accrue, migrate, backfill };
+module.exports = { newId, make, effOf, withLv, find, active, accrue, migrate, backfill };

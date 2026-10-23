@@ -77,7 +77,10 @@ function renderHome(s) {
   $("monStage").textContent = mon.stage.label;
   const p = mon.progress;
   $("monBar").style.width = Math.round(p.ratio * 100) + "%";
-  $("monGoal").innerHTML = p.next ? `${p.next}까지 <b>${fmt(p.remaining)}</b>` : "졸업했습니다";
+  const held = (s.box || []).find((m) => m.id === s.activeId && m.stone);
+  $("monGoal").innerHTML = held
+    ? held.evolveTo ? `🪨 진화 멈춤 — 돌을 빼면 <b>${held.evolveTo}</b>` : "🪨 변하지않는돌 — 진화 멈춤"
+    : p.next ? `${p.next}까지 <b>${fmt(p.remaining)}</b>` : "졸업했습니다";
   $("monQuip").textContent = quipFor(mon, usage.today);
 
   const t = [];
@@ -202,8 +205,12 @@ function renderBox(s) {
         (m.active ? '<span class="tag">키우는 중</span>' : "") +
         (m.isPet ? '<span class="tag pet">바탕화면</span>' : "") +
         (m.graduated ? '<span class="tag gr">졸업</span>' : "") +
-        (m.boost > 0 ? '<span class="tag bo">2배</span>' : "");
-      const goal = m.next ? `${m.next}까지 ${fmt(m.remaining)}` : "다 자랐습니다";
+        (m.boost > 0 ? '<span class="tag bo">2배</span>' : "") +
+        (m.stone ? '<span class="tag st" title="변하지않는돌을 지니고 있다">🪨</span>' : "");
+      // 돌을 지녔으면 "진화까지 1" 이 영영 안 줄어든다 — 멈춰 있다고 말한다
+      const goal = m.stone
+        ? m.evolveTo ? `진화 멈춤 — 돌을 빼면 ${m.evolveTo}` : "변하지않는돌 — 진화 멈춤"
+        : m.next ? `${m.next}까지 ${fmt(m.remaining)}` : "다 자랐습니다";
       const p = m.profile;
       const lv = p ? `Lv.${p.level} · ` : "";
       return `
@@ -221,7 +228,7 @@ function renderBox(s) {
             <button data-act="release" class="del">놓아주기</button>
           </div>
         </div>
-        ${openProfile === m.id ? profileHtml(p, m, s.berries) : ""}`;
+        ${openProfile === m.id ? profileHtml(p, m, s.berries, s.stones) : ""}`;
     })
     .join("");
 }
@@ -234,7 +241,7 @@ function renderBox(s) {
  * 개체값은 따로 적는다. 능력치가 낮은 게 레벨 탓인지 개체 탓인지
  * 구분이 안 되면 "개체값"을 보여주는 의미가 없다.
  */
-function profileHtml(p, m = {}, bag = []) {
+function profileHtml(p, m = {}, bag = [], stones = 0) {
   if (!p) return '<div class="prof"><div class="meta">이 종의 상세 정보가 없습니다.</div></div>';
 
   const types = (p.typeKeys || [])
@@ -286,6 +293,15 @@ function profileHtml(p, m = {}, bag = []) {
   const boost = m.boost > 0 ? `<div class="boost">토큰 경험치 2배 — ${fmt(m.boost)} 남음</div>` : "";
   const rec = m.record && (m.record.w || m.record.l) ? ` · 전적 ${m.record.w}승 ${m.record.l}패` : "";
 
+  // 지닌 물건 — 지금은 변하지않는돌 하나뿐이다
+  const hold = m.stone
+    ? `<div class="meta">🪨 <b>변하지않는돌</b>을 지니고 있어 진화하지 않습니다. 토큰은 그대로 쌓입니다.${
+        m.evolveTo ? `<br>지금 빼면 바로 <b>${m.evolveTo}</b>(으)로 진화합니다.` : ""
+      }</div><div class="feed"><button data-stone="${m.id}">돌 빼기</button></div>`
+    : stones > 0
+      ? `<div class="feed"><button data-stone="${m.id}">🪨 변하지않는돌 지니게 하기 (${stones}개)</button></div>`
+      : '<div class="meta">없음. 진화를 멈추고 싶으면 상점의 변하지않는돌을 지니게 하세요.</div>';
+
   return `
     <div class="prof">
       <div class="hd">
@@ -308,6 +324,8 @@ function profileHtml(p, m = {}, bag = []) {
       ${taste}
       ${feed}
       ${boost}
+      <h5>지닌 물건</h5>
+      ${hold}
     </div>`;
 }
 
@@ -325,6 +343,15 @@ $("boxList").addEventListener("click", async (e) => {
   if (fb) {
     const r = await window.ptb.feedBerry({ id: fb.dataset.id, key: fb.dataset.feed });
     toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
+    return;
+  }
+
+  const sb = e.target.closest("button[data-stone]");
+  if (sb) {
+    sb.disabled = true;
+    const r = await window.ptb.toggleStone(sb.dataset.stone);
+    toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
+    if (!r.ok) sb.disabled = false;
     return;
   }
 
@@ -580,7 +607,7 @@ window.ptb.onShop((s) => {
           <div class="body">
             <div class="nm">${it.name}</div>
             <div class="de">${it.desc}</div>
-            <div class="pr">가격 🍬${it.cost}</div>
+            <div class="pr">가격 🍬${it.cost}${it.have != null ? ` · 가진 수 ${it.have}` : ""}</div>
           </div>
           <button data-id="${it.id}"${dis}>${it.owned ? "보유" : "구매"}</button>
         </div>`;

@@ -178,7 +178,7 @@ function startBattle(idA, idB, level) {
   const ga = box.effOf(a, growthSpeed());
   const gb = box.effOf(b, growthSpeed());
   if (!poke.stageFor(ga) || !poke.stageFor(gb)) return { ok: false, reason: "알은 싸울 수 없습니다" };
-  const r = battle.run(a, ga, b, gb, Math.random, { level: level === 50 ? 50 : null });
+  const r = battle.run(box.withLv(a, growthSpeed()), ga, box.withLv(b, growthSpeed()), gb, Math.random, { level: level === 50 ? 50 : null });
   if (!r) return { ok: false, reason: "결투를 시작하지 못했습니다" };
 
   // 전적은 개체에 남긴다. 놓아주면 같이 사라진다
@@ -213,7 +213,7 @@ function friendRegister(id, trainer) {
   const grown = box.effOf(m, growthSpeed());
   if (!poke.stageFor(grown)) return { ok: false, reason: "알은 등록할 수 없습니다" };
   save.trainerName = String(trainer || "").trim().slice(0, 16);
-  const code = friend.encode(m, grown, save.trainerName);
+  const code = friend.encode(box.withLv(m, growthSpeed()), grown, save.trainerName);
   save.friendTeam = { code, monId: id, at: Date.now() };
   writeSave();
   refresh(true);
@@ -254,7 +254,7 @@ function liveRegister(id) {
   if (!m) return { ok: false, reason: "없는 아이입니다" };
   const grown = box.effOf(m, growthSpeed());
   if (!poke.stageFor(grown)) return { ok: false, reason: "알은 싸울 수 없습니다" };
-  liveTeam = { code: friend.encode(m, grown, save.trainerName), monId: id };
+  liveTeam = { code: friend.encode(box.withLv(m, growthSpeed()), grown, save.trainerName), monId: id };
   return { ok: true, code: liveTeam.code, name: poke.describe(grown, m.line, { shiny: m.shiny }).name };
 }
 
@@ -330,11 +330,13 @@ async function tradeSend(id) {
     cancelId: 1,
     title: "교환 보내기",
     message: `${battle.josa(name, "을를")} 교환으로 보냅니다.`,
-    detail: "박스에서 빠지고 교환 코드가 나옵니다. 그 코드를 친구에게 보내세요. 실수였다면 그 코드를 내가 다시 받으면 돌아옵니다.",
+    detail:
+      "박스에서 빠지고 교환 코드가 나옵니다. 그 코드를 친구에게 보내세요. 실수였다면 그 코드를 내가 다시 받으면 돌아옵니다." +
+      (m.hold === "everstone" ? "\n\n지니고 있는 변하지않는돌도 함께 갑니다." : ""),
   });
   if (r.response !== 0) return { ok: false };
 
-  const code = friend.encodeTrade({ ...m, ot: m.ot || save.trainerName }, grown, save.trainerName);
+  const code = friend.encodeTrade({ ...box.withLv(m, growthSpeed()), ot: m.ot || save.trainerName }, grown, save.trainerName);
   save.box = save.box.filter((x) => x.id !== id);
   save.petIds = (save.petIds || []).filter((x) => x !== id);
   if (save.activeId === id) save.activeId = save.box[0].id; // 키우던 아이를 보냈으면 다른 아이가 자란다
@@ -353,7 +355,7 @@ async function tradeInspect(code) {
   if (d.error) return { ok: false, reason: d.error };
   const desc = poke.describe(d.grown, d.mon.line, { shiny: d.mon.shiny });
   const sp = await poke.spriteWithFallback(desc, CACHE, "anim");
-  const evo = tradeEvolves(d.mon.line, d.grown);
+  const evo = d.hold ? -1 : tradeEvolves(d.mon.line, d.grown);
   return {
     ok: true,
     trainer: d.trainer,
@@ -363,6 +365,7 @@ async function tradeInspect(code) {
     shiny: d.mon.shiny,
     url: sp ? pathToFileURL(sp).href : null,
     evolvesTo: evo >= 0 ? poke.LINES[d.mon.line].names[evo + 1] : null,
+    stone: Boolean(d.hold),
     used: (save.tradeReceived || []).includes(d.nonce),
     mine: (save.tradeSent || []).some((x) => x.code === d.code),
   };
@@ -380,13 +383,14 @@ function tradeReceive(code) {
   if (save.tradeReceived.includes(d.nonce)) return { ok: false, reason: "이미 받은 코드입니다. 같은 코드는 한 번만 받을 수 있습니다" };
 
   let grown = d.grown;
-  const evo = tradeEvolves(d.mon.line, grown);
+  const evo = d.hold ? -1 : tradeEvolves(d.mon.line, grown);
   const before = poke.describe(grown, d.mon.line, { shiny: d.mon.shiny }).name;
   if (evo >= 0) grown = Math.max(grown, poke.STAGES[evo + 1].at);
   const st = poke.stageFor(grown);
+  const { lvGrown, ...dm } = d.mon; // lvGrown 은 세이브에 넣지 않는다 — 아래에서 fed 로 옮긴다
   const m = {
     id: box.newId(),
-    ...d.mon,
+    ...dm,
     raw: 0,
     bonus: 0,
     boost: 0,
@@ -397,6 +401,13 @@ function tradeReceive(code) {
     ot: d.ot, // 처음 키운 트레이너
     traded: new Date().toISOString().slice(0, 10),
   };
+  if (d.hold) {
+    // 같이 온 돌. 멈출 자리가 없는 모습이면(그럴 일은 드물다) 가방에 넣어 준다
+    const cap = poke.stoneCap(m.line, grown);
+    // 돌을 지닌 채 쌓인 레벨은 fed 로 그대로 옮기고, 모습은 holdCap 에서 멈춘다
+    if (cap != null) Object.assign(m, { hold: "everstone", holdCap: cap, fed: Math.max(grown, lvGrown || 0) });
+    else save.items = { ...(save.items || {}), everstone: stoneCount() + 1 };
+  }
   save.box.push(m);
   if (!save.seen.includes(m.line)) save.seen.push(m.line);
   save.maxStage[m.line] = Math.max(save.maxStage[m.line] ?? -1, st);
@@ -439,12 +450,53 @@ function feedBerry(id, key) {
   };
 }
 
+/* ---------------- 변하지않는돌 ---------------- */
+
+const stoneCount = () => (save.items && save.items.everstone) || 0;
+
+/**
+ * 지니게 하거나 뺀다. 지니는 순간 "다음 진화 바로 앞"(pokemon.stoneCap)을 holdCap 으로
+ * 적어 두고 성장을 거기서 멈춘다(box.effOf). 빼면 돌이 가방으로 돌아오고, 그동안 쌓인
+ * 토큰만큼 바로 자란다 — 진화 알림은 평소처럼 refresh 가 띄운다.
+ */
+function toggleStone(id) {
+  const m = box.find(save.box, id);
+  if (!m) return { ok: false, reason: "없는 아이입니다" };
+  save.items = save.items || {};
+  const name = poke.describe(box.effOf(m, growthSpeed()), m.line, { shiny: m.shiny }).name;
+
+  if (m.hold === "everstone") {
+    m.hold = null;
+    m.holdCap = null;
+    save.items.everstone = stoneCount() + 1;
+    const after = poke.describe(box.effOf(m, growthSpeed()), m.line, { shiny: m.shiny }).name;
+    writeSave();
+    refresh(true);
+    pushShop();
+    return { ok: true, message: after !== name ? `변하지않는돌을 뺐다 — ${battle.josa(name, "이가")} ${after}(으)로 진화했다!` : `${name}에게서 변하지않는돌을 뺐습니다` };
+  }
+
+  if (!stoneCount()) return { ok: false, reason: "변하지않는돌이 없습니다. 상점에서 살 수 있습니다" };
+  const eff = box.effOf(m, growthSpeed());
+  if (!poke.stageFor(eff)) return { ok: false, reason: "알에게는 지니게 할 수 없습니다" };
+  const cap = poke.stoneCap(m.line, eff);
+  if (cap == null) return { ok: false, reason: `${battle.josa(name, "은는")} 더 진화하지 않는 모습이라 돌이 필요 없습니다` };
+  m.hold = "everstone";
+  m.holdCap = cap;
+  save.items.everstone = stoneCount() - 1;
+  writeSave();
+  refresh(true);
+  pushShop();
+  return { ok: true, message: `${battle.josa(name, "이가")} 변하지않는돌을 지녔다. 이제 진화하지 않습니다` };
+}
+
 const SHOP = [
   { id: "egg", name: "포켓몬 알", cost: 2, desc: "평범한 알. 박스에 한 마리 늘어난다", icon: "🥚" },
   { id: "egg-super", name: "슈퍼 알", cost: 7, desc: "★3 이상 확정", icon: "🥚" },
   { id: "egg-legend", name: "전설 알", cost: 18, desc: "★4 이상 확정", icon: "🥚" },
   { id: "rare-candy", name: "이상한사탕", cost: 1, desc: "키우는 아이를 1000만 만큼 자라게 한다", icon: "🍬" },
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
+  { id: "everstone", name: "변하지않는돌", cost: 3, desc: "지닌 아이는 진화하지 않는다. 박스 › 상세에서 지니게 하거나 뺀다. 빼면 돌아온다", icon: "🪨" },
   { id: "tm", name: "기술머신", cost: 3, desc: "키우는 아이가 배울 수 있는 기술머신 기술 하나를 가르친다", icon: "💿" },
   { id: "great-ball", name: "슈퍼볼 3개", cost: 1, desc: "야생 포켓몬이 1.5배 잘 잡힌다", icon: "🔵" },
   { id: "ultra-ball", name: "하이퍼볼 3개", cost: 2, desc: "야생 포켓몬이 2배 잘 잡힌다", icon: "🟡" },
@@ -523,6 +575,8 @@ let save = {
    * battleDay/battleRewards 는 하루 보상 횟수를 센다 (BATTLE_REWARDS_PER_DAY).
    */
   berries: {},
+  /** 가방의 도구. { everstone: 1 } — 지니게 하면 줄고, 빼면 돌아온다 */
+  items: {},
   battleDay: null,
   battleRewards: 0,
   /**
@@ -757,16 +811,17 @@ function buy(itemId) {
     if (!a) { save.candySpent -= cost; return { ok: false, reason: "키우는 아이가 없습니다" }; }
     a.fed = (a.fed || 0) + CANDY_FEED;
     msg = poke.describe(box.effOf(a, growthSpeed()), a.line, { shiny: a.shiny }).name + "이(가) 자랐습니다";
+    if (a.hold === "everstone" && box.effOf(a, growthSpeed(), true) > box.effOf(a, growthSpeed())) msg += " — 변하지않는돌 때문에 진화는 멈춰 있습니다";
   } else if (itemId === "tm") {
     const a = box.active(save);
     const eff = box.effOf(a, growthSpeed());
     // 알에게는 가르칠 수 없다. 기술을 쓰지도 않는다
     if (!a || poke.stageFor(eff) === 0) { save.candySpent -= cost; return { ok: false, reason: "알에게는 가르칠 수 없습니다" }; }
-    const pool = profile.tmCandidates(a, eff);
+    const pool = profile.tmCandidates(box.withLv(a, growthSpeed()), eff);
     if (!pool.length) { save.candySpent -= cost; return { ok: false, reason: "더 배울 수 있는 기술머신이 없습니다" }; }
     const id = pool[Math.floor(Math.random() * pool.length)];
     a.tmMoves = [...(a.tmMoves || []), id];
-    const learned = profile.build(a, eff).tmMoves.find((m) => m.id === id);
+    const learned = profile.build(box.withLv(a, growthSpeed()), eff).tmMoves.find((m) => m.id === id);
     msg = poke.describe(eff, a.line, { shiny: a.shiny }).name + "이(가) " + (learned ? learned.name : "새 기술") + "을(를) 배웠습니다";
   } else if (itemId === "great-ball" || itemId === "ultra-ball") {
     const key = itemId === "great-ball" ? "great" : "ultra";
@@ -774,6 +829,10 @@ function buy(itemId) {
     save.balls[key] = (save.balls[key] || 0) + 3;
     msg = BALLS[key].name + " 3개를 샀습니다 (가진 수 " + save.balls[key] + ")";
     if (wildNow) ballInfo();
+  } else if (itemId === "everstone") {
+    save.items = save.items || {};
+    save.items.everstone = (save.items.everstone || 0) + 1;
+    msg = "변하지않는돌을 샀습니다 (가진 수 " + save.items.everstone + ") — 박스 › 상세에서 지니게 하세요";
   } else if (itemId === "charm") { save.charm = true; msg = "이로치 확률이 2배가 됩니다"; }
 
   writeSave();
@@ -908,6 +967,13 @@ async function buildStats() {
         likes: tasteOf(m).likes,
         dislikes: tasteOf(m).dislikes,
         boost: m.boost || 0,
+        // 변하지않는돌. evolveTo — 지금 빼면 무엇으로 진화하나(쌓인 토큰이 문턱을 넘었을 때만)
+        stone: m.hold === "everstone",
+        evolveTo: (() => {
+          if (m.hold !== "everstone") return null;
+          const f = poke.describe(box.effOf(m, growthSpeed(), true), m.line, { shiny: m.shiny });
+          return f.name !== d.name ? f.name : null;
+        })(),
         record: m.record || { w: 0, l: 0 },
         caughtAt: m.caughtAt,
         graduated: Boolean(m.graduatedAt),
@@ -915,7 +981,7 @@ async function buildStats() {
         isPet: save.petIds.includes(m.id),
         url: p ? pathToFileURL(p).href : null,
         animUrl: ap ? pathToFileURL(ap).href : null,
-        profile: profile.build(m, e),
+        profile: profile.build(box.withLv(m, growthSpeed()), e),
       };
     }),
   );
@@ -957,6 +1023,7 @@ async function buildStats() {
     limits: limits.summarize(u, Date.now(), save.limits || {}, save.quotaFiles || {}),
     box: boxList,
     berries: berryBag(),
+    stones: stoneCount(),
     online: onlineCfg(),
     friend: {
       team: save.friendTeam,
@@ -1292,6 +1359,7 @@ function pushShop() {
       ...x,
       cost: priceOf(x.cost),
       owned: x.once ? Boolean(save.charm) : false,
+      have: x.id === "everstone" ? stoneCount() : undefined,
       afford: c.left >= priceOf(x.cost),
     })),
   });
@@ -2345,7 +2413,7 @@ async function wildBattle(petId) {
   W.walkId = (W.walkId || 0) + 1; // 걷던 걸음을 멈춘다
   // 야생의 개체값·성격은 처음 싸울 때 정해 두고 계속 쓴다 — 잡으면 이 아이가 박스에 들어간다
   W.mon = W.mon || box.make(W.line, W.nature, W.shiny);
-  const r = battle.run(pm, grown, W.mon, poke.STAGES[1].at, Math.random, {
+  const r = battle.run(box.withLv(pm, growthSpeed()), grown, W.mon, poke.STAGES[1].at, Math.random, {
     level: 50,
     gentle: 0,
     init: [null, W.state || null],
@@ -2596,6 +2664,7 @@ app.whenReady().then(async () => {
     }
     flyBall(vx, vy);
   });
+  ipcMain.handle("toggle-stone", (_e, id) => toggleStone(id));
   ipcMain.handle("feed-berry", (_e, { id, key } = {}) => feedBerry(id, key));
   ipcMain.handle("friend-register", (_e, { id, trainer } = {}) => friendRegister(id, trainer));
   ipcMain.handle("friend-inspect", (_e, code) => friendInspect(code));
@@ -2610,6 +2679,7 @@ app.whenReady().then(async () => {
     const m = box.find(save.box, id);
     if (!m) return { ok: false, reason: "없는 아이" };
     if (save.box.length <= 1) return { ok: false, reason: "마지막 한 마리는 놓아줄 수 없습니다" };
+    if (m.hold === "everstone") save.items = { ...(save.items || {}), everstone: stoneCount() + 1 }; // 돌은 가방으로
     save.box = save.box.filter((x) => x.id !== id);
     save.petIds = save.petIds.filter((x) => x !== id);
     if (save.activeId === id) save.activeId = save.box[0].id;

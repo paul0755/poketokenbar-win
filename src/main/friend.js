@@ -37,7 +37,8 @@ let dv = null;
 function dataVersion() {
   if (dv) return dv;
   const h = crypto.createHash("sha1");
-  for (const f of ["species.json", "moves.json", "types.json", "battle.js"]) h.update(fs.readFileSync(path.join(__dirname, f)));
+  // profile·friend 도 넣는다 — 레벨·기술을 정하는 방식이 바뀌면 같은 코드로 다른 결투가 나온다
+  for (const f of ["species.json", "moves.json", "types.json", "battle.js", "profile.js", "friend.js"]) h.update(fs.readFileSync(path.join(__dirname, f)));
   return (dv = h.digest("hex").slice(0, 8));
 }
 
@@ -73,6 +74,7 @@ function encode(mon, grown, trainer) {
         mon.eggMoves || [],
         mon.tmMoves || [],
         Math.round(grown),
+        lvOf(mon, grown), // 변하지않는돌을 지녀 모습이 멈춘 아이의 레벨용 성장량. 아니면 0
       ],
     ]),
   ).toString("base64url");
@@ -102,6 +104,8 @@ function encodeTrade(mon, grown, trainer) {
         Math.round(grown),
         String(mon.ot || trainer || "").slice(0, 16),
         mon.caughtAt || null,
+        mon.hold === "everstone" ? 1 : 0, // 지닌 변하지않는돌. 옛 앱은 이 칸을 모르고 넘어간다
+        lvOf(mon, grown),
       ],
     ]),
   ).toString("base64url");
@@ -122,11 +126,12 @@ function decodeTrade(code) {
   }
   const [ver, , trainer, nonce, d] = arr || [];
   if (ver !== 1 || !Array.isArray(d) || typeof nonce !== "string") return { error: "이 앱이 모르는 형식의 코드입니다." };
-  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, ot, caughtAt] = d;
+  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, ot, caughtAt, hold, lv] = d;
   const mon = { line, nature, shiny: Boolean(shiny), ivs, gender: GENDERS[g], ability, eggMoves, tmMoves };
+  if (lv) mon.lvGrown = lv;
   const why = validate(mon, grown);
   if (why) return { error: "말이 안 되는 값이 들어 있습니다 — " + why };
-  return { code: s, trainer: String(trainer || ""), nonce, mon, grown, ot: String(ot || trainer || ""), caughtAt: caughtAt || null };
+  return { code: s, trainer: String(trainer || ""), nonce, mon, grown, ot: String(ot || trainer || ""), caughtAt: caughtAt || null, hold: hold === 1 };
 }
 
 /**
@@ -148,12 +153,16 @@ function decode(code) {
   if (data !== dataVersion()) {
     return { error: "앱 버전이 달라 같은 결투가 나오지 않습니다. 둘 다 최신 버전으로 맞춰 주세요.", versionMismatch: true };
   }
-  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown] = d;
+  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv] = d;
   const mon = { line, nature, shiny: Boolean(shiny), ivs, gender: GENDERS[g], ability, eggMoves, tmMoves };
+  if (lv) mon.lvGrown = lv;
   const why = validate(mon, grown);
   if (why) return { error: "말이 안 되는 값이 들어 있습니다 — " + why };
   return { code: s, trainer: String(trainer || ""), nonce, mon: { id: "friend-" + nonce, ...mon }, grown };
 }
+
+/** 레벨용 성장량 — 모습보다 더 자랐을 때만 싣는다(돌을 지닌 아이). 아니면 0 */
+const lvOf = (mon, grown) => (mon.lvGrown > grown ? Math.round(mon.lvGrown) : 0);
 
 const isInt = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
 
@@ -165,6 +174,7 @@ function validate(mon, grown) {
   const L = poke.LINES[mon.line];
   if (!Number.isInteger(mon.line) || !L) return "없는 포켓몬";
   if (!Number.isFinite(grown) || grown < 0 || grown > 5e9) return "성장량";
+  if (mon.lvGrown != null && (!Number.isFinite(mon.lvGrown) || mon.lvGrown <= grown || mon.lvGrown > 5e9)) return "레벨";
   if (poke.stageFor(grown) === 0) return "알은 싸울 수 없습니다";
   if (!isInt(mon.nature, 0, poke.NATURES.length - 1)) return "성격";
   if (!Array.isArray(mon.ivs) || mon.ivs.length !== 6 || !mon.ivs.every((v) => isInt(v, 0, 31))) return "개체값";

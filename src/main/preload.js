@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld("ptb", {
   // 결투 · 나무열매. 결과(사건 목록·보상)를 받아야 하므로 invoke
   battle: (a) => ipcRenderer.invoke("battle", a),
   feedBerry: (a) => ipcRenderer.invoke("feed-berry", a),
+  toggleStone: (id) => ipcRenderer.invoke("toggle-stone", id),
   battleDesktop: (a) => ipcRenderer.invoke("battle-desktop", a),
   // 친선 배틀 — 코드 만들기 · 받은 코드 보기 · 싸우기
   friendRegister: (a) => ipcRenderer.invoke("friend-register", a),

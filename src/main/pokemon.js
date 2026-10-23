@@ -118,6 +118,24 @@ function stageFor(total) {
   return i;
 }
 
+/**
+ * 변하지않는돌을 지니면 성장이 어디서 멈추나 — 다음에 "종이 바뀌는" 단계 바로 앞.
+ *
+ * 2단 진화 라인은 1차와 최종이 같은 종이라, 1차에서 최종으로 가는 건 진화가 아니다.
+ * 마스터도 같은 종의 이로치(졸업 보상)라 막지 않는다. 앞으로 종이 바뀔 일이 없으면
+ * null — 돌을 지녀도 막을 게 없다. 알(부화)도 진화가 아니라서 null.
+ */
+function stoneCap(lineIndex, total) {
+  const L = LINES[lineIndex % LINES.length];
+  const s = stageFor(total);
+  if (!L || s === 0) return null;
+  for (let k = s + 1; k < STAGES.length; k++) {
+    if (STAGES[k].key === "master") break;
+    if (L.ids[k] !== L.ids[s]) return STAGES[k].at - 1;
+  }
+  return null;
+}
+
 /** 다음 단계까지 얼마나 남았나 (마스터면 next: null) */
 function progress(total) {
   const i = stageFor(total);
@@ -230,4 +248,4 @@ async function spriteWithFallback(mon, cacheDir, kind) {
   catch (e) { console.error("[sprite] 실패 " + mon.dexId + " " + kind + ": " + e.message); return null; }
 }
 
-module.exports = { STAGES, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollShiny, rollNature, stageFor, progress, describe, evolutionTree, spritePath, spriteWithFallback };
+module.exports = { STAGES, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };
