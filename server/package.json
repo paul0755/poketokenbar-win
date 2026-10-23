@@ -1,0 +1,16 @@
+{
+  "name": "poketokenbar-relay",
+  "private": true,
+  "description": "PokeTokenBar 실시간 배틀 중계 서버 (Cloudflare Workers + Durable Objects). 앱 설치 파일에는 들어가지 않는다",
+  "scripts": {
+    "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.40.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261019.1": true
+  }
+}

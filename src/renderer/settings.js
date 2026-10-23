@@ -41,6 +41,9 @@ window.ptb.onSettings((s) => {
   showQuiet();
   $("pollMinutes").value = String(s.pollMinutes);
   $("autoLaunch").checked = s.autoLaunch;
+  $("onlineOn").checked = !!(s.online && s.online.enabled);
+  $("onlineRelay").value = (s.online && s.online.custom) || "";
+  $("onlineRelay").placeholder = s.onlineDefault || "";
   $("dataPath").textContent = s.dataPath || "";
   /*
    * 공식 값이 들어오고 있으면 여기에 아무것도 넣을 필요가 없다.
@@ -126,6 +129,15 @@ const on = (id, ev, fn) => $(id).addEventListener(ev, (e) => ready && fn(e));
 
 on("notifyEnabled", "change", () => send({ notifyEnabled: $("notifyEnabled").checked }));
 on("autoLaunch", "change", () => send({ autoLaunch: $("autoLaunch").checked }));
+// 서버 주소는 ws:// 나 wss:// 로 시작해야 한다. 아니면 저장하지 않는다
+const sendOnline = () => {
+  const relay = $("onlineRelay").value.trim();
+  if (relay && !/^wss?:\/\/[^\s]+$/.test(relay)) return void ($("onlineRelay").style.borderColor = "#ff5a5a");
+  $("onlineRelay").style.borderColor = "";
+  send({ online: { enabled: $("onlineOn").checked, relay } });
+};
+on("onlineOn", "change", sendOnline);
+on("onlineRelay", "change", sendOnline);
 for (const id of ["limClaudeBlock", "limClaudeWeek", "limCodexBlock"]) {
   on(id, "change", () => {
     sendLimits();

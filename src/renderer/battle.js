@@ -64,6 +64,7 @@
     renderBag(s);
     renderFriend(s);
     renderTrade(s);
+    liveUi();
   });
 
   /* ---------------- 친선 배틀 ----------------
@@ -134,6 +135,208 @@
       updateGo();
     }, 250);
   });
+
+  /* ---------------- 실시간 배틀 ----------------
+     중계 서버(server/)로 같은 방에 들어온 두 사람이 같은 결투를 같은 시각에 본다.
+
+       방 만들기(6자리) / 코드로 참가 → 서로의 팀 코드를 받는다 → 둘 다 "준비"
+       → 서버가 정한 시각에 동시에 시작
+
+     결투 계산은 친선 배틀과 똑같다(메인 friendBattle — 두 코드로 씨앗과 좌우를 정한다).
+     그래서 두 PC가 같은 결투를 계산하고, 서버는 코드와 시작 시각만 전한다.
+     서버와 내 시계는 다를 수 있다 — 서버가 매 메시지에 실어 보내는 now 로 차이를 잰다. */
+
+  const live = { ws: null, code: null, role: null, peer: null, offset: 0, result: null };
+
+  function liveOn(s) {
+    return Boolean(s && s.online && s.online.enabled);
+  }
+
+  function liveState(text, cls = "") {
+    $("liveStatus").textContent = text;
+    $("liveStatus").className = "note " + cls;
+  }
+
+  /**
+   * 내 포켓몬 고르기. 처음엔 친선 배틀에 등록한 아이를 몰래 썼는데, 방을 만들 때 누구로
+   * 들어가는지 알 수가 없었다. 이 칸에서 직접 고르고, 방 안에서도 바꿀 수 있다.
+   */
+  function fillLiveMine(s) {
+    const sel = $("liveMine");
+    const keep = sel.value;
+    const list = fighters(s);
+    sel.innerHTML = list.map((m) => `<option value="${m.id}">${m.name} Lv.${m.profile.level}${m.active ? " (키우는 중)" : ""}</option>`).join("");
+    if (list.some((m) => m.id === keep)) sel.value = keep;
+    else sel.value = (list.find((m) => m.active) || list[0] || {}).id || "";
+  }
+
+  function liveUi() {
+    const s = last;
+    const on = liveOn(s);
+    const inRoom = Boolean(live.ws);
+    if (s) fillLiveMine(s);
+    $("liveMine").disabled = !on || playing; // 결투 중에는 못 바꾼다. 방 안에서는 바꿀 수 있다
+    $("liveMake").disabled = $("liveJoin").disabled = !on || !$("liveMine").value || inRoom || playing;
+    $("liveCodeIn").disabled = !on || inRoom;
+    $("liveLeave").hidden = !inRoom;
+    $("liveReady").hidden = !(inRoom && live.peer);
+    $("liveReady").disabled = playing || !live.peer || !live.peer.ok;
+    if (!on) liveState("설정 › 온라인 기능을 켜면 쓸 수 있습니다. 보내는 건 팀 코드와 이름뿐입니다.");
+    else if (!inRoom) liveState("내 포켓몬을 고르고, 방을 만들거나 친구에게 받은 6자리 코드로 참가하세요.");
+  }
+
+  function liveClose(text) {
+    if (live.ws) {
+      const ws = live.ws;
+      live.ws = null;
+      try { ws.close(); } catch {}
+    }
+    live.peer = null;
+    live.code = null;
+    $("liveRoom").hidden = true;
+    $("liveFoe").hidden = true;
+    liveUi();
+    if (text) liveState(text);
+  }
+
+  async function liveConnect(code, role) {
+    const s = last;
+    const relay = s.online.relay.replace(/\/+$/, "");
+    // 고른 아이로 코드를 만든다. 친선 배틀에 등록한 코드와는 따로다
+    const team = await window.ptb.liveTeam($("liveMine").value);
+    if (!team || !team.ok) return liveState((team && team.reason) || "포켓몬을 골라 주세요", "bad");
+    live.myCode = team.code;
+    let ws;
+    try {
+      ws = new WebSocket(`${relay}/room/${code}?role=${role}`);
+    } catch {
+      return liveState("서버 주소가 올바르지 않습니다. 설정 › 온라인 기능을 확인해 주세요.", "bad");
+    }
+    live.ws = ws;
+    live.code = code;
+    live.role = role;
+    live.peer = null;
+    liveState("서버에 접속하는 중…");
+    liveUi();
+
+    ws.onopen = () => {
+      // 내 팀 코드를 보낸다. 친구가 이 코드로 같은 결투를 계산한다
+      ws.send(JSON.stringify({ t: "hello", name: (s.friend && s.friend.trainer) || "", team: live.myCode }));
+    };
+    ws.onmessage = async (e) => {
+      let m;
+      try { m = JSON.parse(e.data); } catch { return; }
+      if (typeof m.now === "number") live.offset = m.now - Date.now();
+      if (m.t === "joined") {
+        $("liveRoom").hidden = false;
+        $("liveRoomCode").textContent = code;
+        liveState(role === "host" ? "방을 만들었습니다. 이 코드를 친구에게 알려 주세요. 기다리는 중…" : "방에 들어왔습니다. 상대를 기다리는 중…");
+      } else if (m.t === "peer") {
+        // 받은 코드는 메인이 검사한다 — 버전이 다르거나 말이 안 되면 여기서 끝난다
+        const r = await window.ptb.friendInspect(m.team);
+        live.peer = { team: m.team, name: m.name, ok: Boolean(r && r.ok && !r.self) };
+        $("liveFoe").hidden = false;
+        if (r && r.ok) {
+          $("liveFoeImg").src = r.url || "";
+          $("liveFoeTxt").textContent = `${m.name || r.trainer || "상대"}의 ${r.name}${r.shiny ? " ★" : ""} (${r.stage})`;
+        } else {
+          $("liveFoeImg").src = "";
+          $("liveFoeTxt").textContent = "상대 팀을 읽지 못했습니다";
+        }
+        // 누가 포켓몬을 바꾸면 서버가 양쪽 준비를 내린다 — 내 준비 표시도 내린다
+        delete $("liveReady").dataset.on;
+        // 내가 방금 바꿔서 서버가 상대 정보를 다시 보낸 거면, 내가 바꿨다는 말을 남긴다
+        const mine = live.justChanged;
+        live.justChanged = null;
+        liveState(
+          !live.peer.ok ? (r && r.reason) || "상대 팀을 쓸 수 없습니다"
+            : m.changed ? "상대가 포켓몬을 바꿨습니다. 확인하고 다시 준비를 눌러 주세요."
+            : mine ? `${mine}(으)로 바꿨습니다. 둘 다 다시 준비를 눌러 주세요.`
+            : "상대가 들어왔습니다. 둘 다 준비를 누르면 시작합니다.",
+          live.peer.ok ? "" : "bad",
+        );
+        liveUi();
+      } else if (m.t === "peerReady") {
+        liveState("상대가 준비했습니다." + ($("liveReady").dataset.on ? " 곧 시작합니다." : " 준비를 누르세요."));
+      } else if (m.t === "start") {
+        await liveStart(m.at);
+      } else if (m.t === "left") {
+        live.peer = null;
+        $("liveFoe").hidden = true;
+        liveState("상대가 나갔습니다. 다른 친구를 기다리거나 방을 나가세요.");
+        liveUi();
+      } else if (m.t === "error") {
+        liveClose(m.reason || "서버가 거절했습니다");
+      }
+    };
+    ws.onclose = () => {
+      if (live.ws === ws) liveClose("서버와 연결이 끊겼습니다.");
+    };
+    ws.onerror = () => {
+      if (live.ws === ws) liveClose("서버에 접속하지 못했습니다. 설정 › 온라인 기능의 서버 주소를 확인해 주세요.");
+    };
+  }
+
+  /** 서버가 정한 시각에 시작한다. 결과는 미리 계산해 두고, 시각이 되면 재생만 한다 */
+  async function liveStart(at) {
+    if (!live.peer) return;
+    playing = true;
+    delete $("liveReady").dataset.on;
+    liveUi();
+    const r = await window.ptb.liveBattle(live.peer.team);
+    if (!r || !r.ok) {
+      playing = false;
+      liveUi();
+      return liveState((r && r.reason) || "결투를 시작하지 못했습니다", "bad");
+    }
+    const localAt = at - live.offset; // 서버 시각 → 내 시계
+    $("arena").scrollIntoView({ behavior: "smooth", block: "start" });
+    while (Date.now() < localAt) {
+      liveState(`${Math.ceil((localAt - Date.now()) / 1000)}초 뒤 시작!`);
+      await new Promise((res) => setTimeout(res, Math.min(250, Math.max(10, localAt - Date.now()))));
+    }
+    liveState("결투 중 — 상대 화면에서도 같은 결투가 진행됩니다.");
+    fast = false;
+    try {
+      await play(r);
+    } finally {
+      playing = false;
+      liveUi();
+      if (live.ws) liveState(r.winner == null ? "무승부! 한 판 더 하려면 둘 다 준비를 누르세요." : r.winner === 0 ? "이겼다! 한 판 더 하려면 둘 다 준비를 누르세요." : "졌다… 한 판 더 하려면 둘 다 준비를 누르세요.");
+    }
+  }
+
+  $("liveMake").onclick = () => {
+    // 6자리. 서버가 이미 있는 방이면 거절하니 겹쳐도 다시 누르면 된다
+    liveConnect(String(Math.floor(100000 + Math.random() * 900000)), "host");
+  };
+  $("liveJoin").onclick = () => {
+    const code = $("liveCodeIn").value.replace(/\D/g, "");
+    if (code.length !== 6) return liveState("6자리 숫자 코드를 넣어 주세요.", "bad");
+    liveConnect(code, "guest");
+  };
+  $("liveReady").onclick = () => {
+    if (!live.ws || !live.peer) return;
+    live.ws.send(JSON.stringify({ t: "ready" }));
+    $("liveReady").dataset.on = "1";
+    liveState("준비했습니다. 상대를 기다리는 중…");
+  };
+  $("liveLeave").onclick = () => liveClose("방을 나왔습니다.");
+  // 방 안에서 포켓몬을 바꾼다 — 새 코드를 다시 보내면 상대 화면도 바뀌고 양쪽 준비가 풀린다
+  $("liveMine").addEventListener("change", async () => {
+    if (!live.ws || live.ws.readyState !== 1 || playing) return;
+    const team = await window.ptb.liveTeam($("liveMine").value);
+    if (!team || !team.ok) return liveState((team && team.reason) || "바꾸지 못했습니다", "bad");
+    live.myCode = team.code;
+    live.justChanged = live.peer ? team.name : null;
+    live.ws.send(JSON.stringify({ t: "hello", name: (last.friend && last.friend.trainer) || "", team: live.myCode }));
+    delete $("liveReady").dataset.on;
+    liveState(`${team.name}(으)로 바꿨습니다.` + (live.peer ? " 둘 다 다시 준비를 눌러 주세요." : " 상대를 기다리는 중…"));
+  });
+  $("liveCopyCode").onclick = async () => {
+    try { await navigator.clipboard.writeText(live.code || ""); } catch {}
+    window.toast && toast("방 코드를 복사했습니다");
+  };
 
   /* ---------------- 교환 ----------------
      보내기 → 박스에서 빠지고 코드가 나온다(메인이 한 번 묻는다). 받기 → 같은 코드는 한 번만.

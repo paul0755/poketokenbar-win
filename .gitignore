@@ -33,3 +33,6 @@ npm-debug.log*
 Thumbs.db
 desktop.ini
 *.lnk
+
+# 중계 서버 로컬 실행 흔적 (wrangler dev)
+.wrangler/

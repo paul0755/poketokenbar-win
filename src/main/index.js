@@ -120,6 +120,16 @@ const CANDY_FEED = 10_000_000;
 const BATTLE_REWARDS_PER_DAY = 5;
 
 /**
+ * 실시간 배틀 중계 서버 기본 주소 — server/ 를 Cloudflare 에 올린 것.
+ * 설정 › 온라인 기능에서 바꿀 수 있다. 직접 띄운 로컬 서버(npm run dev)는 ws://127.0.0.1:8787.
+ */
+const DEFAULT_RELAY = "wss://poketokenbar-relay.yezandi.workers.dev";
+const onlineCfg = () => {
+  const o = save.online || {};
+  return { enabled: Boolean(o.enabled), relay: String(o.relay || "").trim() || DEFAULT_RELAY, custom: String(o.relay || "").trim() };
+};
+
+/**
  * 나무열매 하나가 두 배로 쳐 주는 토큰 양. 좋아하는 맛이면 두 배 더 오래 간다.
  * 하루 5천만~1억을 쓰니 보통 열매 하나가 반나절 남짓이다.
  * 아무리 먹여도 BOOST_CAP 까지만 쌓인다 — 열매를 모아 한 번에 몰아주는 걸 막는다.
@@ -232,9 +242,26 @@ async function friendInspect(code) {
  * 누가 왼쪽인지도 코드로 정해서 양쪽 PC가 같은 판을 돌린다. 화면에는 늘 내가
  * 왼쪽에 서도록 결과만 뒤집어 넘긴다. 보상은 없다 — 가짜 코드로 열매를 찍을 수 있다.
  */
-async function friendBattle(code) {
-  if (!save.friendTeam) return { ok: false, reason: "먼저 내 팀을 등록해 코드를 만들어 주세요" };
-  const mine = friend.decode(save.friendTeam.code);
+/**
+ * 실시간 배틀에서 내가 내보낸 팀. 친선 배틀 등록(friendTeam)과 따로 둔다 — 실시간 배틀은
+ * 그 칸에서 고른 아이로 싸우고, 친구에게 보내 둔 친선 코드를 건드리면 안 된다.
+ * 방이 끝나면 의미가 없어서 저장하지 않는다.
+ */
+let liveTeam = null; // { code, monId }
+
+function liveRegister(id) {
+  const m = box.find(save.box, id);
+  if (!m) return { ok: false, reason: "없는 아이입니다" };
+  const grown = box.effOf(m, growthSpeed());
+  if (!poke.stageFor(grown)) return { ok: false, reason: "알은 싸울 수 없습니다" };
+  liveTeam = { code: friend.encode(m, grown, save.trainerName), monId: id };
+  return { ok: true, code: liveTeam.code, name: poke.describe(grown, m.line, { shiny: m.shiny }).name };
+}
+
+async function friendBattle(code, opts = {}) {
+  const team = opts.live ? liveTeam : save.friendTeam;
+  if (!team) return { ok: false, reason: opts.live ? "실시간 배틀에서 내 포켓몬을 골라 주세요" : "먼저 내 팀을 등록해 코드를 만들어 주세요" };
+  const mine = friend.decode(team.code);
   if (mine.error) return { ok: false, reason: "등록한 내 코드가 이 버전과 맞지 않습니다. 다시 등록해 주세요" };
   const theirs = friend.decode(code);
   if (theirs.error) return { ok: false, reason: theirs.error };
@@ -518,6 +545,12 @@ let save = {
    */
   tradeSent: [],
   tradeReceived: [],
+  /**
+   * 온라인 기능(실시간 배틀). 이 앱이 처음으로 밖으로 무언가를 보내는 기능이라 기본은 꺼짐.
+   * 켜면 결투 탭의 실시간 배틀이 중계 서버(server/)에 붙는다. 보내는 건 팀 코드와 이름뿐 —
+   * 토큰 기록은 보내지 않는다. relay 가 비어 있으면 DEFAULT_RELAY 를 쓴다.
+   */
+  online: { enabled: false, relay: "" },
   /** 방해 금지 시간. 이 사이에는 저절로 나오지 않는다 (wild.js inQuiet) */
   wildQuiet: { enabled: false, from: 22, to: 8 },
   /** 상점에서 산 볼. 몬스터볼은 출현마다 공짜로 주니 여기 없다 */
@@ -924,6 +957,7 @@ async function buildStats() {
     limits: limits.summarize(u, Date.now(), save.limits || {}, save.quotaFiles || {}),
     box: boxList,
     berries: berryBag(),
+    online: onlineCfg(),
     friend: {
       team: save.friendTeam,
       trainer: save.trainerName || "",
@@ -1304,6 +1338,8 @@ function settingsPayload() {
     wildQuiet: save.wildQuiet || { enabled: false, from: 22, to: 8 },
     pollMinutes: save.pollMinutes,
     autoLaunch: save.autoLaunch,
+    online: onlineCfg(),
+    onlineDefault: DEFAULT_RELAY,
     autoSources: officialSources(),
     dataPath: app.getPath("userData"),
     dataDefault: DEFAULT_DATA,
@@ -2564,6 +2600,9 @@ app.whenReady().then(async () => {
   ipcMain.handle("friend-register", (_e, { id, trainer } = {}) => friendRegister(id, trainer));
   ipcMain.handle("friend-inspect", (_e, code) => friendInspect(code));
   ipcMain.handle("friend-battle", (_e, code) => friendBattle(code));
+  // 실시간 배틀 — 고른 아이로 코드를 만들고(방 안에서 바꿔도 된다), 그 코드로 싸운다
+  ipcMain.handle("live-team", (_e, id) => liveRegister(id));
+  ipcMain.handle("live-battle", (_e, code) => friendBattle(code, { live: true }));
   ipcMain.handle("trade-send", (_e, id) => tradeSend(id));
   ipcMain.handle("trade-inspect", (_e, code) => tradeInspect(code));
   ipcMain.handle("trade-receive", (_e, code) => tradeReceive(code));
