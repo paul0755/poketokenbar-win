@@ -5,45 +5,62 @@
   position: relative; width: 100%; aspect-ratio: 16 / 10;
   border-radius: 12px; overflow: hidden; border: 2px solid #0b0c10;
   box-shadow: 0 6px 18px rgba(0, 0, 0, .4); user-select: none;
+  background: #1d1f26;
 }
-.rm-wall { position: absolute; inset: 0 0 38% 0; background: var(--rm-wall); }
-.rm-wall::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 7%; background: var(--rm-trim); box-shadow: 0 -2px 0 rgba(0, 0, 0, .12) inset; }
-.rm-floor { position: absolute; inset: 62% 0 0 0; background: var(--rm-floor); }
-.rm-room svg { position: absolute; shape-rendering: crispEdges; overflow: visible; }
+/* 320×200 으로 칠한 그림을 그대로 키운다 — 픽셀이 번지지 않게 */
+.rm-scene, .rm-actors { position: absolute; inset: 0; }
+.rm-actors { pointer-events: none; }
+.rm-room canvas { image-rendering: pixelated; position: absolute; display: block; }
+.rm-base { inset: 0; width: 100%; height: 100%; }
+.rm-f { pointer-events: none; }
+/* 바닥 그림은 밤이면 어둡게 칠한다. 따로 그린 가구·아이들도 맞춰 어둡게 — 램프만 빼고 */
+.rm-room[data-per="evening"] .rm-f { filter: brightness(.9); }
+.rm-room[data-per="night"] .rm-f { filter: brightness(.72) saturate(.85); }
+.rm-room .rm-f[data-f="lamp"] { filter: none; }
+.rm-room[data-per="night"] .rm-mon .rm-body { filter: brightness(.86); }
 
-/* 배경 — 벽지 · 바닥 · 창밖 */
-.rm-room[data-theme="cabin"] { --rm-wall: repeating-linear-gradient(90deg, #e6c393 0 46px, #d9b37f 46px 48px); --rm-trim: #9c6b3f; --rm-floor: repeating-linear-gradient(0deg, #b9824f 0 22px, #a8723f 22px 24px); --rm-sky1: #8fd3ff; --rm-sky2: #d9f1ff; --rm-win: #fff; }
-.rm-room[data-theme="beach"] { --rm-wall: repeating-linear-gradient(0deg, #e9f6fb 0 30px, #d6edf5 30px 32px); --rm-trim: #5fb3c9; --rm-floor: linear-gradient(#f3dcaa, #e9c98c); --rm-sky1: #4fc3f7; --rm-sky2: #b3ecff; --rm-win: #fff; }
-.rm-room[data-theme="night"] { --rm-wall: radial-gradient(circle at 20% 30%, #ffffff55 0 1px, transparent 2px) 0 0/60px 50px, radial-gradient(circle at 70% 60%, #ffffff40 0 1px, transparent 2px) 0 0/90px 70px, linear-gradient(#1f2350, #2d2f6b); --rm-trim: #121433; --rm-floor: repeating-linear-gradient(45deg, #3a2f5c 0 14px, #34295200 14px 28px), #3f3366; --rm-sky1: #0b1030; --rm-sky2: #27306b; --rm-win: #c9c3ff; }
-.rm-room[data-theme="lab"] { --rm-wall: repeating-linear-gradient(90deg, #f4f6f8 0 80px, #e3e7eb 80px 82px); --rm-trim: #8a96a3; --rm-floor: conic-gradient(#dfe5ea 25%, #f5f7f9 0 50%, #dfe5ea 0 75%, #f5f7f9 0) 0 0/48px 48px; --rm-sky1: #9be7c4; --rm-sky2: #e6fff4; --rm-win: #fff; }
-.rm-sun { fill: #ffd54f; }
-.rm-room[data-theme="night"] .rm-sun { fill: #fff6c9; }
-.rm-glow { opacity: .35; }
-.rm-room[data-theme="night"] .rm-glow { opacity: 1; }
-.rm-sea { display: none; }
-.rm-room[data-theme="beach"] .rm-sea { display: inline; }
+/* 캔버스 위에 얹는 글자 */
+.rm-txt { position: absolute; transform: translate(-50%, -50%); font: 800 1.9cqw/1 Consolas, "Malgun Gothic", monospace; color: #3b2a12; white-space: nowrap; text-align: center; pointer-events: none; }
+.rm-txt.lt { color: #ffffffcc; font-size: 1.5cqw; }
+.rm-txt.sm { color: #455a64; font-size: 1.35cqw; line-height: 1.25; }
 
-/* 포켓몬 */
-.rm-mon { position: absolute; cursor: pointer; }
-.rm-mon .rm-body { position: relative; animation: var(--walk) var(--dur) linear infinite; }
-.rm-mon img { display: block; height: calc(var(--h) * 1cqw); image-rendering: pixelated; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .18)); animation: rm-hop .5s ease-in-out infinite alternate; }
-.rm-mon .rm-shadow { position: absolute; left: 50%; bottom: -3px; width: 60%; height: 7px; transform: translateX(-50%); background: rgba(0, 0, 0, .22); border-radius: 50%; filter: blur(1px); }
-.rm-mon .rm-tag { position: absolute; left: 50%; bottom: calc(100% + 3px); transform: translateX(-50%); white-space: nowrap; background: rgba(15, 16, 22, .88); color: #fff; font-size: 10.5px; padding: 3px 7px; border-radius: 6px; opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 5; }
+/* 어항 물고기 */
+.rm-fish { position: absolute; width: 1.6cqw; height: .9cqw; background: #ff8a3d; border-radius: 40% 50% 50% 40%; z-index: 1330; animation: rm-swim 7s ease-in-out infinite; pointer-events: none; }
+.rm-fish::after { content: ""; position: absolute; left: -.6cqw; top: .1cqw; border: .35cqw solid transparent; border-right: .5cqw solid #e0661f; }
+.rm-fish.b { background: #ffe066; width: 1.2cqw; animation-duration: 9s; animation-delay: -3s; }
+.rm-fish.b::after { border-right-color: #e0b400; }
+@keyframes rm-swim { 0%, 100% { transform: translateX(0) scaleX(-1); } 48% { transform: translateX(var(--sw)) scaleX(-1); } 52% { transform: translateX(var(--sw)) scaleX(1); } 96% { transform: translateX(0) scaleX(1); } }
+
+/* 포켓몬 — 자리(left/top/z)는 room.js 가 매 프레임 정한다 */
+.rm-mon { position: absolute; translate: -50% 0; pointer-events: auto; cursor: pointer; }
+.rm-mon .rm-body { position: relative; transform-origin: bottom center; }
+.rm-mon img { display: block; height: calc(var(--h, 12) * 1cqw); image-rendering: pixelated; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .25)); }
+.rm-body.r img { transform: scaleX(-1); } /* 원본은 왼쪽을 본다 */
+.rm-body.walking { animation: rm-bob .3s ease-in-out infinite alternate; }
+.rm-mon .rm-shadow { position: absolute; left: 50%; bottom: 3%; width: 55%; height: 6%; transform: translateX(-50%); background: rgba(0, 0, 0, .25); border-radius: 50%; z-index: -1; }
+.rm-mon.sit .rm-body, .rm-mon.sleep .rm-body { animation: rm-breathe 2.4s ease-in-out infinite; }
+.rm-mon.sleep img { filter: brightness(.82) drop-shadow(0 1px 0 rgba(0, 0, 0, .25)); }
+.rm-mon.sit .rm-shadow, .rm-mon.sleep .rm-shadow { display: none; }
+.rm-mon.jump { animation: rm-jump .5s cubic-bezier(.3, .7, .4, 1); }
+@keyframes rm-bob { from { transform: translateY(0); } to { transform: translateY(-4%); } }
+@keyframes rm-breathe { 50% { transform: scale(1.03, .96); } }
+@keyframes rm-jump { 0% { transform: translateY(0); } 40% { transform: translateY(-28%); } 70% { transform: translateY(0); } 85% { transform: translateY(-6%); } 100% { transform: translateY(0); } }
+
+/* 말풍선 · 이름표 */
+.rm-bub { position: absolute; left: 50%; bottom: 92%; translate: -50% 0; padding: .3cqw .9cqw; border-radius: 1cqw; background: #fff; color: #333; border: 2px solid #333; font: 800 1.8cqw/1.2 "Malgun Gothic", sans-serif; white-space: nowrap; opacity: 0; transform: scale(.6); transition: opacity .15s, transform .15s; pointer-events: none; }
+.rm-bub.on { opacity: 1; transform: scale(1); }
+.rm-bub.heart { color: #e53935; }
+.rm-bub.z { background: #e8eaf6; color: #3949ab; border-color: #3949ab; animation: rm-z 1.6s ease-in-out infinite; }
+@keyframes rm-z { 50% { transform: translateY(-20%); } }
+.rm-tag { position: absolute; left: 50%; top: 100%; translate: -50% 0; margin-top: 2px; white-space: nowrap; background: rgba(15, 16, 22, .88); color: #fff; font-size: 10.5px; padding: 2px 7px; border-radius: 6px; opacity: 0; transition: opacity .15s; pointer-events: none; }
 .rm-mon:hover .rm-tag, .rm-mon.show .rm-tag { opacity: 1; }
-.rm-mon.sit .rm-body { animation: none; }
-.rm-mon.sit img { animation: rm-breathe 1.6s ease-in-out infinite; transform-origin: bottom center; }
-.rm-spark { position: absolute; width: 9px; height: 9px; background: radial-gradient(#fff 0 30%, #ffe48a 40%, transparent 70%); border-radius: 50%; animation: rm-tw 1.4s ease-in-out infinite; pointer-events: none; }
-@keyframes rm-hop { from { transform: translateY(0); } to { transform: translateY(-3px); } }
-@keyframes rm-breathe { 50% { transform: scaleY(.96); } }
+.rm-spark { position: absolute; left: 12%; top: 8%; width: 1.4cqw; height: 1.4cqw; background: radial-gradient(#fff 0 30%, #ffe48a 40%, transparent 70%); border-radius: 50%; animation: rm-tw 1.4s ease-in-out infinite; pointer-events: none; }
+.rm-spark.b { left: auto; right: 6%; top: 30%; animation-delay: .6s; }
 @keyframes rm-tw { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: 1; transform: scale(1); } }
-/* 걷기 — 원본 스프라이트는 왼쪽을 본다. 가는 쪽을 보게 뒤집는다 */
-@keyframes rm-walkA { 0% { transform: translateX(0) scaleX(1); } 46% { transform: translateX(-20cqw) scaleX(1); } 50% { transform: translateX(-20cqw) scaleX(-1); } 96% { transform: translateX(0) scaleX(-1); } 100% { transform: translateX(0) scaleX(1); } }
-@keyframes rm-walkB { 0% { transform: translateX(0) scaleX(-1); } 46% { transform: translateX(16cqw) scaleX(-1); } 50% { transform: translateX(16cqw) scaleX(1); } 96% { transform: translateX(0) scaleX(1); } 100% { transform: translateX(0) scaleX(-1); } }
-@keyframes rm-walkC { 0%, 20% { transform: translateX(0) scaleX(1); } 50%, 60% { transform: translateX(-9cqw) scaleX(1); } 62% { transform: translateX(-9cqw) scaleX(-1); } 92% { transform: translateX(0) scaleX(-1); } 100% { transform: translateX(0) scaleX(1); } }
 
-.rm-plate { position: absolute; left: 8px; top: 7px; background: rgba(15, 16, 22, .72); color: #fff; padding: 4px 8px; border-radius: 8px; font-size: 10.5px; line-height: 1.35; z-index: 4; }
+.rm-plate { position: absolute; left: 8px; top: 7px; background: rgba(15, 16, 22, .72); color: #fff; padding: 4px 8px; border-radius: 8px; font-size: 10.5px; line-height: 1.35; z-index: 5000; pointer-events: none; }
 .rm-plate b { color: var(--accent); }
-.rm-empty { position: absolute; left: 50%; top: 74%; transform: translateX(-50%); background: rgba(15, 16, 22, .7); color: #fff; font-size: 11px; padding: 5px 10px; border-radius: 8px; white-space: nowrap; }
+.rm-empty { position: absolute; left: 50%; top: 74%; transform: translateX(-50%); background: rgba(15, 16, 22, .7); color: #fff; font-size: 11px; padding: 5px 10px; border-radius: 8px; white-space: nowrap; z-index: 5000; }
 
 /* 꾸미기 */
 .rm-panel h5 { margin: 14px 0 6px; font-size: 11.5px; color: var(--muted); font-weight: 700; }

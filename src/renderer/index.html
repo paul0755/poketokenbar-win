@@ -499,8 +499,12 @@
 
   <!-- ---------------- 미니룸 (room.js) ---------------- -->
   <section id="tab-room" hidden>
-    <div class="dexhead"><span class="t">내 방</span><span class="c">포켓몬을 누르면 이름표</span></div>
-    <div class="rm-room" id="rmRoom" data-theme="cabin"></div>
+    <div class="dexhead"><span class="t">내 방</span><span class="c">포켓몬을 누르면 깡충 · 이름표</span></div>
+    <div class="rm-room" id="rmRoom" data-theme="cabin">
+      <div class="rm-scene"></div>
+      <div class="rm-actors" id="rmActors"></div>
+      <div class="rm-empty" id="rmEmpty" hidden>아래에서 방에 둘 포켓몬을 골라 주세요</div>
+    </div>
     <div class="rm-panel" id="rmPanel">
       <h5>배경<span class="w" id="rmWallet">🍬 –</span></h5>
       <div class="rm-chips" id="rmThemes"></div>

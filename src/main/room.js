@@ -18,15 +18,22 @@ const THEMES = [
   { id: "beach", name: "바닷가", icon: "🏖️", cost: 4 },
   { id: "night", name: "밤하늘", icon: "🌙", cost: 4 },
   { id: "lab", name: "연구소", icon: "🧪", cost: 4 },
+  { id: "snow", name: "눈 오는 산장", icon: "❄️", cost: 4 },
+  { id: "cave", name: "수정 동굴", icon: "💎", cost: 5 },
 ];
 
 const FURNI = [
   { id: "window", name: "창문", icon: "🪟", cost: 0, desc: "창밖은 배경마다 다르다" },
-  { id: "lamp", name: "스탠드 램프", icon: "💡", cost: 2, desc: "밤하늘 배경에서 더 밝다" },
+  { id: "lamp", name: "스탠드 램프", icon: "💡", cost: 2, desc: "밤이 되면 더 밝게 켜진다" },
   { id: "rug", name: "둥근 러그", icon: "⭕", cost: 2, desc: "방 한가운데 깐다" },
-  { id: "cushion", name: "몬스터볼 쿠션", icon: "🔴", cost: 2, desc: "작은 아이 하나가 올라앉아 쉰다" },
-  { id: "plant", name: "나무열매 화분", icon: "🪴", cost: 2, desc: "열매가 셋 달렸다" },
+  { id: "cushion", name: "몬스터볼 쿠션", icon: "🔴", cost: 2, desc: "작은 아이가 올라앉아 쉰다" },
+  { id: "plant", name: "나무열매 화분", icon: "🪴", cost: 2, desc: "아이들이 와서 열매를 먹는다" },
   { id: "shelf", name: "기술머신 책장", icon: "💿", cost: 3, desc: "디스크가 꽂힌 책장" },
+  { id: "bed", name: "침대", icon: "🛏️", cost: 4, desc: "밤이 되면 누군가 올라가 잔다" },
+  { id: "desk", name: "책상과 컴퓨터", icon: "🖥️", cost: 4, desc: "화면에 코드가 떠 있다" },
+  { id: "tv", name: "TV와 게임기", icon: "📺", cost: 3, desc: "모여서 구경한다" },
+  { id: "aquarium", name: "어항", icon: "🐟", cost: 4, desc: "물고기가 헤엄친다" },
+  { id: "poster", name: "산 풍경 포스터", icon: "🖼️", cost: 1, desc: "벽에 붙인다" },
 ];
 
 const MAX_MONS = 5;
