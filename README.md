@@ -32,6 +32,17 @@ npm install
 npm start
 ```
 
+`npm start` 에서 `Electron failed to install correctly … node_modules\electron\index.js` 가 나면
+Electron 실행 파일이 덜 받아진 것입니다(npm 이 설치 스크립트를 막았거나 내려받기가 끊긴 경우).
+`npm install` 뒤와 `npm start` 앞에 저절로 확인해 다시 받으니 보통은 한 번 더 `npm start` 하면 됩니다.
+그래도 안 되면 지우고 다시 받으세요.
+
+```bash
+npm run fix-electron
+```
+
+회사망·백신이 GitHub 내려받기를 막으면 이것도 실패합니다. 그때는 Releases 의 설치 파일을 쓰세요.
+
 설치 파일 만들기:
 
 ```bash

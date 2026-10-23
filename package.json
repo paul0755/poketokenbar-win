@@ -27,7 +27,10 @@
   },
   "main": "src/main/index.js",
   "scripts": {
+    "postinstall": "node scripts/ensure-electron.mjs",
+    "prestart": "node scripts/ensure-electron.mjs",
     "start": "electron .",
+    "fix-electron": "node scripts/ensure-electron.mjs --force",
     "probe": "node src/main/usage.js",
     "lines": "node scripts/build-lines.mjs",
     "icon": "node scripts/make-icon.mjs",
@@ -73,5 +76,9 @@
       "artifactName": "PokeTokenBar-Setup-${version}.${ext}",
       "runAfterFinish": false
     }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "electron-winstaller@5.4.0": true
   }
 }
