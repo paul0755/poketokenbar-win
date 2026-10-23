@@ -13,6 +13,7 @@ const backup = require("./backup");
 const battle = require("./battle");
 const wild = require("./wild");
 const friend = require("./friend");
+const room = require("./room");
 const BERRIES = require("./berries.json");
 
 /**
@@ -450,6 +451,69 @@ function feedBerry(id, key) {
   };
 }
 
+/* ---------------- 미니룸 (room.js) ---------------- */
+
+const isEggMon = (m) => !poke.stageFor(box.effOf(m, growthSpeed()));
+const roomPrice = (cost) => (cost ? priceOf(cost) : 0);
+
+/** 화면에 넘길 방 — 가진 것·놓은 것·둘 아이와 기록 장식에 쓸 숫자 */
+function roomState() {
+  room.normalize(save);
+  const r = save.room;
+  return {
+    theme: r.theme,
+    themes: room.THEMES.map((t) => ({ ...t, cost: roomPrice(t.cost), owned: r.themes.includes(t.id) })),
+    furni: room.FURNI.map((f) => ({ ...f, cost: roomPrice(f.cost), owned: r.owned.includes(f.id), on: r.owned.includes(f.id) && !r.off.includes(f.id) })),
+    mons: room.monsIn(save, isEggMon),
+    max: room.MAX_MONS,
+    // 기록 장식 — 졸업 트로피(마지막 졸업생 이름), 결투 배지(친선 + 박스 결투 승수)
+    graduated: (save.graduated || []).length,
+    lastGrad: ((save.graduated || []).slice(-1)[0] || {}).name || null,
+    wins: ((save.friendRecord || {}).w || 0) + (save.box || []).reduce((a, m) => a + ((m.record || {}).w || 0), 0),
+  };
+}
+
+/** 배경·가구를 산다. 사탕은 상점과 같은 지갑에서 나간다 */
+function roomBuy(kind, id) {
+  room.normalize(save);
+  const r = save.room;
+  const list = kind === "theme" ? room.THEMES : room.FURNI;
+  const it = list.find((x) => x.id === id);
+  if (!it) return { ok: false, reason: "없는 물건입니다" };
+  const have = kind === "theme" ? r.themes : r.owned;
+  if (have.includes(id)) return { ok: false, reason: "이미 가지고 있습니다" };
+  const cost = roomPrice(it.cost);
+  if (candy().left < cost) return { ok: false, reason: "사탕이 모자랍니다" };
+  save.candySpent = (save.candySpent ?? 0) + cost;
+  have.push(id);
+  if (kind === "theme") r.theme = id; // 산 배경은 바로 바른다
+  writeSave();
+  refresh(true);
+  pushShop();
+  return { ok: true, message: kind === "theme" ? `${it.name} 배경으로 바꿨습니다` : `${battle.josa(it.name, "을를")} 방에 놓았습니다` };
+}
+
+/** 배경 바꾸기 · 가구 놓기/치우기 · 둘 아이 고르기 */
+function roomSet(patch = {}) {
+  room.normalize(save);
+  const r = save.room;
+  if (patch.theme != null) {
+    if (!r.themes.includes(patch.theme)) return { ok: false, reason: "아직 없는 배경입니다" };
+    r.theme = patch.theme;
+  }
+  if (patch.toggle != null) {
+    if (!r.owned.includes(patch.toggle)) return { ok: false, reason: "아직 없는 가구입니다" };
+    r.off = r.off.includes(patch.toggle) ? r.off.filter((x) => x !== patch.toggle) : [...r.off, patch.toggle];
+  }
+  if (Array.isArray(patch.mons)) {
+    const ok = (id) => { const m = box.find(save.box, id); return m && !isEggMon(m); };
+    r.mons = [...new Set(patch.mons.map(String))].filter(ok).slice(0, room.MAX_MONS);
+  }
+  writeSave();
+  refresh(true);
+  return { ok: true };
+}
+
 /* ---------------- 변하지않는돌 ---------------- */
 
 const stoneCount = () => (save.items && save.items.everstone) || 0;
@@ -634,6 +698,8 @@ let save = {
    */
   trayIcon: "logo",
   petSize: 128,
+  /** 팝오버 창 크기. 테두리를 끌어 바꾸면 기억한다. null 이면 기본(400 × 화면에 맞는 높이) */
+  popSize: null,
   pollMinutes: 0.5, // 갱신 주기(분). 0.5 = 30초
   autoLaunch: false,
 };
@@ -923,6 +989,7 @@ async function buildStats() {
 
   // 프로필이 없던 시절의 개체를 채운다 (한 번만 걸린다)
   if (box.backfill(save.box)) writeSave();
+  if (room.normalize(save)) writeSave(); // 미니룸이 없던 세이브
 
   // 늘어난 토큰은 키우는 아이에게만 적립된다.
   if (box.accrue(save, u.total)) writeSave();
@@ -1024,6 +1091,7 @@ async function buildStats() {
     box: boxList,
     berries: berryBag(),
     stones: stoneCount(),
+    room: roomState(),
     online: onlineCfg(),
     friend: {
       team: save.friendTeam,
@@ -1182,16 +1250,27 @@ function logConsole(tag) {
 
 /* ---------------- 팝오버 ---------------- */
 
+/** 팝오버가 이보다 작아지면 탭 줄과 카드가 깨진다. 화면 배치는 400px 을 기준으로 짰다 */
+const POP_MIN = { w: 400, h: 460 };
+
 function createWindow() {
   // 700px가 늘 들어간다는 보장이 없다. 작업 영역을 넘지 않게 자르고,
   // 잘린 만큼은 본문 스크롤이 받아준다.
   const area = screen.getPrimaryDisplay().workArea;
+  // 끌어서 바꾼 크기를 기억해 둔다. 모니터가 바뀌었을 수 있어 작업 영역 안으로 자른다
+  const ps = save.popSize || {};
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(v)));
   win = new BrowserWindow({
-    width: 400,
-    height: Math.max(460, Math.min(760, area.height - 60)),
+    width: clamp(ps.w || POP_MIN.w, POP_MIN.w, area.width),
+    height: clamp(ps.h || Math.min(760, area.height - 60), POP_MIN.h, area.height),
+    minWidth: POP_MIN.w,
+    minHeight: POP_MIN.h,
     show: false,
     frame: false,
-    resizable: false,
+    resizable: true,
+    // 테두리 없는 창은 탭 줄(끌기 영역)을 두 번 누르면 최대화된다. 팝오버가 화면을 덮으면 안 된다
+    maximizable: false,
+    fullscreenable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
     webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true },
@@ -1200,6 +1279,17 @@ function createWindow() {
   // 최초 refresh가 로드보다 빠르면 그 send는 허공에 사라진다. 로드 후 한 번 더 민다.
   win.webContents.on("did-finish-load", () => (lastStats ? push(win, lastStats) : refresh()));
   win.webContents.on("console-message", logConsole("renderer"));
+  // 크기를 바꾸면 기억한다. 끄는 동안 수십 번 오니 멈춘 뒤에 한 번만 쓴다
+  let sizeTimer = null;
+  win.on("resize", () => {
+    clearTimeout(sizeTimer);
+    sizeTimer = setTimeout(() => {
+      if (!win || win.isDestroyed()) return;
+      const [w, h] = win.getSize();
+      save.popSize = { w, h };
+      writeSave();
+    }, 600);
+  });
   /**
    * 팝오버답게 포커스를 잃으면 닫는다.
    *
@@ -1519,6 +1609,8 @@ function resetProgress() {
   save.candySpent = 0;
   save.candyBonus = 0;
   save.charm = false;
+  save.items = {}; // 사탕으로 산 것은 같이 비운다 — 변하지않는돌·미니룸
+  save.room = room.fresh();
   save.seen = [];
   save.maxStage = {};
   save.graduated = [];
@@ -2664,6 +2756,8 @@ app.whenReady().then(async () => {
     }
     flyBall(vx, vy);
   });
+  ipcMain.handle("room-buy", (_e, { kind, id } = {}) => roomBuy(kind, id));
+  ipcMain.handle("room-set", (_e, patch) => roomSet(patch || {}));
   ipcMain.handle("toggle-stone", (_e, id) => toggleStone(id));
   ipcMain.handle("feed-berry", (_e, { id, key } = {}) => feedBerry(id, key));
   ipcMain.handle("friend-register", (_e, { id, trainer } = {}) => friendRegister(id, trainer));

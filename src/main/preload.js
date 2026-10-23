@@ -37,6 +37,9 @@ contextBridge.exposeInMainWorld("ptb", {
   battle: (a) => ipcRenderer.invoke("battle", a),
   feedBerry: (a) => ipcRenderer.invoke("feed-berry", a),
   toggleStone: (id) => ipcRenderer.invoke("toggle-stone", id),
+  // 미니룸
+  roomBuy: (a) => ipcRenderer.invoke("room-buy", a),
+  roomSet: (patch) => ipcRenderer.invoke("room-set", patch),
   battleDesktop: (a) => ipcRenderer.invoke("battle-desktop", a),
   // 친선 배틀 — 코드 만들기 · 받은 코드 보기 · 싸우기
   friendRegister: (a) => ipcRenderer.invoke("friend-register", a),

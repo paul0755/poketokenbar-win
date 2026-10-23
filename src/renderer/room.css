@@ -1,0 +1,67 @@
+/* 미니룸 — room.js. 이름이 겹치지 않게 전부 rm- 로 시작한다 */
+
+.rm-room {
+  container-type: inline-size;
+  position: relative; width: 100%; aspect-ratio: 16 / 10;
+  border-radius: 12px; overflow: hidden; border: 2px solid #0b0c10;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .4); user-select: none;
+}
+.rm-wall { position: absolute; inset: 0 0 38% 0; background: var(--rm-wall); }
+.rm-wall::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 7%; background: var(--rm-trim); box-shadow: 0 -2px 0 rgba(0, 0, 0, .12) inset; }
+.rm-floor { position: absolute; inset: 62% 0 0 0; background: var(--rm-floor); }
+.rm-room svg { position: absolute; shape-rendering: crispEdges; overflow: visible; }
+
+/* 배경 — 벽지 · 바닥 · 창밖 */
+.rm-room[data-theme="cabin"] { --rm-wall: repeating-linear-gradient(90deg, #e6c393 0 46px, #d9b37f 46px 48px); --rm-trim: #9c6b3f; --rm-floor: repeating-linear-gradient(0deg, #b9824f 0 22px, #a8723f 22px 24px); --rm-sky1: #8fd3ff; --rm-sky2: #d9f1ff; --rm-win: #fff; }
+.rm-room[data-theme="beach"] { --rm-wall: repeating-linear-gradient(0deg, #e9f6fb 0 30px, #d6edf5 30px 32px); --rm-trim: #5fb3c9; --rm-floor: linear-gradient(#f3dcaa, #e9c98c); --rm-sky1: #4fc3f7; --rm-sky2: #b3ecff; --rm-win: #fff; }
+.rm-room[data-theme="night"] { --rm-wall: radial-gradient(circle at 20% 30%, #ffffff55 0 1px, transparent 2px) 0 0/60px 50px, radial-gradient(circle at 70% 60%, #ffffff40 0 1px, transparent 2px) 0 0/90px 70px, linear-gradient(#1f2350, #2d2f6b); --rm-trim: #121433; --rm-floor: repeating-linear-gradient(45deg, #3a2f5c 0 14px, #34295200 14px 28px), #3f3366; --rm-sky1: #0b1030; --rm-sky2: #27306b; --rm-win: #c9c3ff; }
+.rm-room[data-theme="lab"] { --rm-wall: repeating-linear-gradient(90deg, #f4f6f8 0 80px, #e3e7eb 80px 82px); --rm-trim: #8a96a3; --rm-floor: conic-gradient(#dfe5ea 25%, #f5f7f9 0 50%, #dfe5ea 0 75%, #f5f7f9 0) 0 0/48px 48px; --rm-sky1: #9be7c4; --rm-sky2: #e6fff4; --rm-win: #fff; }
+.rm-sun { fill: #ffd54f; }
+.rm-room[data-theme="night"] .rm-sun { fill: #fff6c9; }
+.rm-glow { opacity: .35; }
+.rm-room[data-theme="night"] .rm-glow { opacity: 1; }
+.rm-sea { display: none; }
+.rm-room[data-theme="beach"] .rm-sea { display: inline; }
+
+/* 포켓몬 */
+.rm-mon { position: absolute; cursor: pointer; }
+.rm-mon .rm-body { position: relative; animation: var(--walk) var(--dur) linear infinite; }
+.rm-mon img { display: block; height: calc(var(--h) * 1cqw); image-rendering: pixelated; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .18)); animation: rm-hop .5s ease-in-out infinite alternate; }
+.rm-mon .rm-shadow { position: absolute; left: 50%; bottom: -3px; width: 60%; height: 7px; transform: translateX(-50%); background: rgba(0, 0, 0, .22); border-radius: 50%; filter: blur(1px); }
+.rm-mon .rm-tag { position: absolute; left: 50%; bottom: calc(100% + 3px); transform: translateX(-50%); white-space: nowrap; background: rgba(15, 16, 22, .88); color: #fff; font-size: 10.5px; padding: 3px 7px; border-radius: 6px; opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 5; }
+.rm-mon:hover .rm-tag, .rm-mon.show .rm-tag { opacity: 1; }
+.rm-mon.sit .rm-body { animation: none; }
+.rm-mon.sit img { animation: rm-breathe 1.6s ease-in-out infinite; transform-origin: bottom center; }
+.rm-spark { position: absolute; width: 9px; height: 9px; background: radial-gradient(#fff 0 30%, #ffe48a 40%, transparent 70%); border-radius: 50%; animation: rm-tw 1.4s ease-in-out infinite; pointer-events: none; }
+@keyframes rm-hop { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+@keyframes rm-breathe { 50% { transform: scaleY(.96); } }
+@keyframes rm-tw { 0%, 100% { opacity: 0; transform: scale(.4); } 50% { opacity: 1; transform: scale(1); } }
+/* 걷기 — 원본 스프라이트는 왼쪽을 본다. 가는 쪽을 보게 뒤집는다 */
+@keyframes rm-walkA { 0% { transform: translateX(0) scaleX(1); } 46% { transform: translateX(-20cqw) scaleX(1); } 50% { transform: translateX(-20cqw) scaleX(-1); } 96% { transform: translateX(0) scaleX(-1); } 100% { transform: translateX(0) scaleX(1); } }
+@keyframes rm-walkB { 0% { transform: translateX(0) scaleX(-1); } 46% { transform: translateX(16cqw) scaleX(-1); } 50% { transform: translateX(16cqw) scaleX(1); } 96% { transform: translateX(0) scaleX(1); } 100% { transform: translateX(0) scaleX(-1); } }
+@keyframes rm-walkC { 0%, 20% { transform: translateX(0) scaleX(1); } 50%, 60% { transform: translateX(-9cqw) scaleX(1); } 62% { transform: translateX(-9cqw) scaleX(-1); } 92% { transform: translateX(0) scaleX(-1); } 100% { transform: translateX(0) scaleX(1); } }
+
+.rm-plate { position: absolute; left: 8px; top: 7px; background: rgba(15, 16, 22, .72); color: #fff; padding: 4px 8px; border-radius: 8px; font-size: 10.5px; line-height: 1.35; z-index: 4; }
+.rm-plate b { color: var(--accent); }
+.rm-empty { position: absolute; left: 50%; top: 74%; transform: translateX(-50%); background: rgba(15, 16, 22, .7); color: #fff; font-size: 11px; padding: 5px 10px; border-radius: 8px; white-space: nowrap; }
+
+/* 꾸미기 */
+.rm-panel h5 { margin: 14px 0 6px; font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.rm-panel h5 .w { float: right; color: var(--accent); }
+.rm-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.rm-chips button { font: inherit; font-size: 11.5px; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+.rm-chips button.on { background: var(--accent); color: #14151a; border-color: var(--accent); font-weight: 700; }
+.rm-chips button .c { color: var(--accent); margin-left: 3px; }
+.rm-chips button.on .c { color: #14151a; }
+.rm-chips button:disabled { opacity: .45; cursor: default; }
+.rm-chips button img { height: 18px; vertical-align: middle; margin: -3px 2px -3px -2px; image-rendering: pixelated; }
+.rm-furni { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.rm-furni .it { display: flex; align-items: center; gap: 7px; padding: 6px 8px; background: var(--card); border: 1px solid var(--line); border-radius: 9px; font-size: 11px; }
+.rm-furni .it .ic { font-size: 16px; }
+.rm-furni .it .t { flex: 1; min-width: 0; line-height: 1.3; }
+.rm-furni .it .t span { display: block; color: var(--dim); font-size: 9.5px; }
+.rm-furni .it button { font: inherit; font-size: 10.5px; padding: 3px 7px; border-radius: 7px; border: 1px solid var(--line); background: var(--card2); color: var(--text); cursor: pointer; white-space: nowrap; }
+.rm-furni .it button.buy { color: var(--accent); }
+.rm-furni .it button:disabled { opacity: .45; cursor: default; }
+.rm-rec { font-size: 11px; color: var(--muted); line-height: 1.6; }
+.rm-rec b { color: var(--text); }

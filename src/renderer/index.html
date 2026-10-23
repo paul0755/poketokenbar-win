@@ -382,13 +382,41 @@
   .boost { font-size: 10px; color: var(--green); margin-top: 6px; }
   .bx .nm .tag.bo { background: var(--green); color: #14151a; }
   .bx .nm .tag.st { background: transparent; padding: 0 2px; }
+
+  /* ---------- 넓은 창 ----------
+     창 테두리를 끌어 넓힐 수 있다. 배치는 400px 기준으로 짰고, 넓어지면 남는 폭을
+     두 단·여러 칸으로 나눠 쓴다. 한없이 늘어나면 읽기 어려워 본문 폭에 상한을 둔다. */
+  .grid { grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); }
+  @media (min-width: 620px) {
+    .scroll > section { max-width: 1100px; margin: 0 auto; }
+    #tab-home { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 22px; align-items: start; }
+    #tab-home .petrow { border-bottom: 0; }
+    #tab-home .hcol + .hcol > h4:first-child { margin-top: 6px; }
+    #items { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); column-gap: 8px; }
+    #boxList { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); column-gap: 8px; align-items: start; }
+    #boxList .bx { margin-bottom: 7px; }
+    #boxList .prof, #boxList .note { grid-column: 1 / -1; }
+    /* 상세는 한 줄을 통째로 쓴다 — 능력치 막대가 끝없이 늘어지지 않게 두 단으로 흘린다 */
+    #boxList .prof { columns: 2; column-gap: 26px; }
+    #boxList .prof .hd, #boxList .prof .abil { column-span: all; }
+    #boxList .prof .stat, #boxList .prof .mv, #boxList .prof .feed { break-inside: avoid; }
+    #boxList .prof h5 { break-after: avoid; }
+    /* 결투는 두 칸이 마주 봐야 해서 너무 벌어지지 않게 */
+    #tab-battle { max-width: 640px; }
+    /* 방은 창 높이에 맞춰 커진다 — 넓기만 하고 잘리면 꾸민 게 안 보인다 */
+    #rmRoom { max-width: calc((100vh - 150px) * 1.6); margin: 0 auto; }
+    .rm-furni { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+    #toast { left: 50%; right: auto; transform: translateX(-50%); min-width: 300px; max-width: 520px; }
+  }
 </style>
 <link rel="stylesheet" href="moves.css" />
+<link rel="stylesheet" href="room.css" />
 
 <nav>
   <button data-tab="home" class="on">홈</button>
   <button data-tab="shop">상점</button>
   <button data-tab="box">박스</button>
+  <button data-tab="room">방</button>
   <button data-tab="battle">결투</button>
   <button data-tab="dex">도감</button>
   <span class="sp"></span>
@@ -399,6 +427,8 @@
 <div class="scroll">
   <!-- ---------------- 홈 ---------------- -->
   <section id="tab-home">
+    <!-- 넓은 창에서는 두 단(왼쪽: 키우는 아이, 오른쪽: 토큰·한도). 좁으면 위아래로 이어진다 -->
+    <div class="hcol">
     <div class="mon">
       <div class="pic" id="pic"></div>
       <div class="info">
@@ -419,7 +449,9 @@
       <div class="t"><b id="petName">–</b><span id="petState">바탕화면 펫</span></div>
       <button id="petToggle">띄우기</button>
     </div>
+    </div>
 
+    <div class="hcol">
     <h4>오늘 쓴 토큰<span class="peak" id="refreshedAt"></span></h4>
     <div class="big"><span class="n" id="today">–</span><span class="raw" id="todayRaw"></span></div>
     <div class="wm">
@@ -443,6 +475,7 @@
         <button class="mini" id="refreshNow">↻ 새로고침</button>
       </div>
     </div>
+    </div>
   </section>
 
   <!-- ---------------- 상점 ---------------- -->
@@ -462,6 +495,22 @@
       키우는 아이만 자랍니다. 바탕화면에는 여러 마리를 동시에 세울 수 있습니다.
     </div>
     <div id="boxList"></div>
+  </section>
+
+  <!-- ---------------- 미니룸 (room.js) ---------------- -->
+  <section id="tab-room" hidden>
+    <div class="dexhead"><span class="t">내 방</span><span class="c">포켓몬을 누르면 이름표</span></div>
+    <div class="rm-room" id="rmRoom" data-theme="cabin"></div>
+    <div class="rm-panel" id="rmPanel">
+      <h5>배경<span class="w" id="rmWallet">🍬 –</span></h5>
+      <div class="rm-chips" id="rmThemes"></div>
+      <h5>가구</h5>
+      <div class="rm-furni" id="rmFurni"></div>
+      <h5>방에 둘 포켓몬 <span id="rmMonsCount"></span></h5>
+      <div class="rm-chips" id="rmMons"></div>
+      <h5>키운 기록 — 사지 않아도 저절로 생긴다</h5>
+      <div class="rm-rec" id="rmRec"></div>
+    </div>
   </section>
 
   <!-- ---------------- 결투 ---------------- -->
@@ -594,3 +643,4 @@
 <script src="app.js"></script>
 <script src="moves.js"></script>
 <script src="battle.js"></script>
+<script src="room.js"></script>
