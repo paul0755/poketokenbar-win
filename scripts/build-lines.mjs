@@ -51,7 +51,13 @@ const dexOf = (speciesUrl) => Number(speciesUrl.match(/\/(\d+)\/?$/)[1]);
 
 /** 체인을 한 줄기로 편다. 분기(이브이 등)는 첫 갈래만 쓴다. */
 function flatten(node, acc = []) {
-  acc.push({ name: node.species.name, dex: dexOf(node.species.url) });
+  acc.push({
+    name: node.species.name,
+    dex: dexOf(node.species.url),
+    // 이 모습으로 "교환해서" 진화해 오는가 — 윤겔라→후딘, 근육몬→괴력몬처럼.
+    // 도구를 지니고 교환하는 경우(롱스톤→강철톤)도 원작에서는 교환 진화다.
+    byTrade: (node.evolution_details || []).some((d) => d.trigger && d.trigger.name === "trade"),
+  });
   if (node.evolves_to && node.evolves_to.length) flatten(node.evolves_to[0], acc);
   return acc;
 }
@@ -134,6 +140,8 @@ for (const stages of candidates) {
     names: slots.map((x) => (x ? info.get(x.dex).name : "알")),
     captureRate: base.captureRate,
     legendary: Boolean(base.isLegendary || base.isMythical || finalInfo.isLegendary || finalInfo.isMythical),
+    // 교환하면 진화하는 단계(STAGES 칸 번호). 윤겔라(2)를 교환하면 후딘(3)이 된다 → [2]
+    ...(s.some((x, i) => i > 0 && x.byTrade) ? { trade: s.map((x, i) => (i > 0 && x.byTrade ? i : 0)).filter(Boolean) } : {}),
   });
 }
 

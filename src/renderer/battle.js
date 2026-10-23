@@ -63,6 +63,7 @@
     if (!playing) fillPick(s);
     renderBag(s);
     renderFriend(s);
+    renderTrade(s);
   });
 
   /* ---------------- 친선 배틀 ----------------
@@ -133,6 +134,89 @@
       updateGo();
     }, 250);
   });
+
+  /* ---------------- 교환 ----------------
+     보내기 → 박스에서 빠지고 코드가 나온다(메인이 한 번 묻는다). 받기 → 같은 코드는 한 번만.
+     교환으로 진화하는 아이는 받기 전에 미리 알려 준다 — 받는 맛이 거기 있다. */
+
+  function renderTrade(s) {
+    const list = fighters(s);
+    const sel = $("trMine");
+    const keep = sel.value;
+    sel.innerHTML = list.map((m) => `<option value="${m.id}">${m.name} Lv.${m.profile.level}${m.active ? " (키우는 중)" : ""}</option>`).join("");
+    if (list.some((m) => m.id === keep)) sel.value = keep;
+    else {
+      // 처음엔 키우는 아이가 아닌 아이를 골라 둔다 — 키우던 걸 실수로 보내지 않게
+      const other = list.find((m) => !m.active);
+      if (other) sel.value = other.id;
+    }
+    $("trSend").disabled = list.length < 2 || (s.box || []).length < 2;
+    const sent = (s.friend && s.friend.sent) || [];
+    if (sent.length && !$("trSentCode").value) {
+      $("trSentBox").hidden = false;
+      $("trSentCode").value = sent[0].code;
+      $("trSentNote").textContent = `최근에 보낸 아이: ${sent[0].name} — 코드를 잃어버렸으면 여기서 다시 복사하세요.`;
+    }
+  }
+
+  $("trSend").onclick = async () => {
+    const r = await window.ptb.tradeSend($("trMine").value);
+    if (!r || !r.ok) {
+      if (r && r.reason) $("trSentNote").textContent = r.reason;
+      return;
+    }
+    $("trSentBox").hidden = false;
+    $("trSentCode").value = r.code;
+    $("trSentNote").textContent = `${r.name}을(를) 보냈습니다. 코드를 복사해서 친구에게 보내세요.`;
+    window.toast && toast(`${r.name}을(를) 보냈습니다`);
+  };
+  $("trCopy").onclick = async () => {
+    try {
+      await navigator.clipboard.writeText($("trSentCode").value);
+    } catch {
+      $("trSentCode").select();
+      document.execCommand("copy");
+    }
+    window.toast && toast("코드를 복사했습니다");
+  };
+
+  let tradeOk = false;
+  let tradeTimer = null;
+  $("trIn").addEventListener("input", () => {
+    clearTimeout(tradeTimer);
+    tradeTimer = setTimeout(async () => {
+      const code = $("trIn").value.trim();
+      tradeOk = false;
+      $("trFoe").hidden = true;
+      $("trGet").disabled = true;
+      if (!code) return void ($("trInfo").textContent = "");
+      const r = await window.ptb.tradeInspect(code);
+      if (!r || !r.ok) return void ($("trInfo").textContent = (r && r.reason) || "읽지 못했습니다");
+      $("trFoe").hidden = false;
+      $("trFoeImg").src = r.url || "";
+      $("trFoeTxt").innerHTML =
+        `${r.trainer ? r.trainer + "에게서 " : ""}${r.name}${r.shiny ? " ★" : ""} (${r.stage})` +
+        (r.evolvesTo ? ` <span class="evo">교환하면 ${r.evolvesTo}(으)로 진화!</span>` : "");
+      if (r.used) return void ($("trInfo").textContent = "이미 받은 코드입니다. 같은 코드는 한 번만 받을 수 있습니다.");
+      $("trInfo").textContent = r.mine ? "내가 보낸 코드입니다. 받으면 돌아옵니다." : r.ot && r.ot !== r.trainer ? `처음 키운 트레이너: ${r.ot}` : "";
+      tradeOk = true;
+      $("trGet").disabled = false;
+    }, 250);
+  });
+
+  $("trGet").onclick = async () => {
+    if (!tradeOk) return;
+    $("trGet").disabled = true;
+    const r = await window.ptb.tradeReceive($("trIn").value.trim());
+    if (!r || !r.ok) return void ($("trInfo").textContent = (r && r.reason) || "받지 못했습니다");
+    tradeOk = false;
+    $("trInfo").textContent = r.evolved
+      ? `✨ ${r.before}이(가) 교환으로 ${r.name}(으)로 진화했다! 박스에 들어갔습니다.`
+      : r.returned
+        ? `${r.name}이(가) 돌아왔습니다.`
+        : `${r.name}을(를) 받았습니다. 박스에 들어갔습니다.`;
+    window.toast && toast(r.evolved ? `${r.name}(으)로 진화!` : `${r.name}을(를) 받았습니다`);
+  };
 
   $("frGo").onclick = async () => {
     if (playing) return;

@@ -10,6 +10,11 @@
  * 서로 코드를 바꿔 넣으면 양쪽 PC에서 똑같은 결투가 나온다. 같은 두 코드로는
  * 몇 번을 돌려도 같은 결과다 — 마음에 들 때까지 다시 돌릴 수 없다.
  *
+ * ── 교환 코드 (PTBT-) ──
+ * 같은 꼴로 한 마리를 통째로 보낸다(encodeTrade). 보내는 쪽 박스에서 빠지고 받는 쪽에
+ * 들어간다. nonce 로 같은 코드를 두 번 받지 못하게 한다(index.js). 결투가 아니라서
+ * 데이터 버전은 따지지 않는다 — 버전이 달라도 아이는 옮길 수 있어야 한다.
+ *
  * ── 막지 못하는 것 ──
  * 세이브는 내 PC의 파일이라 조작을 막을 수 없다. 여기서 거르는 건 "말이 안 되는
  * 값"뿐이다(개체값 31 초과, 그 종이 못 배우는 기술). 그래서 보상이 없는 친선이다.
@@ -72,6 +77,56 @@ function encode(mon, grown, trainer) {
     ]),
   ).toString("base64url");
   return `${PREFIX}-${body}-${check(body)}`;
+}
+
+/**
+ * 교환 코드. 친선 코드와 같은 내용에 "누가 처음 키웠나"(ot)와 받은 날을 더한다.
+ * nonce 를 길게 둔다 — 같은 코드 두 번 받기를 이 값으로 막는다.
+ */
+function encodeTrade(mon, grown, trainer) {
+  const body = Buffer.from(
+    JSON.stringify([
+      1,
+      dataVersion(),
+      String(trainer || "").slice(0, 16),
+      crypto.randomBytes(6).toString("hex"),
+      [
+        mon.line,
+        mon.nature ?? 0,
+        mon.shiny ? 1 : 0,
+        mon.ivs || [0, 0, 0, 0, 0, 0],
+        Math.max(0, GENDERS.indexOf(mon.gender)),
+        mon.ability ?? 0,
+        mon.eggMoves || [],
+        mon.tmMoves || [],
+        Math.round(grown),
+        String(mon.ot || trainer || "").slice(0, 16),
+        mon.caughtAt || null,
+      ],
+    ]),
+  ).toString("base64url");
+  return `PTBT-${body}-${check(body)}`;
+}
+
+function decodeTrade(code) {
+  const s = String(code || "").replace(/\s+/g, "");
+  if (/^PTB1-/.test(s)) return { error: "친선 배틀 코드입니다. 교환 코드(PTBT-…)를 넣어 주세요." };
+  const m = /^PTBT-([A-Za-z0-9_-]+)-([0-9a-z]{5})$/.exec(s);
+  if (!m) return { error: "교환 코드가 아닙니다. PTBT- 로 시작하는 한 줄을 통째로 붙여 넣어 주세요." };
+  if (check(m[1]) !== m[2]) return { error: "코드가 중간에 잘렸거나 바뀌었습니다. 다시 복사해 주세요." };
+  let arr;
+  try {
+    arr = JSON.parse(Buffer.from(m[1], "base64url").toString("utf8"));
+  } catch {
+    return { error: "코드를 읽지 못했습니다." };
+  }
+  const [ver, , trainer, nonce, d] = arr || [];
+  if (ver !== 1 || !Array.isArray(d) || typeof nonce !== "string") return { error: "이 앱이 모르는 형식의 코드입니다." };
+  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, ot, caughtAt] = d;
+  const mon = { line, nature, shiny: Boolean(shiny), ivs, gender: GENDERS[g], ability, eggMoves, tmMoves };
+  const why = validate(mon, grown);
+  if (why) return { error: "말이 안 되는 값이 들어 있습니다 — " + why };
+  return { code: s, trainer: String(trainer || ""), nonce, mon, grown, ot: String(ot || trainer || ""), caughtAt: caughtAt || null };
 }
 
 /**
@@ -145,4 +200,4 @@ function rng(seed) {
   };
 }
 
-module.exports = { encode, decode, validate, order, seedOf, rng, dataVersion };
+module.exports = { encode, decode, encodeTrade, decodeTrade, validate, order, seedOf, rng, dataVersion };

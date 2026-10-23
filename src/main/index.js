@@ -272,6 +272,120 @@ async function friendBattle(code) {
   return { ok: true, friendly: true, winner, turns: r.turns, fighters, log, reward: null, rewardsLeft: battleRewardsLeft() };
 }
 
+/* ---------------- 교환 (friend.js encodeTrade) ---------------- */
+
+/**
+ * 교환으로 진화하는가. 원작에서 교환으로 진화하는 아이(윤겔라·근육몬·데구리·고우스트 등)가
+ * 그 모습으로 오면 다음 단계까지 단번에 자란다. lines.json 의 trade 는 PokéAPI 진화
+ * 체인에서 뽑은 "교환하면 진화하는 칸"이다(build-lines).
+ */
+function tradeEvolves(line, grown) {
+  const L = poke.LINES[line];
+  const st = poke.stageFor(grown);
+  return Boolean(L && L.trade && L.trade.includes(st) && poke.STAGES[st + 1]) ? st : -1;
+}
+
+/**
+ * 보낸다 — 박스에서 빠지고 코드가 나온다. 되돌릴 수 없어서 한 번 묻는다.
+ * 실수로 보냈으면 그 코드를 내가 다시 받으면 돌아온다(아래 tradeReceive).
+ */
+async function tradeSend(id) {
+  const m = box.find(save.box, id);
+  if (!m) return { ok: false, reason: "없는 아이입니다" };
+  if (save.box.length <= 1) return { ok: false, reason: "마지막 한 마리는 보낼 수 없습니다" };
+  const grown = box.effOf(m, growthSpeed());
+  if (!poke.stageFor(grown)) return { ok: false, reason: "알은 보낼 수 없습니다" };
+  const name = poke.describe(grown, m.line, { shiny: m.shiny }).name;
+  const r = await dialog.showMessageBox(win && win.isVisible() ? win : null, {
+    type: "question",
+    buttons: ["보내기", "취소"],
+    defaultId: 1,
+    cancelId: 1,
+    title: "교환 보내기",
+    message: `${battle.josa(name, "을를")} 교환으로 보냅니다.`,
+    detail: "박스에서 빠지고 교환 코드가 나옵니다. 그 코드를 친구에게 보내세요. 실수였다면 그 코드를 내가 다시 받으면 돌아옵니다.",
+  });
+  if (r.response !== 0) return { ok: false };
+
+  const code = friend.encodeTrade({ ...m, ot: m.ot || save.trainerName }, grown, save.trainerName);
+  save.box = save.box.filter((x) => x.id !== id);
+  save.petIds = (save.petIds || []).filter((x) => x !== id);
+  if (save.activeId === id) save.activeId = save.box[0].id; // 키우던 아이를 보냈으면 다른 아이가 자란다
+  save.tradeSent = [...(save.tradeSent || []), { code, name, at: Date.now() }].slice(-5);
+  destroyPet(id);
+  writeSave();
+  syncPets();
+  refresh(true);
+  pushDex();
+  return { ok: true, code, name };
+}
+
+/** 받기 전에 미리 본다 — 누구인지, 교환으로 진화하는지, 이미 받은 코드인지 */
+async function tradeInspect(code) {
+  const d = friend.decodeTrade(code);
+  if (d.error) return { ok: false, reason: d.error };
+  const desc = poke.describe(d.grown, d.mon.line, { shiny: d.mon.shiny });
+  const sp = await poke.spriteWithFallback(desc, CACHE, "anim");
+  const evo = tradeEvolves(d.mon.line, d.grown);
+  return {
+    ok: true,
+    trainer: d.trainer,
+    ot: d.ot,
+    name: desc.name,
+    stage: desc.stage.label,
+    shiny: d.mon.shiny,
+    url: sp ? pathToFileURL(sp).href : null,
+    evolvesTo: evo >= 0 ? poke.LINES[d.mon.line].names[evo + 1] : null,
+    used: (save.tradeReceived || []).includes(d.nonce),
+    mine: (save.tradeSent || []).some((x) => x.code === d.code),
+  };
+}
+
+/**
+ * 받는다. 같은 코드는 한 번만. 성장량은 난이도와 무관하게 그대로 옮긴다(fed) —
+ * 보낸 사람 화면과 같은 모습·레벨로 도착해야 한다.
+ * 교환으로 진화하는 모습이면 다음 단계 문턱까지 채워 준다 — 원작의 교환 진화.
+ */
+function tradeReceive(code) {
+  const d = friend.decodeTrade(code);
+  if (d.error) return { ok: false, reason: d.error };
+  save.tradeReceived = save.tradeReceived || [];
+  if (save.tradeReceived.includes(d.nonce)) return { ok: false, reason: "이미 받은 코드입니다. 같은 코드는 한 번만 받을 수 있습니다" };
+
+  let grown = d.grown;
+  const evo = tradeEvolves(d.mon.line, grown);
+  const before = poke.describe(grown, d.mon.line, { shiny: d.mon.shiny }).name;
+  if (evo >= 0) grown = Math.max(grown, poke.STAGES[evo + 1].at);
+  const st = poke.stageFor(grown);
+  const m = {
+    id: box.newId(),
+    ...d.mon,
+    raw: 0,
+    bonus: 0,
+    boost: 0,
+    fed: grown,
+    maxStage: st,
+    caughtAt: d.caughtAt || new Date().toISOString().slice(0, 10),
+    graduatedAt: null,
+    ot: d.ot, // 처음 키운 트레이너
+    traded: new Date().toISOString().slice(0, 10),
+  };
+  save.box.push(m);
+  if (!save.seen.includes(m.line)) save.seen.push(m.line);
+  save.maxStage[m.line] = Math.max(save.maxStage[m.line] ?? -1, st);
+  save.tradeReceived = [...save.tradeReceived, d.nonce].slice(-500);
+  writeSave();
+  refresh(true);
+  pushDex();
+
+  const after = poke.describe(grown, m.line, { shiny: m.shiny }).name;
+  const mine = (save.tradeSent || []).some((x) => x.code === d.code);
+  if (save.notifyEnabled && Notification.isSupported() && evo >= 0) {
+    new Notification({ title: `${battle.josa(before, "이가")} 진화했다!`, body: `교환으로 ${after}(으)로 진화했습니다`, silent: false }).show();
+  }
+  return { ok: true, name: after, before, evolved: evo >= 0, returned: mine };
+}
+
 /**
  * 나무열매 먹이기. 싫어하는 맛이면 안 먹는다 — 열매도 그대로 남는다.
  */
@@ -398,6 +512,12 @@ let save = {
   trainerName: "",
   friendTeam: null, // { code, monId, at }
   friendRecord: { w: 0, l: 0, d: 0 },
+  /**
+   * 교환. tradeSent 는 보낸 코드(잃어버리면 다시 복사할 수 있게 최근 몇 개),
+   * tradeReceived 는 받은 코드의 nonce — 같은 코드를 두 번 받지 못하게 한다.
+   */
+  tradeSent: [],
+  tradeReceived: [],
   /** 방해 금지 시간. 이 사이에는 저절로 나오지 않는다 (wild.js inQuiet) */
   wildQuiet: { enabled: false, from: 22, to: 8 },
   /** 상점에서 산 볼. 몬스터볼은 출현마다 공짜로 주니 여기 없다 */
@@ -804,7 +924,12 @@ async function buildStats() {
     limits: limits.summarize(u, Date.now(), save.limits || {}, save.quotaFiles || {}),
     box: boxList,
     berries: berryBag(),
-    friend: { team: save.friendTeam, trainer: save.trainerName || "", record: save.friendRecord || { w: 0, l: 0, d: 0 } },
+    friend: {
+      team: save.friendTeam,
+      trainer: save.trainerName || "",
+      record: save.friendRecord || { w: 0, l: 0, d: 0 },
+      sent: (save.tradeSent || []).slice(-3).reverse(),
+    },
     battleRewardsLeft: battleRewardsLeft(),
     battleRewardsMax: BATTLE_REWARDS_PER_DAY,
     activeId: act ? act.id : null,
@@ -2367,6 +2492,9 @@ app.whenReady().then(async () => {
   ipcMain.handle("friend-register", (_e, { id, trainer } = {}) => friendRegister(id, trainer));
   ipcMain.handle("friend-inspect", (_e, code) => friendInspect(code));
   ipcMain.handle("friend-battle", (_e, code) => friendBattle(code));
+  ipcMain.handle("trade-send", (_e, id) => tradeSend(id));
+  ipcMain.handle("trade-inspect", (_e, code) => tradeInspect(code));
+  ipcMain.handle("trade-receive", (_e, code) => tradeReceive(code));
   ipcMain.handle("release", (_e, id) => {
     const m = box.find(save.box, id);
     if (!m) return { ok: false, reason: "없는 아이" };

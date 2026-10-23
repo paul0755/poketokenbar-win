@@ -41,6 +41,10 @@ contextBridge.exposeInMainWorld("ptb", {
   friendRegister: (a) => ipcRenderer.invoke("friend-register", a),
   friendInspect: (code) => ipcRenderer.invoke("friend-inspect", code),
   friendBattle: (code) => ipcRenderer.invoke("friend-battle", code),
+  // 교환 — 보내기(박스에서 빠짐) · 받기 전 보기 · 받기
+  tradeSend: (id) => ipcRenderer.invoke("trade-send", id),
+  tradeInspect: (code) => ipcRenderer.invoke("trade-inspect", code),
+  tradeReceive: (code) => ipcRenderer.invoke("trade-receive", code),
   // 펫 창 전용 — 바탕화면 결투 장면
   onDuel: (cb) => ipcRenderer.on("duel", (_e, d) => cb(d)),
   wildSpawn: () => ipcRenderer.invoke("wild-spawn"),

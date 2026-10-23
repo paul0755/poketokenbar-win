@@ -434,7 +434,10 @@
    "후딘"
   ],
   "captureRate": 200,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   2
+  ]
  },
  {
   "line": "알통몬",
@@ -453,7 +456,10 @@
    "괴력몬"
   ],
   "captureRate": 180,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   2
+  ]
  },
  {
   "line": "모다피",
@@ -510,7 +516,10 @@
    "딱구리"
   ],
   "captureRate": 255,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   2
+  ]
  },
  {
   "line": "포니타",
@@ -662,7 +671,10 @@
    "팬텀"
   ],
   "captureRate": 190,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   2
+  ]
  },
  {
   "line": "롱스톤",
@@ -681,7 +693,10 @@
    "강철톤"
   ],
   "captureRate": 45,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   1
+  ]
  },
  {
   "line": "슬리프",
@@ -833,7 +848,10 @@
    "거대코뿌리"
   ],
   "captureRate": 120,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   2
+  ]
  },
  {
   "line": "덩쿠리",
@@ -871,7 +889,10 @@
    "킹드라"
   ],
   "captureRate": 225,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   2
+  ]
  },
  {
   "line": "콘치",
@@ -928,7 +949,10 @@
    "핫삼"
   ],
   "captureRate": 45,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   1
+  ]
  },
  {
   "line": "잉어킹",
@@ -985,7 +1009,11 @@
    "폴리곤Z"
   ],
   "captureRate": 45,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   1,
+   2
+  ]
  },
  {
   "line": "암나이트",
@@ -1669,7 +1697,10 @@
    "에레키블"
   ],
   "captureRate": 45,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   2
+  ]
  },
  {
   "line": "마그비",
@@ -1688,7 +1719,10 @@
    "마그마번"
   ],
   "captureRate": 45,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   2
+  ]
  },
  {
   "line": "애버라스",
@@ -2391,7 +2425,10 @@
    "밀로틱"
   ],
   "captureRate": 255,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   1
+  ]
  },
  {
   "line": "어둠대신",
@@ -2429,7 +2466,10 @@
    "야느와르몽"
   ],
   "captureRate": 190,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   2
+  ]
  },
  {
   "line": "마자",
@@ -2505,7 +2545,10 @@
    "헌테일"
   ],
   "captureRate": 255,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   1
+  ]
  },
  {
   "line": "아공이",
@@ -3417,7 +3460,10 @@
    "기가이어스"
   ],
   "captureRate": 255,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   2
+  ]
  },
  {
   "line": "또르박쥐",
@@ -3474,7 +3520,10 @@
    "노보청"
   ],
   "captureRate": 180,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   2
+  ]
  },
  {
   "line": "동챙이",
@@ -3873,7 +3922,10 @@
    "슈바르고"
   ],
   "captureRate": 200,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   1
+  ]
  },
  {
   "line": "깜놀버슬",
@@ -4082,7 +4134,10 @@
    "어지리더"
   ],
   "captureRate": 200,
-  "legendary": false
+  "legendary": false,
+  "trade": [
+   1
+  ]
  },
  {
   "line": "비조푸",
