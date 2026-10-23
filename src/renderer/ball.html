@@ -23,6 +23,10 @@
   @keyframes shake2 { 0%, 100% { rotate: 0deg; } 25% { rotate: 24deg; } 60% { rotate: -16deg; } }
   #ball.open { animation: open .4s ease-out; }
   @keyframes open { 0% { scale: 1; } 40% { scale: 1.25; filter: brightness(2); } 100% { scale: 1; } }
+  /* 빗나가면 스르르 사라졌다가(vanish) 제자리에서 다시 나타난다(land) */
+  #ball { transition: opacity .35s ease; }
+  body.vanish #ball { opacity: 0; }
+  body.vanish #n, body.vanish #odds { display: none; }
   #ball.caught { filter: brightness(.8) drop-shadow(0 3px 4px rgba(0, 0, 0, .5)); }
   /* 볼 종류 — 위쪽 반구 색과 무늬만 바꾼다 */
   body[data-ball="great"] #top { fill: #3a7bd5; }

@@ -2076,7 +2076,7 @@ async function spawnWild() {
   await walkWild(spot, 2600);
   // 가만히 있지 않는다. 가끔 자리를 옮겨서 던지는 맛이 있게
   W.wander = setInterval(() => {
-    if (wildNow !== W || W.busy) return;
+    if (wildNow !== W || W.busy || Date.now() < (W.holdUntil || 0)) return;
     const nx = Math.min(Math.max(area.x, W.pos.x + Math.round((Math.random() - 0.5) * 260)), area.x + area.width - w);
     const ny = Math.min(Math.max(area.y, W.pos.y + Math.round((Math.random() - 0.5) * 120)), area.y + area.height - w);
     walkWild({ x: nx, y: ny }, 1400);
@@ -2109,16 +2109,26 @@ async function wildFlee(text) {
 }
 
 /**
- * 던졌다. 놓는 순간의 속도로 포물선을 그린다. 매 프레임 야생 창과 겹치는지 본다.
- * 속도는 px/프레임(16ms). 너무 세게 던져도 화면을 한 번에 건너뛰지 않게 자른다.
+ * 던졌다 — 겨눈 방향으로 날아가며 포물선을 그린다.
+ *
+ * 처음엔 놓는 순간의 속도에 중력만 얹었다. 손으로 휙 던지면 0.3초 만에 도착해서
+ * 휘어질 틈이 없었고, 직선으로 쏘는 것처럼 보였다. 중력을 세게 하면 이번엔 공이
+ * 겨눈 곳 아래로 떨어져 안 맞는다.
+ *
+ * 그래서 둘을 나눈다:
+ *   바닥 길  겨눈 방향 그대로 곧게 간다. 맞았는지는 이 길로 판정한다 — 맞히기 난이도는 그대로
+ *   높이     그 위에 포물선을 얹는다. 겨눈 선이 야생 근처를 지나면 야생 자리에서 내려앉도록,
+ *            아니면 적당한 거리에서 내려앉도록 높이를 정한다
+ * 속도는 조금 줄여서(0.75배, 최대 프레임당 30px) 날아가는 게 눈에 보이게 한다.
  */
 async function flyBall(vx, vy) {
   const W = wildNow;
   if (!W) return;
-  const G = 0.55;
-  const MAX = 42;
-  const sp = Math.hypot(vx, vy);
-  if (sp > MAX) { vx = (vx / sp) * MAX; vy = (vy / sp) * MAX; }
+  const MAX = 30;
+  vx *= 0.75;
+  vy *= 0.75;
+  let sp = Math.hypot(vx, vy);
+  if (sp > MAX) { vx = (vx / sp) * MAX; vy = (vy / sp) * MAX; sp = MAX; }
   if (ballsLeft(W, W.ballKey) <= 0) {
     // 고른 볼이 없다 — 던지지 않고 제자리로
     slideBall(W.home, 300).then(() => wildNow === W && ballSend({ t: "land" }));
@@ -2131,25 +2141,83 @@ async function flyBall(vx, vy) {
   let y = W.ballPos.y;
   const w = petW();
   const a = W.area;
-  for (let f = 0; f < 160; f++) {
-    if (wildNow !== W) return;
-    x += vx;
-    y += vy;
-    vy += G;
-    placeBall(x, y);
-    // 맞았나 — 공 가운데가 야생 창 안쪽(가장자리 18%를 뺀)에 들어왔나
+
+  // 야생 위에 바로 놓았으면 그대로 맞은 걸로 친다 — 포물선으로 머리 위를 넘겨 버리면 억울하다
+  {
     const cx = x + BALL_W / 2;
     const cy = y + BALL_W / 2;
     const m = w * 0.18;
-    if (!W.fleeing && cx > W.pos.x + m && cx < W.pos.x + w - m && cy > W.pos.y + m && cy < W.pos.y + w - m * 0.3) {
-      return hitWild();
-    }
-    if (cx < a.x - BALL_W || cx > a.x + a.width + BALL_W || cy > a.y + a.height) break;
+    if (!W.fleeing && cx > W.pos.x + m && cx < W.pos.x + w - m && cy > W.pos.y + m && cy < W.pos.y + w - m * 0.3) return hitWild();
+  }
+
+  // 겨눈 선 위에서 야생까지의 거리 — 선이 야생 근처를 지나면 거기서 내려앉는다
+  const ux = vx / sp;
+  const uy = vy / sp;
+  const dx = W.pos.x + w / 2 - (x + BALL_W / 2);
+  const dy = W.pos.y + w / 2 - (y + BALL_W / 2);
+  const along = dx * ux + dy * uy;
+  const off = Math.abs(dx * uy - dy * ux);
+  const D = along > 0 && off < w ? along : Math.max(320, sp * 28);
+  const H = Math.min(180, Math.max(50, D * 0.35)); // 멀리 던질수록 높이 뜬다
+  let d = 0;
+
+  // 맞았나 — 공 가운데가 야생 창 안쪽(가장자리 18%를 뺀)에 들어왔나
+  const inWild = (cx, cy) => {
+    const m = w * 0.18;
+    return !W.fleeing && cx > W.pos.x + m && cx < W.pos.x + w - m && cy > W.pos.y + m && cy < W.pos.y + w - m * 0.3;
+  };
+
+  // 1) 포물선 — 겨눈 지점까지
+  let h = 0;
+  while (d < D) {
+    if (wildNow !== W) return;
+    x += vx;
+    y += vy;
+    d += sp;
+    const t = Math.min(1, d / D);
+    h = 4 * H * t * (1 - t);
+    placeBall(x, y - h);
+    // 아직 높이 떠 있을 때(올라가는 중)는 머리 위로 넘어간다
+    if (h < H * 0.45 && t > 0.5 && inWild(x + BALL_W / 2, y + BALL_W / 2)) return hitWild();
+    if (x + BALL_W / 2 < a.x - BALL_W || x + BALL_W / 2 > a.x + a.width + BALL_W || y - h < a.y - BALL_W * 3) break;
     await wait(16);
   }
-  // 빗나갔다. 볼은 잃지 않는다 — 던지는 솜씨로 볼을 잃으면 마우스가 서툰 사람만 손해다
-  await slideBall(W.home, 350);
+
+  /*
+   * 2) 빗나갔다 — 그대로 떨어진다. 처음엔 겨눈 지점에 "착지"시켜 굴렸는데, 허공에서
+   * 보이지 않는 바닥에 걸려 튕기는 것처럼 보였다. 화면 바닥(작업표시줄 윗선)까지
+   * 중력으로 떨어져 통통 튀다가 사라진다. 떨어지다 야생 몸에 닿으면 그것도 맞은 거다.
+   */
+  const floor = a.y + a.height - BALL_W;
+  let py = y - h;
+  let fvx = vx;
+  let fvy = vy + (4 * H * sp) / D; // 포물선이 내려오던 빠르기를 그대로 잇는다
+  const G = 0.9;
+  let bounces = 0;
+  for (let f = 0; f < 240; f++) {
+    if (wildNow !== W) return;
+    x += fvx;
+    py += fvy;
+    fvy += G;
+    if (py >= floor) {
+      py = floor;
+      fvy = -fvy * 0.45; // 튈 때마다 낮아진다
+      fvx *= 0.7;
+      bounces++;
+      if (bounces >= 3 || Math.abs(fvy) < 2.5) { placeBall(x, py); break; }
+    }
+    placeBall(x, py);
+    if (bounces === 0 && inWild(x + BALL_W / 2, py + BALL_W / 2)) return hitWild();
+    if (x + BALL_W / 2 < a.x - BALL_W || x + BALL_W / 2 > a.x + a.width + BALL_W) break; // 화면 밖으로 굴러 나갔다
+    await wait(16);
+  }
+
+  // 3) 스르르 사라졌다가 제자리에 다시 나타난다. 볼은 잃지 않는다 —
+  //    던지는 솜씨로 볼을 잃으면 마우스가 서툰 사람만 손해다
+  ballSend({ t: "vanish" });
+  await wait(450);
   if (wildNow !== W) return;
+  placeBall(W.home.x, W.home.y);
   ballSend({ t: "land" });
   W.busy = false;
 }
@@ -2453,6 +2521,10 @@ app.whenReady().then(async () => {
     const W = wildNow;
     if (!W || W.busy || !okPt(p)) return;
     W.drag = [{ ...p, t: Date.now() }];
+    // 볼을 잡으면 야생이 멈칫 선다. 걷는 중에 던지면 날아가는 사이 자리를 옮겨서
+    // 겨눈 곳에 떨어진 볼이 빗나갔다 — 원작에서도 던질 때 상대는 서 있다
+    W.walkId = (W.walkId || 0) + 1;
+    W.holdUntil = Date.now() + 4000;
   });
   ipcMain.on("ball-drag", (_e, p) => {
     const W = wildNow;

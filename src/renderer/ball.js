@@ -71,9 +71,12 @@ window.ptb.onBall((d) => {
       b.remove("idle");
       b.add("fly");
       break;
-    case "land": // 빗나가서 돌아왔다 — 다시 잡을 수 있다
+    case "vanish": // 빗나가 바닥에서 튀다가 사라진다
+      b.add("vanish");
+      break;
+    case "land": // 제자리에 다시 나타났다 — 다시 잡을 수 있다
       locked = false;
-      b.remove("fly", "busy");
+      b.remove("fly", "busy", "vanish");
       b.add("idle");
       ball.classList.remove("caught");
       break;
