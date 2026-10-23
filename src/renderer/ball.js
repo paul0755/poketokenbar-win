@@ -41,11 +41,20 @@ window.addEventListener("mouseup", (e) => {
   window.ptb.ballDragEnd({ x: e.screenX, y: e.screenY });
 });
 
+/**
+ * 애니메이션을 처음부터 다시 건다.
+ *
+ * 클래스를 뗐다 붙이는 사이에 레이아웃을 한 번 읽어야 브라우저가 "새로 시작"으로 본다.
+ * 처음엔 offsetWidth 를 읽었는데, 볼은 SVG 라 offsetWidth 가 없다(undefined) — 그래서
+ * 두 번째·세 번째 흔들림이 화면에서 안 움직였다. 판정은 세 번 했는데 보이는 건 한 번이었다.
+ * SVG 에도 있는 getBoundingClientRect 를 읽는다.
+ */
 function replay(cls) {
-  ball.classList.remove("shake", "open");
-  void ball.offsetWidth;
+  ball.classList.remove("shake", "shake2", "open");
+  ball.getBoundingClientRect();
   if (cls) ball.classList.add(cls);
 }
+let shakes = 0;
 
 window.ptb.onBall((d) => {
   const b = document.body.classList;
@@ -69,11 +78,14 @@ window.ptb.onBall((d) => {
       ball.classList.remove("caught");
       break;
     case "hit":
-      b.remove("fly");
+      // 기다릴 때 흔들던 것(idle)이 남아 있으면 포획 흔들림을 덮어쓴다 — 확실히 뗀다
+      b.remove("fly", "idle");
       b.add("busy");
+      shakes = 0;
       break;
     case "shake":
-      replay("shake");
+      // 원작처럼 흔들 때마다 방향을 바꾼다 — 같은 동작이 반복되면 한 번 흔든 것처럼 보인다
+      replay(shakes++ % 2 ? "shake2" : "shake");
       break;
     case "open":
       replay("open");

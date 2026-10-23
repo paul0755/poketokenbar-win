@@ -18,7 +18,9 @@
   @keyframes spin { to { rotate: 360deg; } }
   /* 포획 판정 — 원작처럼 좌우로 흔들린다 */
   #ball.shake { animation: shake .7s ease-in-out; }
-  @keyframes shake { 0%, 100% { rotate: 0deg; } 25% { rotate: -22deg; } 60% { rotate: 18deg; } }
+  #ball.shake2 { animation: shake2 .7s ease-in-out; }
+  @keyframes shake { 0%, 100% { rotate: 0deg; } 25% { rotate: -24deg; } 60% { rotate: 16deg; } }
+  @keyframes shake2 { 0%, 100% { rotate: 0deg; } 25% { rotate: 24deg; } 60% { rotate: -16deg; } }
   #ball.open { animation: open .4s ease-out; }
   @keyframes open { 0% { scale: 1; } 40% { scale: 1.25; filter: brightness(2); } 100% { scale: 1; } }
   #ball.caught { filter: brightness(.8) drop-shadow(0 3px 4px rgba(0, 0, 0, .5)); }

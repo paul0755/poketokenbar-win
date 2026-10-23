@@ -2042,11 +2042,16 @@ async function hitWild() {
 
   const st = W.state || {};
   const res = wild.throwBall(W.rate, BALLS[W.thrown].mul, st.hp ?? 1, CATCH_STATUS[st.status] || 1);
+  /*
+   * 흔들림. 원작처럼 "흔들 — 멈칫 — 흔들 — 멈칫" 리듬을 준다. 흔들림 자체는 0.7초,
+   * 그 뒤 잠깐 멈춰 있어야 몇 번째인지 셀 수 있다. 다 버티면 한 번 더 멈췄다가 딸깍.
+   */
   for (let i = 0; i < res.shakes; i++) {
     if (wildNow !== W) return;
     ballSend({ t: "shake" });
-    await wait(950);
+    await wait(1250);
   }
+  if (res.caught) await wait(300);
   if (wildNow !== W) return;
   if (W.thrown === "poke") W.balls -= 1;
   else { save.balls[W.thrown] = Math.max(0, (save.balls[W.thrown] || 0) - 1); writeSave(); }
