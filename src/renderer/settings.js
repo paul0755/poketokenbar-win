@@ -39,6 +39,16 @@ window.ptb.onSettings((s) => {
   $("quietFrom").value = String(q.from);
   $("quietTo").value = String(q.to);
   showQuiet();
+  const B = s.burning || {};
+  $("burnOn").checked = !!B.enabled;
+  $("burnMult").value = String(B.mult || 4);
+  $("burnWeekdays").checked = !!B.weekdays;
+  (B.spans || []).forEach((sp, i) => {
+    $("burnS" + i).checked = !!sp.on;
+    $("burnF" + i).value = String(sp.from);
+    $("burnT" + i).value = String(sp.to);
+  });
+  showBurn();
   $("pollMinutes").value = String(s.pollMinutes);
   $("autoLaunch").checked = s.autoLaunch;
   $("onlineOn").checked = !!(s.online && s.online.enabled);
@@ -204,6 +214,36 @@ const sendQuiet = () => {
   send({ wildQuiet: { enabled: $("quietOn").checked, from: Number($("quietFrom").value), to: Number($("quietTo").value) } });
 };
 for (const id of ["quietOn", "quietFrom", "quietTo"]) on(id, "change", sendQuiet);
+/* 버닝타임 — 두 구간(코어 · 야근)과 배수. 끝 시각의 0 은 자정이다 */
+for (const i of [0, 1]) {
+  $("burnF" + i).innerHTML = Array.from({ length: 24 }, (_, h) => `<option value="${h}">${hourLabel(h)}</option>`).join("");
+  $("burnT" + i).innerHTML = Array.from({ length: 24 }, (_, h) => `<option value="${h}">${h === 0 ? "자정" : hourLabel(h)}</option>`).join("");
+}
+function burnValue() {
+  return {
+    enabled: $("burnOn").checked,
+    mult: Number($("burnMult").value),
+    weekdays: $("burnWeekdays").checked,
+    spans: [0, 1].map((i) => ({ on: $("burnS" + i).checked, from: Number($("burnF" + i).value), to: Number($("burnT" + i).value) })),
+  };
+}
+function showBurn() {
+  const b = burnValue();
+  for (const id of ["burnMult", "burnWeekdays", "burnS0", "burnS1"]) $(id).disabled = !b.enabled;
+  for (const i of [0, 1]) $("burnF" + i).disabled = $("burnT" + i).disabled = !b.enabled || !b.spans[i].on;
+  const empty = b.spans.some((s) => s.on && s.from === s.to);
+  $("burnNote").textContent = !b.enabled
+    ? "정해 둔 시간에 쓴 토큰은 성장을 몇 배로 쳐 줍니다. 꺼져 있습니다."
+    : empty
+      ? "시작과 끝이 같은 구간은 적용되지 않습니다. 시간을 다르게 골라 주세요."
+      : `이 시간에 쓴 토큰은 키우는 아이가 ${b.mult}배로 자랍니다. 기록마다 쓴 시각을 보고 나눠서, 앱을 꺼 둔 동안 쓴 것도 제 시간대대로 칩니다. 자정을 넘겨도 됩니다. 나무열매(2배)와 겹치면 더해집니다(${b.mult + 1}배). 사탕은 그대로입니다.`;
+}
+const sendBurn = () => {
+  showBurn();
+  send({ burning: burnValue() });
+};
+for (const id of ["burnOn", "burnMult", "burnWeekdays", "burnS0", "burnF0", "burnT0", "burnS1", "burnF1", "burnT1"]) on(id, "change", sendBurn);
+
 $("wildNow").onclick = async () => {
   const r = await window.ptb.wildSpawn();
   $("wildNote").textContent = r && r.ok ? "나타났습니다! 설정 창을 닫고 바탕화면을 보세요." : (r && r.reason) || "부르지 못했습니다";

@@ -57,6 +57,26 @@ function quipFor(mon, todayTokens) {
   return "쑥쑥 자라는 중입니다.";
 }
 
+/** "오후 4시" · "내일 오전 10시" — 버닝타임이 언제 끝나고 언제 오는지 */
+function whenLabel(ms) {
+  const d = new Date(ms);
+  const h = d.getHours();
+  const hm = (h < 12 ? "오전 " : "오후 ") + (h % 12 === 0 ? 12 : h % 12) + "시" + (d.getMinutes() ? " " + d.getMinutes() + "분" : "");
+  const today = new Date();
+  if (h === 0 && !d.getMinutes()) return "자정"; // 늘 24시간 안의 자정이다
+  return (d.getDate() === today.getDate() ? "" : "내일 ") + hm;
+}
+
+function renderBurn(b) {
+  const el = $("monBurn");
+  if (!b || !b.enabled || (!b.on && !b.next)) return void (el.hidden = true);
+  el.hidden = false;
+  el.className = "burn" + (b.on ? " on" : "");
+  el.textContent = b.on
+    ? `🔥 버닝타임 ×${b.mult}${b.until ? " — " + whenLabel(b.until) + "까지" : ""}`
+    : `🔥 다음 버닝타임 ${whenLabel(b.next)}부터 ×${b.mult}`;
+}
+
 function renderHome(s) {
   const { mon, usage } = s;
 
@@ -82,6 +102,7 @@ function renderHome(s) {
     ? held.evolveTo ? `🪨 진화 멈춤 — 돌을 빼면 <b>${held.evolveTo}</b>` : "🪨 변하지않는돌 — 진화 멈춤"
     : p.next ? `${p.next}까지 <b>${fmt(p.remaining)}</b>` : "졸업했습니다";
   $("monQuip").textContent = quipFor(mon, usage.today);
+  renderBurn(s.burning);
 
   const t = [];
   // 레벨·타입은 홈에서도 보여야 한다. 박스를 열어야만 보이면

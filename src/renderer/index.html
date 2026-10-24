@@ -80,6 +80,14 @@
   .goal { margin-top: 5px; font-size: 11px; color: var(--dim); }
   .goal b { color: var(--muted); font-weight: 600; }
   .quip { margin-top: 3px; font-size: 11.5px; font-weight: 600; }
+  /* 버닝타임 — 켜져 있을 때는 눈에 띄게, 기다리는 중이면 흐리게 */
+  .burn { margin-top: 5px; font-size: 10.5px; color: var(--dim); }
+  .burn.on {
+    display: inline-block; padding: 2px 8px; border-radius: 99px; font-weight: 800; color: #1a0f05;
+    background: linear-gradient(90deg, #ff7a18, #ffb347); box-shadow: 0 0 10px #ff7a1866;
+    animation: burnpulse 1.6s ease-in-out infinite;
+  }
+  @keyframes burnpulse { 50% { box-shadow: 0 0 16px #ff7a18aa; } }
   .traits { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .chip { font-size: 10px; padding: 2px 7px; border-radius: 99px; background: var(--card); border: 1px solid var(--line); color: var(--muted); }
   .chip b { color: var(--text); font-weight: 600; }
@@ -436,6 +444,7 @@
         <div class="stage" id="monStage">&nbsp;</div>
         <div class="bar"><i id="monBar" style="width:0%"></i></div>
         <div class="goal" id="monGoal">&nbsp;</div>
+        <div class="burn" id="monBurn" hidden></div>
         <div class="quip" id="monQuip"></div>
         <div class="traits" id="monTraits"></div>
       </div>

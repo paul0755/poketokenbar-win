@@ -33,6 +33,9 @@
   .row .top { display: flex; align-items: center; gap: 10px; }
   .row .k { flex: 1; font-size: 12px; font-weight: 600; }
   .row .note { margin-top: 3px; font-size: 10px; color: var(--dim); line-height: 1.45; }
+  .row .burnspan { margin-top: 6px; }
+  .row .bk { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); cursor: pointer; }
+  .row .bk input { accent-color: var(--accent); margin: 0; }
 
   button, select {
     padding: 5px 10px; font: inherit; font-size: 11px; color: var(--text);
@@ -111,6 +114,25 @@
       <span class="val" id="pricePctVal">100%</span>
     </div>
     <div class="note">사탕이 들어오는 속도는 그대로입니다. 값만 바뀝니다.</div>
+  </div>
+  <div class="row">
+    <div class="top">
+      <span class="k">🔥 버닝타임</span>
+      <select id="burnMult"><option value="2">성장 ×2</option><option value="3">성장 ×3</option><option value="4">성장 ×4</option></select>
+      <label class="sw"><input type="checkbox" id="burnOn" /><span></span></label>
+    </div>
+    <div class="top burnspan">
+      <label class="bk"><input type="checkbox" id="burnS0" /> 코어 타임</label>
+      <select id="burnF0"></select><span>~</span><select id="burnT0"></select>
+    </div>
+    <div class="top burnspan">
+      <label class="bk"><input type="checkbox" id="burnS1" /> 야근 시간</label>
+      <select id="burnF1"></select><span>~</span><select id="burnT1"></select>
+    </div>
+    <div class="top burnspan">
+      <label class="bk"><input type="checkbox" id="burnWeekdays" /> 평일만 (토·일 제외)</label>
+    </div>
+    <div class="note" id="burnNote"></div>
   </div>
 
   <h4>알림</h4>

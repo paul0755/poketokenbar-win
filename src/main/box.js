@@ -140,7 +140,11 @@ function active(save) {
 const BASE_ALLOW = 50_000_000;
 const ALLOW_PER_HOUR = 60_000_000;
 
-function accrue(save, total) {
+/**
+ * burn(from, to) — 그 사이 늘어난 토큰 중 버닝타임 몫과 배수 { share, mult } (burning.js).
+ * 버닝 몫은 나무열매처럼 bonus 로 더 쳐 준다.
+ */
+function accrue(save, total, burn = null) {
   const prev = save.lastTotal;
   const prevAt = save.lastTotalAt;
   const now = Date.now();
@@ -158,6 +162,11 @@ function accrue(save, total) {
   const a = active(save);
   if (a) {
     a.raw = (a.raw || 0) + delta;
+    if (burn) {
+      const { share, mult } = burn(typeof prevAt === "number" ? prevAt : now - 60_000, now);
+      const hot = Math.round(delta * share * (mult - 1));
+      if (hot > 0) a.bonus = (a.bonus || 0) + hot;
+    }
     // 나무열매가 남아 있으면 그만큼 한 번 더 쳐 준다
     const extra = Math.min(delta, a.boost || 0);
     if (extra > 0) {

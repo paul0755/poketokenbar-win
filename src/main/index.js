@@ -14,6 +14,7 @@ const battle = require("./battle");
 const wild = require("./wild");
 const friend = require("./friend");
 const room = require("./room");
+const burning = require("./burning");
 const BERRIES = require("./berries.json");
 
 /**
@@ -451,6 +452,23 @@ function feedBerry(id, key) {
   };
 }
 
+/* ---------------- 버닝타임 (burning.js) ---------------- */
+
+const burnCfg = () => burning.normalize(save.burning);
+let burnWasOn = null; // 켜지는 순간에만 알린다. 앱을 켠 첫 갱신은 알리지 않는다
+
+function notifyBurning(st) {
+  const was = burnWasOn;
+  burnWasOn = st.on;
+  if (was !== false || !st.on || !save.notifyEnabled || !Notification.isSupported()) return;
+  const end = st.until ? new Date(st.until) : null;
+  new Notification({
+    title: `🔥 버닝타임 시작 — 성장 ×${st.mult}`,
+    body: end ? `${end.getHours()}시${end.getMinutes() ? " " + end.getMinutes() + "분" : ""}까지 쓰는 토큰은 ${st.mult}배로 자랍니다` : `지금 쓰는 토큰은 ${st.mult}배로 자랍니다`,
+    silent: false,
+  }).show();
+}
+
 /* ---------------- 미니룸 (room.js) ---------------- */
 
 const isEggMon = (m) => !poke.stageFor(box.effOf(m, growthSpeed()));
@@ -671,6 +689,8 @@ let save = {
   online: { enabled: false, relay: "" },
   /** 방해 금지 시간. 이 사이에는 저절로 나오지 않는다 (wild.js inQuiet) */
   wildQuiet: { enabled: false, from: 22, to: 8 },
+  /** 버닝타임 — 정해 둔 시간에 쓴 토큰은 성장 몇 배 (burning.js). 없으면 기본(코어 10~16 · 야근 18~0, 4배) */
+  burning: null,
   /** 상점에서 산 볼. 몬스터볼은 출현마다 공짜로 주니 여기 없다 */
   balls: { great: 0, ultra: 0 },
   /**
@@ -992,7 +1012,8 @@ async function buildStats() {
   if (room.normalize(save)) writeSave(); // 미니룸이 없던 세이브
 
   // 늘어난 토큰은 키우는 아이에게만 적립된다.
-  if (box.accrue(save, u.total)) writeSave();
+  const burn = burnCfg();
+  if (box.accrue(save, u.total, (from, to) => ({ share: burning.share(u.events, from, to, burn), mult: burn.mult }))) writeSave();
 
   const act = box.active(save);
   // 속도는 임계값을 고치는 대신 성장량에 곱해서 적용한다.
@@ -1092,6 +1113,7 @@ async function buildStats() {
     berries: berryBag(),
     stones: stoneCount(),
     room: roomState(),
+    burning: burning.status(new Date(), burn),
     online: onlineCfg(),
     friend: {
       team: save.friendTeam,
@@ -1156,7 +1178,8 @@ function applyTray(s) {
       "오늘 " + fmt(s.usage.today) + " · 누적 " + fmt(s.usage.total) +
       (p.next ? "\n다음(" + p.next + ")까지 " + fmt(p.remaining) : "\n최고 단계입니다") +
       (b ? "\n5시간 창 " + fmt(b.used) + " · " + hm(b.remainingMs) + " 남음" : "") +
-      (q ? "\nCodex 주간 " + q.percent + "%" : ""),
+      (q ? "\nCodex 주간 " + q.percent + "%" : "") +
+      (s.burning && s.burning.on ? "\n🔥 버닝타임 ×" + s.burning.mult + " 중" : ""),
   );
 }
 
@@ -1227,6 +1250,7 @@ async function refresh(force = false) {
     s.scannedAt = Date.now();
     lastStats = s;
     sendNotifications(s);
+    if (s.burning) notifyBurning(s.burning);
     push(win, s);
     pushPets(s);
     try {
@@ -1494,6 +1518,7 @@ function settingsPayload() {
     wildLevel: save.wildLevel ?? "rare",
     wildLeft: wildLeftToday(),
     wildQuiet: save.wildQuiet || { enabled: false, from: 22, to: 8 },
+    burning: burnCfg(),
     pollMinutes: save.pollMinutes,
     autoLaunch: save.autoLaunch,
     online: onlineCfg(),
@@ -1538,6 +1563,7 @@ function restartPolling() {
 
 function applySettings(patch) {
   Object.assign(save, patch);
+  if ("burning" in patch) save.burning = burning.normalize(patch.burning); // 설정 창 값을 믿지 않는다
   writeSave();
 
   if ("wanderLevel" in patch) for (const id of pets.keys()) startWander(id);
