@@ -125,3 +125,26 @@
   #gdMembers { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); column-gap: 8px; }
   #gdRoom { max-width: calc((100vh - 230px) * 1.6); margin: 0 auto; }
 }
+
+/* 길드 순위 */
+.gd-rank { background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; margin-bottom: 9px; }
+.gd-rank .hd { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; font-size: 12px; }
+.gd-rank .hd span { margin-left: auto; font-size: 10.5px; color: var(--muted); }
+.gd-rank .hd span b { color: var(--accent); }
+.gd-rank .row { display: grid; grid-template-columns: 18px minmax(60px, 1fr) 2fr auto; grid-template-rows: auto auto; column-gap: 7px; align-items: center; padding: 4px 6px; border-radius: 8px; font-size: 11.5px; }
+.gd-rank .row.me { background: #26220f; }
+.gd-rank .row .no { font-weight: 800; color: var(--muted); text-align: center; }
+.gd-rank .row:first-of-type .no { color: var(--accent); }
+.gd-rank .row .nm { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-rank .row .bar { position: relative; height: 7px; background: #2b2e37; border-radius: 99px; overflow: hidden; }
+.gd-rank .row .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--blue); border-radius: 99px; }
+.gd-rank .row .bar i.b { background: linear-gradient(90deg, #ff7a18, #ffb347); }
+.gd-rank .row .v { font-weight: 800; font-variant-numeric: tabular-nums; }
+.gd-rank .row .sub { grid-column: 2 / -1; font-size: 9.5px; color: var(--dim); }
+.gd-rank .sub { font-size: 10.5px; color: var(--dim); }
+.gd-rank .ft { margin-top: 6px; font-size: 10.5px; color: var(--muted); }
+.gd-rank .ft b { color: var(--text); }
+.gd-rank .ft.dim { font-size: 9.5px; color: var(--dim); }
+.gd-share { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); cursor: pointer; }
+.gd-share input { accent-color: var(--accent); margin: 0; }
+.gd-m .t .ld { display: inline; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 5px; background: #3a2f16; color: var(--accent); }

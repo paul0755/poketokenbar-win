@@ -3,7 +3,8 @@
  *
  * 실시간 배틀 방(Room)과 달리 저장한다. 길드원이 꺼져 있어도 방을 구경하고 결투할 수
  * 있어야 하기 때문이다. 저장하는 건 앱이 올린 "방 사진"(snap)뿐이다 — 트레이너 이름,
- * 방 꾸미기, 방에 둔 포켓몬, 도감·졸업·승수, 대표 팀 코드. 토큰 사용 기록은 오지 않는다.
+ * 방 꾸미기, 방에 둔 포켓몬, 도감·졸업·승수, 대표 팀 코드, 그리고 공개를 켠 사람만
+ * 이번 주·오늘 토큰 합계(길드 순위). 토큰 사용 기록(로그) 자체는 오지 않는다.
  *
  * ── 계정 없이 ──
  * 들어올 때 서버가 길드원 번호(memberId)와 열쇠(key)를 준다. 앱은 세이브에 둔다.
@@ -36,6 +37,14 @@ const randomHex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) 
 const str = (v, n) => String(v ?? "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, n);
 const int = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : null);
 const ID = /^[a-z]{1,16}$/;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const big = (v) => (Number.isSafeInteger(v) && v >= 0 && v <= 1e13 ? v : 0); // 토큰 합계 — 넉넉히 10조까지
+
+/** 공개를 켠 길드원의 사용량 합계. 언제 기준인지(주·날)가 있어야 지난주 숫자를 거를 수 있다 */
+function cleanUsage(u) {
+  if (!u || typeof u !== "object" || !DAY.test(u.weekKey) || !DAY.test(u.dayKey)) return null;
+  return { week: big(u.week), today: big(u.today), burn: big(u.burn), weekKey: u.weekKey, dayKey: u.dayKey };
+}
 const isId = (v) => typeof v === "string" && ID.test(v); // ID.test(undefined) 는 "undefined" 를 본다
 const STAGES = ["baby", "mid", "final", "master"];
 
@@ -67,6 +76,7 @@ export function cleanSnap(m) {
     lastGrad: str(m.lastGrad, 20),
     wins: int(m.wins, 0, 10_000_000) ?? 0,
     team,
+    usage: cleanUsage(m.usage),
   };
 }
 

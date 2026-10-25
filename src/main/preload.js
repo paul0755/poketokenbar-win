@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld("ptb", {
   guildKick: (id) => ipcRenderer.invoke("guild-kick", id),
   guildView: () => ipcRenderer.invoke("guild-view"),
   guildBattle: (id) => ipcRenderer.invoke("guild-battle", id),
+  guildShare: (on) => ipcRenderer.invoke("guild-share", on),
   battleDesktop: (a) => ipcRenderer.invoke("battle-desktop", a),
   // 친선 배틀 — 코드 만들기 · 받은 코드 보기 · 싸우기
   friendRegister: (a) => ipcRenderer.invoke("friend-register", a),

@@ -56,7 +56,8 @@ npm run deploy       # https://poketokenbar-relay.<계정>.workers.dev
 | `POST /guild/ABCD2345/kick` | `{ memberId, key, target }` | 길드장만 |
 | `POST /guild/ABCD2345/disband` | `{ memberId, key }` | 길드장만 — 길드를 통째로 지운다 |
 
-- `member`(방 사진) — `{ trainer, theme, furni[], mons[{ line, dexId, name, shiny, stage, level }], dex{seen,total}, graduated, lastGrad, wins, team }`.
+- `member`(방 사진) — `{ trainer, theme, furni[], mons[{ line, dexId, name, shiny, stage, level }], dex{seen,total}, graduated, lastGrad, wins, team, usage }`.
+  `usage` 는 길드 순위용 토큰 합계 `{ week, today, burn, weekKey, dayKey }` — 앱에서 공개를 끈 사람은 보내지 않습니다
   서버는 꼴만 보고(`cleanSnap`) 모르는 칸·틀린 값은 버립니다
 - 계정이 없습니다. `key` 는 들어갈 때 한 번 주고, 서버에는 SHA-256 해시만 남깁니다
 - 길드 코드는 헷갈리는 글자(0·O·1·I)를 뺀 8글자. 앱에는 `GLD-` 를 붙여 보여 줍니다

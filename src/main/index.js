@@ -457,7 +457,8 @@ function feedBerry(id, key) {
    길드원들의 방과 포켓몬을 모아 본다. 내 방은 "방 사진"(guildSnap)으로 올리고, 남의 방은
    받아서 방 탭이 그대로 그린다. 길드원과는 올려 둔 대표 팀 코드로 바로 친선 배틀을 한다 —
    상대가 꺼져 있어도 된다(친선 배틀은 두 코드만 있으면 같은 결투가 나온다).
-   온라인 기능을 켰을 때만 서버에 닿는다. 토큰 기록은 보내지 않는다. */
+   온라인 기능을 켰을 때만 서버에 닿는다. 토큰은 길드 순위용 합계(이번 주·오늘·버닝 몫)만,
+   그것도 공개를 켰을 때만 보낸다(guildShare). 기록(로그) 자체는 보내지 않는다. */
 
 const guildBase = () => onlineCfg().relay.replace(/^ws(s?):/, "http$1:").replace(/\/+$/, "") + "/guild";
 
@@ -525,7 +526,26 @@ function guildSnap() {
     lastGrad: st.lastGrad || "",
     wins: st.wins,
     team: guildTeamCode(),
+    // 공개를 끈 사람은 아예 보내지 않는다 — 서버에도 남지 않는다
+    usage: save.guildShare !== false && guildUsage ? guildUsage : null,
   };
+}
+
+/**
+ * 길드 순위에 올릴 내 사용량 — 합계 셋뿐이다(이번 주 · 오늘 · 이번 주 중 버닝타임에 쓴 몫).
+ * 주는 홈의 "이번 주"와 같은 월요일 0시 시작. 언제 기준인지(weekKey·dayKey)를 같이 보내서
+ * 지난주에 마지막으로 올린 사람의 숫자가 이번 주 순위에 섞이지 않게 한다.
+ */
+let guildUsage = null;
+const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function weekUsage(u, burn) {
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  let hot = 0;
+  for (const e of u.events || []) if (e.t >= monday.getTime() && burning.multAt(e.t, burn) > 1) hot += e.n;
+  return { week: Math.round(u.week || 0), today: Math.round(u.today || 0), burn: Math.round(hot), weekKey: dayKey(monday), dayKey: dayKey(now) };
 }
 
 /** 내 칸 열쇠가 더는 안 맞는다 — 내보내졌거나 길드가 없어졌다. 화면이 알려 주고 지운다 */
@@ -537,19 +557,25 @@ function guildGone(r) {
   }
 }
 
-let guildPushed = { body: "", at: 0 };
-/** 바뀐 게 있으면 올린다. 갱신마다 불리지만 같으면 보내지 않고, 1분에 한 번까지 */
+let guildPushed = { body: "", room: "", at: 0 };
+/**
+ * 바뀐 게 있으면 올린다. 갱신마다 불리지만 같으면 보내지 않는다.
+ * 방이 바뀌면 1분에 한 번까지, 토큰 합계만 바뀌면 5분에 한 번까지 — 토큰은 쓰는 동안
+ * 늘 바뀌어서, 그대로 두면 길드원 모두가 1분마다 서버를 두드린다.
+ */
 async function guildPush(force = false) {
   const g = save.guild;
   if (!g || g.gone || !onlineCfg().enabled || !save.trainerName) return;
   const snap = guildSnap();
   const body = JSON.stringify(snap);
-  if (!force && (body === guildPushed.body || Date.now() - guildPushed.at < 60_000)) return;
-  guildPushed = { body, at: Date.now() };
+  const roomPart = JSON.stringify({ ...snap, usage: snap.usage ? true : null });
+  const gap = roomPart !== guildPushed.room ? 60_000 : 5 * 60_000;
+  if (!force && (body === guildPushed.body || Date.now() - guildPushed.at < gap)) return;
+  guildPushed = { body, room: roomPart, at: Date.now() };
   const r = await guildCall(`/${g.code}/update`, { memberId: g.memberId, key: g.key, member: snap });
   if (r.ok && Boolean(r.leader) !== Boolean(g.leader)) { g.leader = Boolean(r.leader); writeSave(); }
   if (!r.ok) {
-    if (r.status === 429) guildPushed.body = ""; // 너무 잦았다 — 다음 갱신 때 다시
+    if (r.status === 429) guildPushed.body = guildPushed.room = ""; // 너무 잦았다 — 다음 갱신 때 다시
     guildGone(r);
   }
 }
@@ -568,7 +594,7 @@ async function guildCreate({ name, trainer } = {}) {
   const r = await guildCall("", { name: String(name).trim().slice(0, 20), member: guildSnap() });
   if (!r.ok) return r;
   save.guild = { code: r.code, name: r.name, memberId: r.memberId, key: r.key, leader: true };
-  guildPushed = { body: "", at: Date.now() };
+  guildPushed = { body: "", room: "", at: Date.now() };
   writeSave();
   refresh(true);
   return { ok: true, code: r.code, message: `길드 "${r.name}"를 만들었습니다. 코드를 친구에게 알려 주세요` };
@@ -582,7 +608,7 @@ async function guildJoin({ code, trainer } = {}) {
   const r = await guildCall(`/${c}/join`, { member: guildSnap() });
   if (!r.ok) return r;
   save.guild = { code: c, name: r.name, memberId: r.memberId, key: r.key, leader: false };
-  guildPushed = { body: "", at: Date.now() };
+  guildPushed = { body: "", room: "", at: Date.now() };
   writeSave();
   refresh(true);
   return { ok: true, message: `길드 "${r.name}"에 들어왔습니다` };
@@ -601,6 +627,14 @@ async function guildLeave() {
   writeSave();
   refresh(true);
   return { ok: true, message: "길드에서 나왔습니다" };
+}
+
+async function guildShare(on) {
+  save.guildShare = Boolean(on);
+  writeSave();
+  refresh(true);
+  await guildPush(true).catch(() => {});
+  return { ok: true, message: on ? "길드 순위에 내 토큰 합계를 공개합니다" : "길드 순위에서 내 토큰 합계를 감췄습니다" };
 }
 
 async function guildKick(target) {
@@ -656,6 +690,7 @@ async function guildView() {
       trainer: s.trainer,
       updated: m.updated,
       canBattle: Boolean(s.team) && m.id !== g.memberId,
+      usage: s.usage || null, // 공개를 끈 사람은 null
       room: { theme: s.theme, furni: s.furni || [], mons, dex: s.dex || { seen: 0, total: 0 }, wins: s.wins || 0, graduated: s.graduated || 0, lastGrad: s.lastGrad || "" },
     };
   }));
@@ -913,6 +948,8 @@ let save = {
    * 내보내졌거나 길드가 없어졌으면 gone 에 이유가 남는다(화면이 알려 주고 지운다).
    */
   guild: null,
+  /** 길드 순위에 내 토큰 합계(이번 주·오늘)를 공개하나. 끄면 순위에 "비공개"로 나온다 */
+  guildShare: true,
   /** 버닝타임 — 정해 둔 시간에 쓴 토큰은 성장 몇 배 (burning.js). 없으면 기본(코어 10~16 · 야근 18~0, 4배) */
   burning: null,
   /** 상점에서 산 볼. 몬스터볼은 출현마다 공짜로 주니 여기 없다 */
@@ -1238,6 +1275,7 @@ async function buildStats() {
   // 늘어난 토큰은 키우는 아이에게만 적립된다.
   const burn = burnCfg();
   if (box.accrue(save, u.total, (from, to) => ({ share: burning.share(u.events, from, to, burn), mult: burn.mult }))) writeSave();
+  guildUsage = weekUsage(u, burn);
 
   const act = box.active(save);
   // 속도는 임계값을 고치는 대신 성장량에 곱해서 적용한다.
@@ -1337,7 +1375,7 @@ async function buildStats() {
     berries: berryBag(),
     stones: stoneCount(),
     room: roomState(),
-    guild: save.guild ? { code: save.guild.code, name: save.guild.name, leader: Boolean(save.guild.leader), memberId: save.guild.memberId, gone: save.guild.gone || null } : null,
+    guild: save.guild ? { code: save.guild.code, name: save.guild.name, leader: Boolean(save.guild.leader), memberId: save.guild.memberId, gone: save.guild.gone || null, share: save.guildShare !== false } : null,
     burning: burning.status(new Date(), burn),
     online: onlineCfg(),
     friend: {
@@ -3013,6 +3051,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("guild-leave", () => guildLeave());
   ipcMain.handle("guild-kick", (_e, id) => guildKick(String(id || "")));
   ipcMain.handle("guild-view", () => guildView());
+  ipcMain.handle("guild-share", (_e, on) => guildShare(on));
   ipcMain.handle("guild-battle", (_e, id) => guildBattle(String(id || "")));
   ipcMain.handle("room-buy", (_e, { kind, id } = {}) => roomBuy(kind, id));
   ipcMain.handle("room-set", (_e, patch) => roomSet(patch || {}));

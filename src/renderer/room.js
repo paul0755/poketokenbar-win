@@ -438,7 +438,7 @@
 
   function render(Rm, d) {
     Rm.data = d;
-    const key = JSON.stringify([d.kind, d.code, d.guildName, d.count, d.theme, d.furni, d.dex && d.dex.seen, d.dex && d.dex.total, d.wins, d.graduated, d.lastGrad, d.trainer, period(d.theme)]);
+    const key = JSON.stringify([d.kind, d.code, d.guildName, d.count, d.notice, d.theme, d.furni, d.dex && d.dex.seen, d.dex && d.dex.total, d.wins, d.graduated, d.lastGrad, d.trainer, period(d.theme)]);
     if (key !== Rm.key) {
       Rm.key = key;
       if (d.kind === "hall") paintHall(Rm, d);
@@ -572,7 +572,7 @@
     }
     html.push(`<i class="rm-spark" style="left:${X(158)}%; top:${Y(122)}%; z-index:1700"></i><i class="rm-spark b" style="left:${X(168)}%; top:${Y(130)}%; right:auto; z-index:1700"></i>`);
     html.push(`<span class="rm-txt sign" style="left:${X(160)}%; top:${Y(30)}%;">${esc(d.guildName || "길드")}</span>`);
-    html.push(`<span class="rm-txt lt" style="left:${X(246)}%; top:${Y(98)}%;">길드 게시판</span>`);
+    html.push(`<span class="rm-txt lt" style="left:${X(246)}%; top:${Y(99)}%;">${d.notice ? "이번 주 1위 · " + esc(d.notice) : "길드 게시판"}</span>`);
     html.push(`<div class="rm-plate"><b>${esc(d.guildName || "길드")}</b> 길드 홀<br>길드원 ${d.count || 0}명</div>`);
 
     Rm.el.dataset.theme = "hall";
