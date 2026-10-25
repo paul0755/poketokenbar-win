@@ -528,11 +528,14 @@ function guildSnap() {
     team: guildTeamCode(),
     // 공개를 끈 사람은 아예 보내지 않는다 — 서버에도 남지 않는다
     usage: save.guildShare !== false && guildUsage ? guildUsage : null,
+    weekTop: (save.weekTop || []).length,
   };
 }
 
 /**
- * 길드 순위에 올릴 내 사용량 — 합계 셋뿐이다(이번 주 · 오늘 · 이번 주 중 버닝타임에 쓴 몫).
+ * 길드 순위에 올릴 내 사용량 — 합계뿐이다(이번 주 · 오늘 · 이번 주 중 버닝타임에 쓴 몫 ·
+ * 칭호용 시간대별 몫: 아침 6~10 · 코어 10~16 · 야근 18~24 · 새벽 0~6시. 시간대는 버닝타임
+ * 설정과 상관없이 고정이다 — 사람마다 다르면 칭호를 견줄 수 없다).
  * 주는 홈의 "이번 주"와 같은 월요일 0시 시작. 언제 기준인지(weekKey·dayKey)를 같이 보내서
  * 지난주에 마지막으로 올린 사람의 숫자가 이번 주 순위에 섞이지 않게 한다.
  */
@@ -543,9 +546,37 @@ function weekUsage(u, burn) {
   const monday = new Date(now);
   monday.setHours(0, 0, 0, 0);
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  let hot = 0;
-  for (const e of u.events || []) if (e.t >= monday.getTime() && burning.multAt(e.t, burn) > 1) hot += e.n;
-  return { week: Math.round(u.week || 0), today: Math.round(u.today || 0), burn: Math.round(hot), weekKey: dayKey(monday), dayKey: dayKey(now) };
+  const prevMonday = new Date(monday);
+  prevMonday.setDate(prevMonday.getDate() - 7);
+  /** [from, to) 사이의 합계 — 전체 · 버닝 몫 · 시간대별 몫 */
+  const sum = (from, to) => {
+    const s = { week: 0, burn: 0, morning: 0, core: 0, night: 0, dawn: 0 };
+    for (const e of u.events || []) {
+      if (e.t < from || e.t >= to) continue;
+      s.week += e.n;
+      if (burning.multAt(e.t, burn) > 1) s.burn += e.n;
+      const h = new Date(e.t).getHours();
+      if (h < 6) s.dawn += e.n;
+      else if (h < 10) s.morning += e.n;
+      else if (h < 16) s.core += e.n;
+      else if (h >= 18) s.night += e.n;
+    }
+    for (const k of Object.keys(s)) s[k] = Math.round(s[k]);
+    return s;
+  };
+  const cur = sum(monday.getTime(), Infinity);
+  return {
+    ...cur,
+    week: Math.round(u.week || 0), // 홈의 "이번 주"와 같은 값
+    today: Math.round(u.today || 0),
+    weekKey: dayKey(monday),
+    weekStart: monday.getTime(), // 내 PC 시간대의 월요일 0시 — 서버가 "지난주에 이미 길드원이었나"를 이걸로 본다
+    dayKey: dayKey(now),
+    // 지난주 최종 합계. 주가 바뀌기 직전 몇 분(마지막으로 올린 뒤 쓴 몫)이나, 일요일 밤 앱이
+    // 꺼져 있던 동안 쓴 몫이 지난주 칸에 빠지지 않게 서버가 이걸로 지난주를 마무리한다.
+    // 이번 주 내내 같은 값이라 이것 때문에 더 자주 올리지는 않는다
+    prev: { ...sum(prevMonday.getTime(), monday.getTime()), weekKey: dayKey(prevMonday) },
+  };
 }
 
 /** 내 칸 열쇠가 더는 안 맞는다 — 내보내졌거나 길드가 없어졌다. 화면이 알려 주고 지운다 */
@@ -666,6 +697,20 @@ async function guildView() {
   const leader = r.leader === g.memberId;
   if (leader !== Boolean(g.leader) || r.name !== g.name) { g.leader = leader; g.name = r.name; writeSave(); }
 
+  // 끝난 주(이번 주보다 앞)에서 내가 1위였으면 메달을 받는다. 한 주에 한 번만
+  const thisWeek = guildUsage ? guildUsage.weekKey : "";
+  save.weekTop = save.weekTop || [];
+  let medal = false;
+  for (const wk of r.weeks || []) {
+    if (!thisWeek || wk.key >= thisWeek) continue;
+    const top = (wk.rows || []).reduce((a, x) => (x.week > (a ? a.week : 0) ? x : a), null);
+    if (top && top.id === g.memberId && !save.weekTop.some((x) => x.guild === g.code && x.week === wk.key)) {
+      save.weekTop.push({ guild: g.code, week: wk.key });
+      medal = true;
+    }
+  }
+  if (medal) { writeSave(); refresh(true); }
+
   const url = async (dexId, shiny, kind) => {
     const p = await poke.spriteWithFallback({ dexId, isShiny: shiny }, CACHE, kind).catch(() => null);
     return p ? pathToFileURL(p).href : null;
@@ -691,10 +736,11 @@ async function guildView() {
       updated: m.updated,
       canBattle: Boolean(s.team) && m.id !== g.memberId,
       usage: s.usage || null, // 공개를 끈 사람은 null
-      room: { theme: s.theme, furni: s.furni || [], mons, dex: s.dex || { seen: 0, total: 0 }, wins: s.wins || 0, graduated: s.graduated || 0, lastGrad: s.lastGrad || "" },
+      room: { theme: s.theme, furni: s.furni || [], mons, dex: s.dex || { seen: 0, total: 0 }, wins: s.wins || 0, graduated: s.graduated || 0, lastGrad: s.lastGrad || "", weekTop: s.weekTop || 0 },
     };
   }));
-  return { ok: true, code: r.code, name: r.name, max: r.max, leader, members, now: r.now };
+  // 주간 기록 — 그 주의 1위 포켓몬 그림은 지금 길드원 카드에서 가져온다(화면이 한다)
+  return { ok: true, code: r.code, name: r.name, max: r.max, leader, members, weeks: r.weeks || [], thisWeek, medal, now: r.now };
 }
 
 /** 길드원과 결투 — 내 대표 팀 코드 vs 그 사람이 올려 둔 코드. Lv.50, 보상 없음 */
@@ -742,6 +788,7 @@ function roomState() {
     graduated: (save.graduated || []).length,
     lastGrad: ((save.graduated || []).slice(-1)[0] || {}).name || null,
     wins: ((save.friendRecord || {}).w || 0) + (save.box || []).reduce((a, m) => a + ((m.record || {}).w || 0), 0),
+    weekTop: (save.weekTop || []).length, // 길드 주간 1위 메달
   };
 }
 
@@ -950,6 +997,8 @@ let save = {
   guild: null,
   /** 길드 순위에 내 토큰 합계(이번 주·오늘)를 공개하나. 끄면 순위에 "비공개"로 나온다 */
   guildShare: true,
+  /** 길드 주간 1위를 한 주들. [{ guild, week }] — 방에 메달 액자로 걸린다 */
+  weekTop: [],
   /** 버닝타임 — 정해 둔 시간에 쓴 토큰은 성장 몇 배 (burning.js). 없으면 기본(코어 10~16 · 야근 18~0, 4배) */
   burning: null,
   /** 상점에서 산 볼. 몬스터볼은 출현마다 공짜로 주니 여기 없다 */

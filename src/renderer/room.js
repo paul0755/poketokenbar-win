@@ -285,6 +285,16 @@
     });
   }
 
+  /** 길드 주간 1위 메달 액자 — 몇 번 했는지는 글자로 얹는다 */
+  function drawMedal(g) {
+    box(g, 100, 56, 32, 30, "#2a3a7a", "#3e2723", "#6d4c41", "#4e342e");
+    R(g, 103, 59, 26, 24, "#2f3f86"); dither(g, 103, 59, 26, 24, "#26357a");
+    R(g, 110, 60, 4, 9, "#e53935"); R(g, 118, 60, 4, 9, "#1e88e5"); // 리본
+    R(g, 112, 66, 8, 3, "#c62828");
+    oval(g, 116, 73, 6, 6, "#c49000"); oval(g, 116, 73, 5, 5, "#ffd54f"); oval(g, 116, 73, 2, 2, "#fff3b0");
+    R(g, 114, 72, 4, 1, "#c49000");
+  }
+
   function drawPoster(g) {
     const x = 196, y = 18, w = 26, h = 36;
     R(g, x, y, w, h, "#fff3e0"); R(g, x, y + h - 1, w, 1, "#d7c4a8");
@@ -438,7 +448,7 @@
 
   function render(Rm, d) {
     Rm.data = d;
-    const key = JSON.stringify([d.kind, d.code, d.guildName, d.count, d.notice, d.theme, d.furni, d.dex && d.dex.seen, d.dex && d.dex.total, d.wins, d.graduated, d.lastGrad, d.trainer, period(d.theme)]);
+    const key = JSON.stringify([d.kind, d.code, d.guildName, d.count, d.notice, d.weekTop, d.theme, d.furni, d.dex && d.dex.seen, d.dex && d.dex.total, d.wins, d.graduated, d.lastGrad, d.trainer, period(d.theme)]);
     if (key !== Rm.key) {
       Rm.key = key;
       if (d.kind === "hall") paintHall(Rm, d);
@@ -572,7 +582,7 @@
     }
     html.push(`<i class="rm-spark" style="left:${X(158)}%; top:${Y(122)}%; z-index:1700"></i><i class="rm-spark b" style="left:${X(168)}%; top:${Y(130)}%; right:auto; z-index:1700"></i>`);
     html.push(`<span class="rm-txt sign" style="left:${X(160)}%; top:${Y(30)}%;">${esc(d.guildName || "길드")}</span>`);
-    html.push(`<span class="rm-txt lt" style="left:${X(246)}%; top:${Y(99)}%;">${d.notice ? "이번 주 1위 · " + esc(d.notice) : "길드 게시판"}</span>`);
+    html.push(`<span class="rm-txt lt" style="left:${X(246)}%; top:${Y(99)}%;">${d.notice ? esc(d.notice) : "길드 게시판"}</span>`);
     html.push(`<div class="rm-plate"><b>${esc(d.guildName || "길드")}</b> 길드 홀<br>길드원 ${d.count || 0}명</div>`);
 
     Rm.el.dataset.theme = "hall";
@@ -607,6 +617,7 @@
     if (d.wins > 0) drawBadges(g, d.wins);
     if (on.has("poster")) drawPoster(g);
     if (d.graduated > 0) drawTrophies(g, d.graduated);
+    if (d.weekTop > 0) drawMedal(g);
     if (on.has("rug")) drawRug(g);
     // 밤이면 방이 어두워지고 램프 둘레만 밝다
     if (per === "night" || per === "evening") {
@@ -632,6 +643,7 @@
     html.push(`<span class="rm-txt" style="left:${X(116)}%; top:${Y(41)}%;">${dex.seen}/${dex.total}</span>`);
     if (d.wins > 0) html.push(`<span class="rm-txt lt" style="left:${X(161)}%; top:${Y(52)}%;">${d.wins}승</span>`);
     if (d.graduated > 0) html.push(`<span class="rm-txt sm" style="left:${X(292)}%; top:${Y(44)}%;">졸업<br>${esc(d.lastGrad || "")}</span>`);
+    if (d.weekTop > 0) html.push(`<span class="rm-txt lt" style="left:${X(116)}%; top:${Y(90)}%;">주간 1위 ×${d.weekTop}</span>`);
     html.push(`<div class="rm-plate"><b>${esc(d.trainer || "나")}</b>의 방<br>도감 ${dex.seen} · 졸업 ${d.graduated || 0}</div>`);
 
     Rm.el.dataset.theme = theme;
@@ -881,6 +893,7 @@
       `🖼️ <b>도감 액자</b> — 도감 ${dex.seen}/${dex.total}. 만날수록 숫자가 오른다`,
       `🏅 <b>결투 배지 진열장</b> — ${R0.wins}승${next ? ` · ${next}승이면 배지가 하나 더 빛난다` : " · 배지를 다 모았다"}`,
       `🏆 <b>졸업 트로피</b> — ${R0.graduated ? `${R0.graduated}마리 졸업 (마지막: ${esc(R0.lastGrad)})` : "마스터까지 키우면 생긴다"}`,
+      `🏅 <b>주간 1위 메달</b> — ${R0.weekTop ? `${R0.weekTop}번` : "길드에서 한 주 동안 토큰을 가장 많이 쓰면 생긴다"}`,
     ].join("<br>");
 
     const pickable = (s.box || []).filter((m) => m.stageKey !== "egg");
@@ -902,6 +915,7 @@
       wins: R0.wins,
       graduated: R0.graduated,
       lastGrad: R0.lastGrad,
+      weekTop: R0.weekTop || 0,
       trainer: (s.friend && s.friend.trainer) || "나",
     };
   }

@@ -19,10 +19,19 @@
  *   POST /guild/ABCD2345/leave     나가기   { memberId, key }        — 내 칸은 바로 지운다
  *   POST /guild/ABCD2345/kick      내보내기 { memberId, key, target } (길드장)
  *   POST /guild/ABCD2345/disband   길드 없애기 { memberId, key }    (길드장)
+ *
+ * ── 주간 기록 (명예의 전당) ──
+ * 길드원이 토큰 합계를 올릴 때마다 그 주(weekKey) 칸에 마지막 값을 적어 둔다("wk:2026-10-19").
+ * 그래야 일요일 밤 앱이 꺼져 있던 사람의 숫자도 다음 주에 남아 지난주 순위를 확정할 수 있다.
+ * 앱은 지난주 최종 합계(usage.prev)도 같이 보낸다 — 주가 바뀌기 직전 몇 분이나 앱이 꺼져 있던
+ * 동안 쓴 몫까지 넣어 지난주 칸을 마무리한다.
+ * 최근 KEEP_WEEKS 주만 둔다. 길드를 나가거나 내보내지면 그 사람의 줄은 모든 주에서 지운다.
+ * 순위·칭호는 앱이 이 기록으로 계산한다 — 서버는 적어 두기만 한다.
  */
 
 export const MAX_MEMBERS = 30;
 const UPDATE_GAP_MS = 15_000; // 내 방 올리기는 15초에 한 번까지
+const KEEP_WEEKS = 26; // 반년치 주간 기록
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
@@ -40,10 +49,29 @@ const ID = /^[a-z]{1,16}$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const big = (v) => (Number.isSafeInteger(v) && v >= 0 && v <= 1e13 ? v : 0); // 토큰 합계 — 넉넉히 10조까지
 
+/**
+ * 그 사람 PC 시간대의 이번 주 시작(월요일 0시) 시각. 앱이 보낸 값이 weekKey 와 맞으면(±1.5일)
+ * 그대로 쓰고, 없거나 엉뚱하면 가장 이른 시간대(UTC+14)의 월요일 0시로 본다 — 가장 엄격한 쪽이다.
+ */
+function weekStartOf(u) {
+  const base = Date.parse(u.weekKey + "T00:00:00Z");
+  if (Number.isSafeInteger(u.weekStart) && Math.abs(u.weekStart - base) < 36 * 3_600_000) return u.weekStart;
+  return base - 14 * 3_600_000;
+}
+
 /** 공개를 켠 길드원의 사용량 합계. 언제 기준인지(주·날)가 있어야 지난주 숫자를 거를 수 있다 */
 function cleanUsage(u) {
   if (!u || typeof u !== "object" || !DAY.test(u.weekKey) || !DAY.test(u.dayKey)) return null;
-  return { week: big(u.week), today: big(u.today), burn: big(u.burn), weekKey: u.weekKey, dayKey: u.dayKey };
+  const p = u.prev && typeof u.prev === "object" && DAY.test(u.prev.weekKey) && u.prev.weekKey < u.weekKey ? u.prev : null;
+  return {
+    week: big(u.week), today: big(u.today), burn: big(u.burn),
+    // 칭호용 시간대별 합계(이번 주) — 아침 6~10 · 코어 10~16 · 야근 18~24 · 새벽 0~6시
+    morning: big(u.morning), core: big(u.core), night: big(u.night), dawn: big(u.dawn),
+    weekKey: u.weekKey, dayKey: u.dayKey,
+    weekStart: weekStartOf(u),
+    // 지난주 최종 합계 — record 가 지난주 칸을 마무리한다
+    prev: p ? { week: big(p.week), burn: big(p.burn), morning: big(p.morning), core: big(p.core), night: big(p.night), dawn: big(p.dawn), weekKey: p.weekKey } : null,
+  };
 }
 const isId = (v) => typeof v === "string" && ID.test(v); // ID.test(undefined) 는 "undefined" 를 본다
 const STAGES = ["baby", "mid", "final", "master"];
@@ -77,6 +105,7 @@ export function cleanSnap(m) {
     wins: int(m.wins, 0, 10_000_000) ?? 0,
     team,
     usage: cleanUsage(m.usage),
+    weekTop: int(m.weekTop, 0, 10000) ?? 0, // 주간 1위를 몇 번 했나 — 방의 메달 액자
   };
 }
 
@@ -107,6 +136,48 @@ export class Guild {
     return { memberId: id, key };
   }
 
+  /** 그 주 칸에 한 사람의 합계를 적는다. 같은 값이면 쓰지 않는다 */
+  async writeWeek(weekKey, id, trainer, u) {
+    const key = "wk:" + weekKey;
+    const wk = (await this.store.get(key)) || { key: weekKey, rows: {} };
+    const old = wk.rows[id];
+    if (old && old.week === u.week && old.trainer === trainer) return;
+    wk.rows[id] = { trainer, week: u.week, burn: u.burn, morning: u.morning, core: u.core, night: u.night, dawn: u.dawn, at: Date.now() };
+    await this.store.put(key, wk);
+  }
+
+  /**
+   * 이번 주 칸에 마지막 합계를 적고, 지난주 최종 합계(prev)로 지난주 칸을 마무리한다.
+   * 지난주 칸은 지난주가 끝나기 전에 이미 길드원이었던 사람만 고칠 수 있다 — 이번 주에
+   * 들어온 사람이 들어오기 전 주의 사용량으로 지난주 1위를 가져가면 안 된다.
+   * "지난주가 끝난 때"는 그 사람 PC 의 월요일 0시(usage.weekStart)다.
+   */
+  async record(id, snap, joined) {
+    const u = snap && snap.usage;
+    if (!u) return;
+    await this.writeWeek(u.weekKey, id, snap.trainer, u);
+    if (u.prev && Number.isFinite(u.weekStart) && joined <= u.weekStart) await this.writeWeek(u.prev.weekKey, id, snap.trainer, u.prev);
+    const keys = [...(await this.store.list({ prefix: "wk:" })).keys()].sort();
+    if (keys.length > KEEP_WEEKS) await this.store.delete(keys.slice(0, keys.length - KEEP_WEEKS));
+  }
+
+  /** 나간 사람의 줄을 모든 주에서 지운다 */
+  async forget(id) {
+    for (const [key, wk] of await this.store.list({ prefix: "wk:" })) {
+      if (!wk.rows || !wk.rows[id]) continue;
+      delete wk.rows[id];
+      if (Object.keys(wk.rows).length) await this.store.put(key, wk);
+      else await this.store.delete(key);
+    }
+  }
+
+  async weeks() {
+    const all = await this.store.list({ prefix: "wk:" });
+    return [...all.values()]
+      .sort((a, b) => (a.key < b.key ? 1 : -1))
+      .map((wk) => ({ key: wk.key, rows: Object.entries(wk.rows || {}).map(([id, r]) => ({ id, ...r })) }));
+  }
+
   async view(meta) {
     const list = await this.members();
     return json({
@@ -116,6 +187,7 @@ export class Guild {
       leader: meta.leader,
       max: MAX_MEMBERS,
       members: list.map((m) => ({ id: m.id, snap: m.snap, joined: m.joined, updated: m.updated })),
+      weeks: await this.weeks(),
       now: Date.now(),
     });
   }
@@ -142,6 +214,7 @@ export class Guild {
       if (!snap) return fail("트레이너 이름이 없습니다");
       const me = await this.add(snap);
       await this.store.put("meta", { code: str(body.code, 8), name, leader: me.memberId, created: Date.now() });
+      await this.record(me.memberId, snap, Date.now());
       return json({ ok: true, code: body.code, name, ...me, leader: true });
     }
 
@@ -152,6 +225,7 @@ export class Guild {
       if (!snap) return fail("트레이너 이름이 없습니다");
       if ((await this.members()).length >= MAX_MEMBERS) return fail(`길드가 꽉 찼습니다 (${MAX_MEMBERS}명)`, 403);
       const me = await this.add(snap);
+      await this.record(me.memberId, snap, Date.now());
       return json({ ok: true, code: meta.code, name: meta.name, ...me, leader: false });
     }
 
@@ -163,11 +237,13 @@ export class Guild {
       if (!snap) return fail("트레이너 이름이 없습니다");
       if (Date.now() - me.updated < UPDATE_GAP_MS) return fail("잠시 뒤에 다시 올려 주세요", 429);
       await this.store.put("m:" + me.id, { ...me, snap, updated: Date.now() });
+      await this.record(me.id, snap, me.joined);
       return json({ ok: true, leader: meta.leader === me.id });
     }
 
     if (action === "leave") {
       await this.store.delete("m:" + me.id);
+      await this.forget(me.id);
       const rest = await this.members();
       if (!rest.length) await this.store.deleteAll(); // 마지막 사람이 나가면 길드도 없어진다
       else if (meta.leader === me.id) await this.store.put("meta", { ...meta, leader: rest[0].id }); // 가장 오래된 길드원이 맡는다
@@ -179,6 +255,7 @@ export class Guild {
       const target = str(body.target, 40);
       if (!target || target === me.id) return fail("내보낼 길드원을 골라 주세요");
       await this.store.delete("m:" + target);
+      await this.forget(target);
       return json({ ok: true });
     }
 

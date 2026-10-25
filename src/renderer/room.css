@@ -148,3 +148,18 @@
 .gd-share { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); cursor: pointer; }
 .gd-share input { accent-color: var(--accent); margin: 0; }
 .gd-m .t .ld { display: inline; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 5px; background: #3a2f16; color: var(--accent); }
+
+/* 명예의 전당 */
+.gd-rank .row .tt { font-style: normal; font-size: 10px; }
+.gd-hof .tot { font-size: 11px; color: var(--muted); margin: -2px 0 6px; }
+.gd-hof .tot b { color: var(--text); }
+.gd-hof .wk { display: grid; grid-template-columns: 74px 34px minmax(80px, auto) 1fr; align-items: center; gap: 8px; padding: 6px 4px; border-top: 1px solid var(--line); font-size: 11px; }
+.gd-hof .wk .when { font-weight: 700; line-height: 1.25; }
+.gd-hof .wk .when span { display: block; font-size: 9.5px; font-weight: 400; color: var(--dim); }
+.gd-hof .wk .pic { width: 34px; height: 34px; display: grid; place-items: center; }
+.gd-hof .wk .pic img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; }
+.gd-hof .wk .win b { display: block; }
+.gd-hof .wk .win span { font-size: 10px; color: var(--muted); }
+.gd-hof .wk .chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.gd-hof .wk .chips span { font-size: 9.5px; padding: 2px 6px; border-radius: 99px; background: var(--card2); border: 1px solid var(--line); white-space: nowrap; }
+.gd-hof .more { margin-top: 6px; width: 100%; }

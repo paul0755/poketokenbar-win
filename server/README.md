@@ -49,7 +49,7 @@ npm run deploy       # https://poketokenbar-relay.<계정>.workers.dev
 | 요청 | 본문 | 돌려주는 것 |
 |---|---|---|
 | `POST /guild` | `{ name, member }` | `{ code, memberId, key }` — 만든 사람이 길드장 |
-| `GET /guild/ABCD2345` | | `{ name, leader, max, members: [{ id, snap, joined, updated }] }` |
+| `GET /guild/ABCD2345` | | `{ name, leader, max, members: [{ id, snap, joined, updated }], weeks: [{ key, rows }] }` |
 | `POST /guild/ABCD2345/join` | `{ member }` | `{ memberId, key }` (30명까지) |
 | `POST /guild/ABCD2345/update` | `{ memberId, key, member }` | 내 방 사진 바꾸기 (15초에 한 번까지) |
 | `POST /guild/ABCD2345/leave` | `{ memberId, key }` | 내 칸을 지운다. 길드장이 나가면 가장 오래된 길드원이 맡는다 |
@@ -57,8 +57,11 @@ npm run deploy       # https://poketokenbar-relay.<계정>.workers.dev
 | `POST /guild/ABCD2345/disband` | `{ memberId, key }` | 길드장만 — 길드를 통째로 지운다 |
 
 - `member`(방 사진) — `{ trainer, theme, furni[], mons[{ line, dexId, name, shiny, stage, level }], dex{seen,total}, graduated, lastGrad, wins, team, usage }`.
-  `usage` 는 길드 순위용 토큰 합계 `{ week, today, burn, weekKey, dayKey }` — 앱에서 공개를 끈 사람은 보내지 않습니다
+  `usage` 는 길드 순위용 토큰 합계 `{ week, today, burn, morning, core, night, dawn, weekKey, dayKey, prev }` — 앱에서 공개를 끈 사람은 보내지 않습니다.
+  `prev` 는 지난주 최종 합계로, 지난주가 끝나기 전에 이미 길드원이었던 사람만 지난주 칸을 마무리할 수 있습니다
   서버는 꼴만 보고(`cleanSnap`) 모르는 칸·틀린 값은 버립니다
+- `weeks` — 주간 기록(최근 26주, 최신부터). 길드원이 합계를 올릴 때마다 그 주 칸에 마지막 값을 적어 둡니다.
+  앱이 이걸로 지난주 순위·칭호·명예의 전당을 계산합니다. 나가거나 내보내진 사람의 줄은 모든 주에서 지웁니다
 - 계정이 없습니다. `key` 는 들어갈 때 한 번 주고, 서버에는 SHA-256 해시만 남깁니다
 - 길드 코드는 헷갈리는 글자(0·O·1·I)를 뺀 8글자. 앱에는 `GLD-` 를 붙여 보여 줍니다
 - 길드가 생긴 뒤 처음 배포할 때 `wrangler.toml` 의 마이그레이션 `v2`(Guild)가 같이 적용됩니다
