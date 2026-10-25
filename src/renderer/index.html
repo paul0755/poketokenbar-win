@@ -508,7 +508,12 @@
 
   <!-- ---------------- 미니룸 (room.js) ---------------- -->
   <section id="tab-room" hidden>
-    <div class="dexhead"><span class="t">내 방</span><span class="c">포켓몬을 누르면 깡충 · 이름표</span></div>
+    <div class="rm-switch" id="rmSwitch">
+      <button data-view="mine" class="on">🏠 내 방</button>
+      <button data-view="guild">🏰 길드</button>
+      <span class="c">포켓몬을 누르면 깡충 · 이름표</span>
+    </div>
+    <div id="rmMineView">
     <div class="rm-room" id="rmRoom" data-theme="cabin">
       <div class="rm-scene"></div>
       <div class="rm-actors" id="rmActors"></div>
@@ -523,6 +528,53 @@
       <div class="rm-chips" id="rmMons"></div>
       <h5>키운 기록 — 사지 않아도 저절로 생긴다</h5>
       <div class="rm-rec" id="rmRec"></div>
+    </div>
+    </div>
+
+    <!-- 길드 (guild.js) — 길드원의 방 구경 · 길드원과 결투 -->
+    <div id="gdView" hidden>
+      <div class="gd-box" id="gdOff" hidden>
+        <b>온라인 기능이 꺼져 있습니다</b>
+        <p>길드는 내 방 사진(트레이너 이름 · 방 꾸미기 · 방에 둔 포켓몬 · 도감·졸업·승수 · 대표 팀 코드)을
+          길드 서버에 올려 서로 봅니다. 토큰 사용 기록은 보내지 않습니다.</p>
+        <button class="mini2" id="gdOpenSettings">설정 › 온라인 기능 켜기</button>
+      </div>
+      <div class="gd-box" id="gdGone" hidden>
+        <b id="gdGoneMsg"></b>
+        <p>이 길드의 기록을 내 쪽에서도 지웁니다.</p>
+        <button class="mini2" id="gdGoneOk">확인</button>
+      </div>
+      <div id="gdNone" hidden>
+        <div class="gd-box">
+          <b>트레이너 이름</b>
+          <input class="gd-in" id="gdTrainer" maxlength="16" placeholder="길드원에게 보일 이름" />
+        </div>
+        <div class="gd-box">
+          <b>길드 만들기</b>
+          <div class="gd-row"><input class="gd-in" id="gdName" maxlength="20" placeholder="길드 이름" /><button class="mini2" id="gdCreate">만들기</button></div>
+        </div>
+        <div class="gd-box">
+          <b>코드로 들어가기</b>
+          <div class="gd-row"><input class="gd-in" id="gdCode" maxlength="12" placeholder="GLD-ABCD2345" /><button class="mini2" id="gdJoin">들어가기</button></div>
+        </div>
+        <div class="note">한 번에 한 길드에만 들어갈 수 있습니다(최대 30명). 방을 꾸미면 길드에도 저절로 올라갑니다.</div>
+      </div>
+      <div id="gdIn" hidden>
+        <div class="gd-head">
+          <span class="nm" id="gdTitle"></span>
+          <button class="gd-code" id="gdCopy" title="눌러서 복사"></button>
+          <span class="c" id="gdCount"></span>
+        </div>
+        <div class="rm-room" id="gdRoom" data-theme="cabin"></div>
+        <div class="gd-visit" id="gdVisit"></div>
+        <div id="gdMembers"></div>
+        <div class="gd-foot">
+          <button class="mini2" id="gdRefresh">↻ 새로고침</button>
+          <span class="sp"></span>
+          <button class="mini2 del" id="gdLeave">길드 나가기</button>
+        </div>
+        <div class="note">결투는 길드원이 올려 둔 대표 포켓몬(그 사람 방의 첫 아이)과 Lv.50 친선 배틀입니다. 상대가 꺼져 있어도 됩니다. 보상은 없습니다.</div>
+      </div>
     </div>
   </section>
 
@@ -657,3 +709,4 @@
 <script src="moves.js"></script>
 <script src="battle.js"></script>
 <script src="room.js"></script>
+<script src="guild.js"></script>

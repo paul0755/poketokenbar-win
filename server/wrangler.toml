@@ -9,7 +9,16 @@ compatibility_date = "2025-09-01"
 name = "ROOMS"
 class_name = "Room"
 
-# 무료 요금제는 SQLite 저장소를 쓰는 Durable Object 만 된다. 저장은 하지 않지만 형식은 맞춘다
+[[durable_objects.bindings]]
+name = "GUILDS"
+class_name = "Guild"
+
+# 무료 요금제는 SQLite 저장소를 쓰는 Durable Object 만 된다. Room 은 저장하지 않지만 형식은 맞춘다
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
+
+# 길드 — 길드원의 방 사진을 저장한다
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Guild"]

@@ -1,8 +1,11 @@
-# PokeTokenBar 실시간 배틀 중계 서버
+# PokeTokenBar 실시간 배틀 중계 · 길드 서버
 
 Cloudflare Workers + Durable Objects. 같은 방(6자리 코드)에 들어온 두 앱에게
 서로의 팀 코드와 "언제 시작할지"를 전달만 합니다. 결투 계산은 두 앱이 각자 하고,
-서버는 **아무것도 저장하지 않습니다.** 앱 설치 파일에는 들어가지 않습니다.
+실시간 배틀 방은 **아무것도 저장하지 않습니다.** 앱 설치 파일에는 들어가지 않습니다.
+
+**길드**(`src/guild.js`)는 따로 저장합니다 — 길드원이 꺼져 있어도 방을 구경하고 결투할 수 있어야 해서,
+길드원마다 앱이 올린 "방 사진"을 Durable Object 저장소에 둡니다. 토큰 기록은 오지 않습니다.
 
 ## 로컬에서 돌리기
 
@@ -40,3 +43,21 @@ npm run deploy       # https://poketokenbar-relay.<계정>.workers.dev
 
 서버가 보내는 모든 메시지에 `now`(서버 시각)가 실립니다. 앱은 이걸로 시계 차이를 재서
 두 화면이 같은 순간에 시작하게 합니다.
+
+## 길드 (HTTP, JSON)
+
+| 요청 | 본문 | 돌려주는 것 |
+|---|---|---|
+| `POST /guild` | `{ name, member }` | `{ code, memberId, key }` — 만든 사람이 길드장 |
+| `GET /guild/ABCD2345` | | `{ name, leader, max, members: [{ id, snap, joined, updated }] }` |
+| `POST /guild/ABCD2345/join` | `{ member }` | `{ memberId, key }` (30명까지) |
+| `POST /guild/ABCD2345/update` | `{ memberId, key, member }` | 내 방 사진 바꾸기 (15초에 한 번까지) |
+| `POST /guild/ABCD2345/leave` | `{ memberId, key }` | 내 칸을 지운다. 길드장이 나가면 가장 오래된 길드원이 맡는다 |
+| `POST /guild/ABCD2345/kick` | `{ memberId, key, target }` | 길드장만 |
+| `POST /guild/ABCD2345/disband` | `{ memberId, key }` | 길드장만 — 길드를 통째로 지운다 |
+
+- `member`(방 사진) — `{ trainer, theme, furni[], mons[{ line, dexId, name, shiny, stage, level }], dex{seen,total}, graduated, lastGrad, wins, team }`.
+  서버는 꼴만 보고(`cleanSnap`) 모르는 칸·틀린 값은 버립니다
+- 계정이 없습니다. `key` 는 들어갈 때 한 번 주고, 서버에는 SHA-256 해시만 남깁니다
+- 길드 코드는 헷갈리는 글자(0·O·1·I)를 뺀 8글자. 앱에는 `GLD-` 를 붙여 보여 줍니다
+- 길드가 생긴 뒤 처음 배포할 때 `wrangler.toml` 의 마이그레이션 `v2`(Guild)가 같이 적용됩니다

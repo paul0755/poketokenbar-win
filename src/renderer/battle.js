@@ -442,6 +442,32 @@
     }
   };
 
+  /**
+   * 길드원과 결투 — 방 탭의 길드 화면이 부른다(guild.js). 결과는 메인이 끝까지 계산하고
+   * 여기서 결투 탭으로 넘어와 재생만 한다. 친선 배틀과 같다(Lv.50, 보상 없음).
+   */
+  window.ptbGuildBattle = async (memberId) => {
+    if (playing) return { ok: false, reason: "이미 결투 중입니다" };
+    const r = await window.ptb.guildBattle(memberId);
+    if (!r || !r.ok) return r || { ok: false };
+    setTab("battle");
+    playing = true;
+    fast = false;
+    $("btlGo").disabled = $("btlDesk").disabled = true;
+    updateGo();
+    $("btlSkip").hidden = false;
+    try {
+      $("arena").scrollIntoView({ behavior: "smooth", block: "start" });
+      await play(r);
+    } finally {
+      playing = false;
+      $("btlSkip").hidden = true;
+      if (last) fillPick(last);
+      updateGo();
+    }
+    return { ok: true };
+  };
+
   /* ---------------- 재생 ---------------- */
 
   function setSide(i, m, f) {

@@ -261,7 +261,8 @@ function liveRegister(id) {
 }
 
 async function friendBattle(code, opts = {}) {
-  const team = opts.live ? liveTeam : save.friendTeam;
+  // opts.team — 길드 결투. 길드에 올려 둔 내 대표 팀 코드로 싸운다
+  const team = opts.team ? { code: opts.team } : opts.live ? liveTeam : save.friendTeam;
   if (!team) return { ok: false, reason: opts.live ? "실시간 배틀에서 내 포켓몬을 골라 주세요" : "먼저 내 팀을 등록해 코드를 만들어 주세요" };
   const mine = friend.decode(team.code);
   if (mine.error) return { ok: false, reason: "등록한 내 코드가 이 버전과 맞지 않습니다. 다시 등록해 주세요" };
@@ -450,6 +451,224 @@ function feedBerry(id, key) {
       ? `${name}은(는) ${b.n}을 맛있게 먹었다! 토큰 경험치 2배가 오래 갑니다`
       : `${name}은(는) ${b.n}을 먹었다. 토큰 경험치 2배`,
   };
+}
+
+/* ---------------- 길드 (server/src/guild.js) ----------------
+   길드원들의 방과 포켓몬을 모아 본다. 내 방은 "방 사진"(guildSnap)으로 올리고, 남의 방은
+   받아서 방 탭이 그대로 그린다. 길드원과는 올려 둔 대표 팀 코드로 바로 친선 배틀을 한다 —
+   상대가 꺼져 있어도 된다(친선 배틀은 두 코드만 있으면 같은 결투가 나온다).
+   온라인 기능을 켰을 때만 서버에 닿는다. 토큰 기록은 보내지 않는다. */
+
+const guildBase = () => onlineCfg().relay.replace(/^ws(s?):/, "http$1:").replace(/\/+$/, "") + "/guild";
+
+async function guildCall(path, body) {
+  if (!onlineCfg().enabled) return { ok: false, reason: "설정 › 온라인 기능을 켜야 길드를 쓸 수 있습니다" };
+  try {
+    const res = await fetch(guildBase() + path, {
+      method: body ? "POST" : "GET",
+      headers: body ? { "content-type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(10_000),
+    });
+    const text = await res.text().catch(() => "");
+    let j = null;
+    try { j = JSON.parse(text); } catch {}
+    if (j) return { ...j, status: res.status };
+    // 길드가 생기기 전 서버는 모르는 주소에 이름표만 돌려준다
+    if (text.startsWith("PokeTokenBar relay")) return { ok: false, reason: "이 중계 서버는 아직 길드를 모릅니다. 서버를 새로 배포해야 합니다(server/README.md)" };
+    return { ok: false, reason: `서버 응답을 읽지 못했습니다 (${res.status})` };
+  } catch {
+    return { ok: false, reason: "서버에 닿지 못했습니다. 인터넷이나 설정 › 온라인 기능의 서버 주소를 확인해 주세요" };
+  }
+}
+
+/**
+ * 길드에 올리는 대표 팀 코드 — 방에 둔 첫 아이(없으면 키우는 아이).
+ * 친선 코드는 만들 때마다 nonce 가 달라서, 아이·레벨이 그대로면 전에 만든 걸 다시 쓴다.
+ * 안 그러면 갱신할 때마다 코드가 바뀌어 매번 올리게 된다.
+ */
+let guildTeam = { key: "", code: "" };
+function guildTeamCode() {
+  const m = box.find(save.box, room.monsIn(save, isEggMon)[0]) || box.active(save);
+  if (!m || isEggMon(m)) return "";
+  const grown = box.effOf(m, growthSpeed());
+  const p = profile.build(box.withLv(m, growthSpeed()), grown);
+  const key = [m.id, poke.stageFor(grown), p ? p.level : 0, (m.tmMoves || []).length, m.nature, save.trainerName].join("|");
+  if (guildTeam.key !== key) guildTeam = { key, code: friend.encode(box.withLv(m, growthSpeed()), grown, save.trainerName) };
+  return guildTeam.code;
+}
+
+const dexCount = () => ({
+  seen: dexSpecies().filter((sp) => (save.maxStage[sp.line] ?? -1) >= sp.stage).length,
+  total: dexSpecies().length,
+});
+
+/** 내 방 사진. 서버가 꼴을 다시 본다(guild.js cleanSnap) */
+function guildSnap() {
+  const st = roomState();
+  const mons = st.mons
+    .map((id) => box.find(save.box, id))
+    .filter(Boolean)
+    .map((m) => {
+      const e = box.effOf(m, growthSpeed());
+      const d = poke.describe(e, m.line, { shiny: m.shiny });
+      const p = profile.build(box.withLv(m, growthSpeed()), e);
+      return { line: m.line, dexId: d.dexId, name: d.name, shiny: d.isShiny, stage: d.stage.key, level: p ? p.level : 1 };
+    });
+  return {
+    trainer: save.trainerName || "",
+    theme: st.theme,
+    furni: st.furni.filter((f) => f.on).map((f) => f.id),
+    mons,
+    dex: dexCount(),
+    graduated: st.graduated,
+    lastGrad: st.lastGrad || "",
+    wins: st.wins,
+    team: guildTeamCode(),
+  };
+}
+
+/** 내 칸 열쇠가 더는 안 맞는다 — 내보내졌거나 길드가 없어졌다. 화면이 알려 주고 지운다 */
+function guildGone(r) {
+  if (save.guild && (r.status === 403 || r.status === 404)) {
+    save.guild.gone = r.status === 404 ? "길드가 없어졌습니다" : "길드에서 내보내졌습니다";
+    writeSave();
+    refresh(true);
+  }
+}
+
+let guildPushed = { body: "", at: 0 };
+/** 바뀐 게 있으면 올린다. 갱신마다 불리지만 같으면 보내지 않고, 1분에 한 번까지 */
+async function guildPush(force = false) {
+  const g = save.guild;
+  if (!g || g.gone || !onlineCfg().enabled || !save.trainerName) return;
+  const snap = guildSnap();
+  const body = JSON.stringify(snap);
+  if (!force && (body === guildPushed.body || Date.now() - guildPushed.at < 60_000)) return;
+  guildPushed = { body, at: Date.now() };
+  const r = await guildCall(`/${g.code}/update`, { memberId: g.memberId, key: g.key, member: snap });
+  if (r.ok && Boolean(r.leader) !== Boolean(g.leader)) { g.leader = Boolean(r.leader); writeSave(); }
+  if (!r.ok) {
+    if (r.status === 429) guildPushed.body = ""; // 너무 잦았다 — 다음 갱신 때 다시
+    guildGone(r);
+  }
+}
+
+function setTrainer(trainer) {
+  const t = String(trainer || "").trim().slice(0, 16);
+  if (!t) return false;
+  save.trainerName = t;
+  return true;
+}
+
+async function guildCreate({ name, trainer } = {}) {
+  if (save.guild && !save.guild.gone) return { ok: false, reason: "이미 길드에 들어가 있습니다. 나간 뒤에 만들어 주세요" };
+  if (!setTrainer(trainer)) return { ok: false, reason: "트레이너 이름을 넣어 주세요" };
+  if (!String(name || "").trim()) return { ok: false, reason: "길드 이름을 넣어 주세요" };
+  const r = await guildCall("", { name: String(name).trim().slice(0, 20), member: guildSnap() });
+  if (!r.ok) return r;
+  save.guild = { code: r.code, name: r.name, memberId: r.memberId, key: r.key, leader: true };
+  guildPushed = { body: "", at: Date.now() };
+  writeSave();
+  refresh(true);
+  return { ok: true, code: r.code, message: `길드 "${r.name}"를 만들었습니다. 코드를 친구에게 알려 주세요` };
+}
+
+async function guildJoin({ code, trainer } = {}) {
+  if (save.guild && !save.guild.gone) return { ok: false, reason: "이미 길드에 들어가 있습니다. 나간 뒤에 들어가 주세요" };
+  if (!setTrainer(trainer)) return { ok: false, reason: "트레이너 이름을 넣어 주세요" };
+  const c = String(code || "").toUpperCase().replace(/^GLD-?/, "").replace(/[^A-Z0-9]/g, "");
+  if (!/^[A-HJ-NP-Z2-9]{8}$/.test(c)) return { ok: false, reason: "길드 코드는 8글자입니다 (예: GLD-ABCD2345)" };
+  const r = await guildCall(`/${c}/join`, { member: guildSnap() });
+  if (!r.ok) return r;
+  save.guild = { code: c, name: r.name, memberId: r.memberId, key: r.key, leader: false };
+  guildPushed = { body: "", at: Date.now() };
+  writeSave();
+  refresh(true);
+  return { ok: true, message: `길드 "${r.name}"에 들어왔습니다` };
+}
+
+async function guildLeave() {
+  const g = save.guild;
+  if (!g) return { ok: true };
+  if (!g.gone) {
+    const r = await guildCall(`/${g.code}/leave`, { memberId: g.memberId, key: g.key });
+    // 이미 내보내졌거나 길드가 없으면 서버에 지울 것도 없다 — 내 쪽만 지우면 된다
+    if (!r.ok && r.status !== 403 && r.status !== 404) return r;
+  }
+  save.guild = null;
+  guildCache = null;
+  writeSave();
+  refresh(true);
+  return { ok: true, message: "길드에서 나왔습니다" };
+}
+
+async function guildKick(target) {
+  const g = save.guild;
+  if (!g || !g.leader) return { ok: false, reason: "길드장만 내보낼 수 있습니다" };
+  const r = await guildCall(`/${g.code}/kick`, { memberId: g.memberId, key: g.key, target });
+  return r.ok ? { ok: true, message: "내보냈습니다" } : r;
+}
+
+/**
+ * 길드 보기 — 길드원마다 방을 그릴 수 있는 꼴로 바꾼다. 스프라이트는 내 PC 캐시에서
+ * (처음 보는 종이면 받아서). 남의 팀 코드는 화면에 넘기지 않고 여기 둔다(결투에만 쓴다).
+ */
+let guildCache = null; // { members: Map(id → team) }
+async function guildView() {
+  const g = save.guild;
+  if (!g) return { ok: false, reason: "길드에 들어가 있지 않습니다" };
+  if (g.gone) return { ok: false, gone: g.gone, reason: g.gone };
+  await guildPush().catch(() => {}); // 내 칸이 최신이어야 다른 사람이 보는 내 방도 맞다
+  const r = await guildCall(`/${g.code}`);
+  if (!r.ok) {
+    guildGone(r);
+    return r;
+  }
+  if (!r.members.some((m) => m.id === g.memberId)) {
+    guildGone({ status: 403 });
+    return { ok: false, gone: "길드에서 내보내졌습니다", reason: "길드에서 내보내졌습니다" };
+  }
+  const leader = r.leader === g.memberId;
+  if (leader !== Boolean(g.leader) || r.name !== g.name) { g.leader = leader; g.name = r.name; writeSave(); }
+
+  const url = async (dexId, shiny, kind) => {
+    const p = await poke.spriteWithFallback({ dexId, isShiny: shiny }, CACHE, kind).catch(() => null);
+    return p ? pathToFileURL(p).href : null;
+  };
+  guildCache = { members: new Map() };
+  const members = await Promise.all(r.members.map(async (m) => {
+    const s = m.snap || {};
+    guildCache.members.set(m.id, s.team || "");
+    const mons = await Promise.all((s.mons || []).map(async (x, i) => ({
+      id: m.id + ":" + i,
+      name: x.name,
+      shiny: x.shiny,
+      stageKey: x.stage,
+      profile: { level: x.level },
+      url: await url(x.dexId, x.shiny, "still"),
+      animUrl: await url(x.dexId, x.shiny, "anim"),
+    })));
+    return {
+      id: m.id,
+      me: m.id === g.memberId,
+      leader: m.id === r.leader,
+      trainer: s.trainer,
+      updated: m.updated,
+      canBattle: Boolean(s.team) && m.id !== g.memberId,
+      room: { theme: s.theme, furni: s.furni || [], mons, dex: s.dex || { seen: 0, total: 0 }, wins: s.wins || 0, graduated: s.graduated || 0, lastGrad: s.lastGrad || "" },
+    };
+  }));
+  return { ok: true, code: r.code, name: r.name, max: r.max, leader, members, now: r.now };
+}
+
+/** 길드원과 결투 — 내 대표 팀 코드 vs 그 사람이 올려 둔 코드. Lv.50, 보상 없음 */
+async function guildBattle(memberId) {
+  const theirs = guildCache && guildCache.members.get(memberId);
+  if (!theirs) return { ok: false, reason: "이 길드원은 아직 대표 포켓몬을 올리지 않았습니다" };
+  const mine = guildTeamCode();
+  if (!mine) return { ok: false, reason: "방에 둘 포켓몬이 없습니다(알은 싸울 수 없습니다)" };
+  return friendBattle(theirs, { team: mine });
 }
 
 /* ---------------- 버닝타임 (burning.js) ---------------- */
@@ -689,6 +908,11 @@ let save = {
   online: { enabled: false, relay: "" },
   /** 방해 금지 시간. 이 사이에는 저절로 나오지 않는다 (wild.js inQuiet) */
   wildQuiet: { enabled: false, from: 22, to: 8 },
+  /**
+   * 들어가 있는 길드. { code, name, memberId, key, leader } — key 는 서버가 준 내 칸 열쇠.
+   * 내보내졌거나 길드가 없어졌으면 gone 에 이유가 남는다(화면이 알려 주고 지운다).
+   */
+  guild: null,
   /** 버닝타임 — 정해 둔 시간에 쓴 토큰은 성장 몇 배 (burning.js). 없으면 기본(코어 10~16 · 야근 18~0, 4배) */
   burning: null,
   /** 상점에서 산 볼. 몬스터볼은 출현마다 공짜로 주니 여기 없다 */
@@ -1113,6 +1337,7 @@ async function buildStats() {
     berries: berryBag(),
     stones: stoneCount(),
     room: roomState(),
+    guild: save.guild ? { code: save.guild.code, name: save.guild.name, leader: Boolean(save.guild.leader), memberId: save.guild.memberId, gone: save.guild.gone || null } : null,
     burning: burning.status(new Date(), burn),
     online: onlineCfg(),
     friend: {
@@ -1249,6 +1474,7 @@ async function refresh(force = false) {
     // "왜 안 바뀌지"의 절반은 갱신이 안 된 건지 값이 그대로인 건지 모르는 데서 온다.
     s.scannedAt = Date.now();
     lastStats = s;
+    guildPush().catch((e) => console.error("[guild]", e.message)); // 방이 바뀌었으면 길드에도 올린다
     sendNotifications(s);
     if (s.burning) notifyBurning(s.burning);
     push(win, s);
@@ -2782,6 +3008,12 @@ app.whenReady().then(async () => {
     }
     flyBall(vx, vy);
   });
+  ipcMain.handle("guild-create", (_e, a) => guildCreate(a));
+  ipcMain.handle("guild-join", (_e, a) => guildJoin(a));
+  ipcMain.handle("guild-leave", () => guildLeave());
+  ipcMain.handle("guild-kick", (_e, id) => guildKick(String(id || "")));
+  ipcMain.handle("guild-view", () => guildView());
+  ipcMain.handle("guild-battle", (_e, id) => guildBattle(String(id || "")));
   ipcMain.handle("room-buy", (_e, { kind, id } = {}) => roomBuy(kind, id));
   ipcMain.handle("room-set", (_e, patch) => roomSet(patch || {}));
   ipcMain.handle("toggle-stone", (_e, id) => toggleStone(id));

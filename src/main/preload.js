@@ -40,6 +40,13 @@ contextBridge.exposeInMainWorld("ptb", {
   // 미니룸
   roomBuy: (a) => ipcRenderer.invoke("room-buy", a),
   roomSet: (patch) => ipcRenderer.invoke("room-set", patch),
+  // 길드
+  guildCreate: (a) => ipcRenderer.invoke("guild-create", a),
+  guildJoin: (a) => ipcRenderer.invoke("guild-join", a),
+  guildLeave: () => ipcRenderer.invoke("guild-leave"),
+  guildKick: (id) => ipcRenderer.invoke("guild-kick", id),
+  guildView: () => ipcRenderer.invoke("guild-view"),
+  guildBattle: (id) => ipcRenderer.invoke("guild-battle", id),
   battleDesktop: (a) => ipcRenderer.invoke("battle-desktop", a),
   // 친선 배틀 — 코드 만들기 · 받은 코드 보기 · 싸우기
   friendRegister: (a) => ipcRenderer.invoke("friend-register", a),

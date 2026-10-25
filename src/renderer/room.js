@@ -24,9 +24,7 @@
   const AW = 320; // 그림 좌표(픽셀)
   const AH = 200;
   const FLOOR = 124; // 벽과 바닥의 경계
-  let last = null;
-  let sceneKey = "";
-  let scene = null; // 지금 그린 방 — 가구 자리(행동이 쓴다)
+  let last = null; // 마지막 갱신 — 꾸미기 패널이 쓴다
 
   /* ================= 그리기 도구 ================= */
 
@@ -414,31 +412,201 @@
     cushion: { x: X(38), y: Y(178), face: 1 },
     bed: { x: X(66), y: Y(117), face: 1 },
     tv: { x: X(168), y: Y(150), face: 1 },
+    fountain: { x: X(160), y: Y(176), face: 1 },
   };
 
-  /* ================= 방 그리기 ================= */
+  /* ================= 방 하나 =================
+     내 방과 길드원의 방이 같은 코드로 그려진다. 그릴 거리(data)는 이런 꼴이다:
+       { theme, furni: [놓은 가구 id], mons: [{ id, name, url, animUrl, stageKey, shiny, profile, active }],
+         dex: { seen, total }, wins, graduated, lastGrad, trainer } */
 
   const SIZE = { baby: 10.5, mid: 12.5, final: 15, master: 15 }; // 방 너비의 %
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const rooms = new Set();
 
-  function paintScene(s) {
-    const R0 = s.room;
-    const on = new Set(R0.furni.filter((f) => f.on).map((f) => f.id));
-    const theme = THEMES[R0.theme] ? R0.theme : "cabin";
+  function create(el) {
+    if (!el.querySelector(".rm-scene")) {
+      el.insertAdjacentHTML("beforeend", '<div class="rm-scene"></div><div class="rm-actors"></div><div class="rm-empty" hidden>방에 둔 포켓몬이 없습니다</div>');
+    }
+    const Rm = { el, key: "", scene: null, actors: new Map(), data: null };
+    rooms.add(Rm);
+    return {
+      render: (d) => render(Rm, d),
+      setEmpty: (text) => (el.querySelector(".rm-empty").textContent = text),
+    };
+  }
+
+  function render(Rm, d) {
+    Rm.data = d;
+    const key = JSON.stringify([d.kind, d.code, d.guildName, d.count, d.theme, d.furni, d.dex && d.dex.seen, d.dex && d.dex.total, d.wins, d.graduated, d.lastGrad, d.trainer, period(d.theme)]);
+    if (key !== Rm.key) {
+      Rm.key = key;
+      if (d.kind === "hall") paintHall(Rm, d);
+      else paintScene(Rm, d);
+      release(Rm);
+    }
+    syncActors(Rm, d.mons || []);
+  }
+
+  /* ================= 길드 홀 =================
+     길드는 방처럼 꾸미지 않는다 — 모두가 모이는 곳이라 따로 그린다. 돌벽, 길드 색 깃발,
+     횃불, 길드 이름 간판, 가운데 분수. 길드원마다 대표 포켓몬 한 마리가 이름표를 달고 모인다.
+     길드 색은 길드 코드로 정한다(같은 길드면 누구 화면에서나 같은 색). */
+
+  const GUILD_COLORS = [
+    ["#c62828", "#ef9a9a", "#8e1b1b"], ["#1565c0", "#90caf9", "#0d3f7d"], ["#2e7d32", "#a5d6a7", "#1b4d1f"],
+    ["#6a1b9a", "#ce93d8", "#45106a"], ["#ef6c00", "#ffcc80", "#a84b00"], ["#00838f", "#80deea", "#005058"],
+  ];
+  function guildColor(code) {
+    let h = 0;
+    for (const c of String(code || "")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return GUILD_COLORS[h % GUILD_COLORS.length];
+  }
+
+  function hallWall(g) {
+    R(g, 0, 0, AW, FLOOR, "#8f877c");
+    const r = seeded(31);
+    for (let y = 8, row = 0; y < FLOOR - 6; y += 10, row++) {
+      for (let x = (row % 2) * -10; x < AW; x += 20) {
+        const shade = r();
+        R(g, x, y, 20, 10, "#6f675d"); // 줄눈
+        R(g, x + 1, y + 1, 18, 8, shade < 0.33 ? "#9a9186" : shade < 0.66 ? "#a39a8e" : "#928a7f");
+        R(g, x + 1, y + 1, 18, 1, "#b2a99c");
+      }
+    }
+    // 천장 들보
+    R(g, 0, 0, AW, 8, "#5d4037"); R(g, 0, 7, AW, 1, "#3e2723");
+    for (let x = 10; x < AW; x += 50) { R(g, x, 0, 6, 10, "#4e342e"); R(g, x, 9, 6, 1, "#3e2723"); }
+  }
+
+  function hallFloor(g) {
+    R(g, 0, FLOOR, AW, AH - FLOOR, "#7e776d");
+    const r = seeded(17);
+    for (let y = FLOOR + 3, row = 0; y < AH; y += 8, row++) {
+      for (let x = (row % 2) * 7; x < AW; x += 14) {
+        const c = r() < 0.5 ? "#8c8579" : "#857e72";
+        oval(g, x + 6, y + 2, 6, 3, "#6b655c");
+        oval(g, x + 6, y + 2, 5, 2, c);
+        R(g, x + 3, y, 3, 1, "#9c958a");
+      }
+    }
+  }
+
+  function banner(g, x, col) {
+    const [c, hi, dk] = col;
+    R(g, x - 3, 12, 32, 3, "#c9a227"); R(g, x - 3, 12, 32, 1, "#ffe28a"); // 봉
+    for (let y = 15; y < 72; y++) {
+      const inset = y > 62 ? (y - 62) : 0; // 아래가 뾰족하다
+      R(g, x + inset, y, 26 - inset * 2, 1, y % 2 ? c : c);
+      R(g, x + inset, y, 1, 1, dk); R(g, x + 25 - inset, y, 1, 1, dk);
+    }
+    R(g, x + 2, 17, 22, 1, hi);
+    // 문장 — 방패에 별
+    for (let i = 0; i < 16; i++) { const w = i < 10 ? 14 : 14 - (i - 9) * 2; R(g, x + 13 - (w >> 1), 26 + i, w, 1, i === 0 ? "#fff" : "#f5f5f5"); }
+    for (let i = 0; i < 7; i++) R(g, x + 13 - Math.floor(i / 2), 29 + i, 1 + Math.floor(i / 2) * 2, 1, c);
+    R(g, x + 9, 32, 9, 1, c);
+  }
+
+  function torch(g, x, night) {
+    // 둘레 빛
+    const a = night ? 0.28 : 0.12;
+    for (let r = 26; r > 4; r -= 6) { g.fillStyle = `rgba(255, 170, 60, ${a / 3})`; g.beginPath(); g.ellipse(x + 2, 40, r, r * 0.9, 0, 0, Math.PI * 2); g.fill(); }
+    R(g, x, 44, 5, 12, "#5d4037"); R(g, x - 2, 44, 9, 2, "#3e2723"); R(g, x - 1, 54, 7, 2, "#3e2723");
+    oval(g, x + 2, 39, 4, 6, "#ff7043"); oval(g, x + 2, 40, 3, 4, "#ffb74d"); oval(g, x + 2, 41, 1, 2, "#fff3c4");
+  }
+
+  function sign(g) {
+    box(g, 108, 16, 104, 28, "#8d5a34", "#4e3018", "#a8743f", "#6b4424");
+    R(g, 111, 19, 98, 22, "#7a4e2a");
+    R(g, 108, 16, 104, 2, "#c9a227"); R(g, 108, 42, 104, 2, "#c9a227");
+    for (const x of [111, 207]) { R(g, x, 13, 2, 4, "#6d6d6d"); }
+  }
+
+  function noticeBoard(g) {
+    box(g, 226, 62, 40, 32, "#c8a46e", "#6b4424", "#dcbc88", "#a8834f"); // 코르크
+    const notes = [[230, 66, "#fff9c4"], [245, 64, "#ffffff"], [233, 79, "#e1f5fe"], [251, 77, "#fce4ec"]];
+    for (const [x, y, c] of notes) { R(g, x, y, 12, 11, c); R(g, x + 2, y + 3, 8, 1, "#9e9e9e"); R(g, x + 2, y + 6, 6, 1, "#bdbdbd"); R(g, x + 5, y - 1, 2, 2, "#e53935"); }
+  }
+
+  const HALL = {
+    fountain: { x: 126, y: 120, w: 68, h: 48, draw(g) {
+      oval(g, 34, 38, 33, 9, "#5f5a52"); // 바닥 그늘
+      oval(g, 34, 35, 32, 9, "#a39a8e"); oval(g, 34, 35, 30, 7, "#8f877c"); // 테두리 돌
+      oval(g, 34, 34, 27, 6, "#4fa3d9"); oval(g, 34, 33, 22, 4, "#6ec3f4"); // 물
+      for (let i = 0; i < 6; i++) R(g, 16 + i * 7, 32 + (i % 2), 3, 1, "#cfefff");
+      R(g, 30, 14, 8, 20, "#9a9186"); R(g, 30, 14, 2, 20, "#b2a99c"); // 기둥
+      oval(g, 34, 14, 12, 3, "#a39a8e"); oval(g, 34, 13, 10, 2, "#6ec3f4"); // 위 그릇
+      for (const [x, y] of [[24, 16], [22, 20], [21, 25], [44, 16], [46, 20], [47, 25]]) R(g, x, y, 1, 3, "#bfeaff"); // 물줄기
+      R(g, 33, 4, 2, 9, "#bfeaff"); R(g, 32, 3, 4, 2, "#e3f6ff");
+    } },
+    treeL: { x: 6, y: 138, w: 26, h: 54, draw: (g) => pottedTree(g) },
+    treeR: { x: 288, y: 138, w: 26, h: 54, draw: (g) => pottedTree(g) },
+  };
+  function pottedTree(g) {
+    box(g, 5, 40, 16, 14, "#8d5a34", "#4e3018", "#a8743f", "#6b4424");
+    R(g, 12, 26, 2, 15, "#5d4037");
+    oval(g, 13, 16, 12, 12, "#2e6b3a"); oval(g, 11, 14, 9, 9, "#3f8a4a"); oval(g, 9, 11, 4, 4, "#5aa864");
+  }
+
+  function paintHall(Rm, d) {
+    const per = period("hall");
+    const night = per === "night";
+    const col = guildColor(d.code);
+    const [base, g] = canvas(AW, AH);
+    hallWall(g);
+    R(g, 0, FLOOR - 6, AW, 6, "#5f574e"); R(g, 0, FLOOR - 6, AW, 1, "#7a7268"); R(g, 0, FLOOR - 1, AW, 1, "#4a433b");
+    hallFloor(g);
+    dither(g, 0, FLOOR, AW, 3, "#0000002e");
+    // 길 — 입구에서 분수까지 깐 길드 색 융단
+    for (let y = FLOOR; y < AH; y++) { const w = 24 + Math.round((y - FLOOR) * 0.5); R(g, 160 - w, y, w * 2, 1, (y - FLOOR) % 6 ? col[0] : col[2]); }
+    for (let y = FLOOR; y < AH; y++) { const w = 24 + Math.round((y - FLOOR) * 0.5); R(g, 160 - w, y, 2, 1, "#c9a227"); R(g, 160 + w - 2, y, 2, 1, "#c9a227"); }
+    banner(g, 30, col); banner(g, 264, col);
+    sign(g);
+    noticeBoard(g);
+    torch(g, 84, night); torch(g, 232, night);
+    if (per !== "day") { g.fillStyle = night ? "rgba(10, 14, 40, .3)" : "rgba(60, 20, 40, .1)"; g.fillRect(0, 0, AW, AH); }
+
+    const html = [];
+    for (const [id, f] of Object.entries(HALL)) {
+      html.push(`<canvas class="rm-f" data-h="${id}" width="${f.w}" height="${f.h}" style="left:${X(f.x)}%; top:${Y(f.y)}%; width:${X(f.w)}%; height:${Y(f.h)}%; z-index:${(f.y + f.h) * 10};"></canvas>`);
+    }
+    html.push(`<i class="rm-spark" style="left:${X(158)}%; top:${Y(122)}%; z-index:1700"></i><i class="rm-spark b" style="left:${X(168)}%; top:${Y(130)}%; right:auto; z-index:1700"></i>`);
+    html.push(`<span class="rm-txt sign" style="left:${X(160)}%; top:${Y(30)}%;">${esc(d.guildName || "길드")}</span>`);
+    html.push(`<span class="rm-txt lt" style="left:${X(246)}%; top:${Y(98)}%;">길드 게시판</span>`);
+    html.push(`<div class="rm-plate"><b>${esc(d.guildName || "길드")}</b> 길드 홀<br>길드원 ${d.count || 0}명</div>`);
+
+    Rm.el.dataset.theme = "hall";
+    Rm.el.dataset.per = per;
+    const layer = Rm.el.querySelector(".rm-scene");
+    layer.innerHTML = "";
+    base.className = "rm-base";
+    layer.appendChild(base);
+    layer.insertAdjacentHTML("beforeend", html.join(""));
+    for (const c of layer.querySelectorAll("canvas.rm-f")) {
+      const g2 = c.getContext("2d");
+      g2.imageSmoothingEnabled = false;
+      HALL[c.dataset.h].draw(g2);
+    }
+    Rm.scene = { on: new Set(["fountain"]), per, theme: "hall", hall: true };
+  }
+
+  function paintScene(Rm, d) {
+    const on = new Set((d.furni || []).filter((id) => FURN[id] || ["window", "rug", "poster"].includes(id)));
+    const theme = THEMES[d.theme] ? d.theme : "cabin";
     const per = period(theme);
     const T = THEMES[theme];
-    const dex = s.dex || { seen: 0, total: 0 };
+    const dex = d.dex || { seen: 0, total: 0 };
 
     const [base, g] = canvas(AW, AH);
     T.wall(g);
-    R(g, 0, FLOOR - 6, AW, 6, T.trim[0]); R(g, 0, FLOOR - 6, AW, 1, T.trim[2]); R(g, 0, FLOOR - 1, AW, 1, T.trim[1]);
+    trim(g, T);
     T.floor(g);
     dither(g, 0, FLOOR, AW, 3, "#0000002e"); // 벽 아래 그늘
     if (on.has("window")) drawWindow(g, theme, per);
     drawDexFrame(g);
-    if (R0.wins > 0) drawBadges(g, R0.wins);
+    if (d.wins > 0) drawBadges(g, d.wins);
     if (on.has("poster")) drawPoster(g);
-    if (R0.graduated > 0) drawTrophies(g, R0.graduated);
+    if (d.graduated > 0) drawTrophies(g, d.graduated);
     if (on.has("rug")) drawRug(g);
     // 밤이면 방이 어두워지고 램프 둘레만 밝다
     if (per === "night" || per === "evening") {
@@ -462,14 +630,13 @@
     }
     // 글자 — 캔버스에 쓰면 뭉개진다
     html.push(`<span class="rm-txt" style="left:${X(116)}%; top:${Y(41)}%;">${dex.seen}/${dex.total}</span>`);
-    if (R0.wins > 0) html.push(`<span class="rm-txt lt" style="left:${X(161)}%; top:${Y(52)}%;">${R0.wins}승</span>`);
-    if (R0.graduated > 0) html.push(`<span class="rm-txt sm" style="left:${X(292)}%; top:${Y(44)}%;">졸업<br>${esc(R0.lastGrad || "")}</span>`);
-    html.push(`<div class="rm-plate"><b>${esc((s.friend && s.friend.trainer) || "나")}</b>의 방<br>도감 ${dex.seen} · 졸업 ${R0.graduated}</div>`);
+    if (d.wins > 0) html.push(`<span class="rm-txt lt" style="left:${X(161)}%; top:${Y(52)}%;">${d.wins}승</span>`);
+    if (d.graduated > 0) html.push(`<span class="rm-txt sm" style="left:${X(292)}%; top:${Y(44)}%;">졸업<br>${esc(d.lastGrad || "")}</span>`);
+    html.push(`<div class="rm-plate"><b>${esc(d.trainer || "나")}</b>의 방<br>도감 ${dex.seen} · 졸업 ${d.graduated || 0}</div>`);
 
-    const room = $("rmRoom");
-    room.dataset.theme = theme;
-    room.dataset.per = per; // 밤이면 가구·아이들도 같이 어두워진다(room.css)
-    const layer = room.querySelector(".rm-scene");
+    Rm.el.dataset.theme = theme;
+    Rm.el.dataset.per = per; // 밤이면 가구·아이들도 같이 어두워진다(room.css)
+    const layer = Rm.el.querySelector(".rm-scene");
     layer.innerHTML = "";
     base.className = "rm-base";
     layer.appendChild(base);
@@ -479,14 +646,18 @@
       g2.imageSmoothingEnabled = false;
       FURN[c.dataset.f].draw(g2);
     }
-    scene = { on, per, theme };
+    Rm.scene = { on, per, theme };
+  }
+
+  /** 벽과 바닥 사이 띠 */
+  function trim(g, T) {
+    R(g, 0, FLOOR - 6, AW, 6, T.trim[0]); R(g, 0, FLOOR - 6, AW, 1, T.trim[2]); R(g, 0, FLOOR - 1, AW, 1, T.trim[1]);
   }
 
   /* ================= 포켓몬 ================= */
 
-  const actors = new Map(); // id → 상태
   const rand = (a, b) => a + Math.random() * (b - a);
-  const nightish = () => scene && scene.per === "night";
+  const nightish = (Rm) => Rm.scene && Rm.scene.per === "night";
 
   function hPct(a) { return a.h * 1.6; } // 방은 16:10 — 너비 1% 는 높이 1.6%
 
@@ -494,7 +665,7 @@
     a.el.style.left = a.x + "%";
     // GIF 아래쪽에 빈칸이 있어서 발이 닿도록 조금 내린다
     a.el.style.top = a.y - hPct(a) * 0.92 + "%";
-    a.el.style.zIndex = a.z != null ? a.z : Math.round(Y(0) + a.y * 2 * 10);
+    a.el.style.zIndex = a.z != null ? a.z : Math.round(a.y * 2 * 10); // y% × 2 = 그림 좌표
     a.body.classList.toggle("r", a.face < 0);
   }
 
@@ -505,17 +676,17 @@
     if (ms) a.bubT = setTimeout(() => (a.bub.className = "rm-bub"), ms);
   }
 
-  function makeActor(m) {
+  function makeActor(Rm, m) {
     const el = document.createElement("div");
     el.className = "rm-mon";
     el.innerHTML = `<div class="rm-body"><img alt=""><div class="rm-shadow"></div></div><div class="rm-bub"></div><div class="rm-tag"></div>`;
     const a = {
-      id: m.id, el, body: el.querySelector(".rm-body"), img: el.querySelector("img"), bub: el.querySelector(".rm-bub"), tag: el.querySelector(".rm-tag"),
+      R: Rm, id: m.id, el, body: el.querySelector(".rm-body"), img: el.querySelector("img"), bub: el.querySelector(".rm-bub"), tag: el.querySelector(".rm-tag"),
       x: rand(WALK.x0, WALK.x1), y: rand(WALK.y0, WALK.y1), tx: 0, ty: 0, face: Math.random() < 0.5 ? 1 : -1,
       state: "idle", t: rand(0.3, 2), goal: null, cool: rand(4, 10), z: null, h: 12, small: false,
     };
     el.addEventListener("click", () => poke(a));
-    $("rmActors").appendChild(el);
+    Rm.el.querySelector(".rm-actors").appendChild(el);
     return a;
   }
 
@@ -526,32 +697,39 @@
     const src = m.animUrl || m.url || "";
     if (a.img.getAttribute("src") !== src) a.img.src = src;
     const lv = m.profile ? ` · Lv.${m.profile.level}` : "";
-    a.tag.textContent = `${m.name}${m.shiny ? " ★" : ""}${lv}${m.active ? " · 키우는 중" : ""}`;
+    a.tag.textContent = `${m.owner ? m.owner + "의 " : ""}${m.name}${m.shiny ? " ★" : ""}${lv}${m.active ? " · 키우는 중" : ""}`;
+    let own = a.el.querySelector(".rm-own");
+    if (m.badge && !own) { a.el.insertAdjacentHTML("beforeend", '<div class="rm-own"></div>'); own = a.el.querySelector(".rm-own"); }
+    if (own) { own.hidden = !m.badge; own.textContent = m.badge || ""; own.classList.toggle("me", Boolean(m.me)); }
     a.el.classList.toggle("shiny", Boolean(m.shiny));
     if (m.shiny && !a.el.querySelector(".rm-spark")) a.el.insertAdjacentHTML("beforeend", '<i class="rm-spark"></i><i class="rm-spark b"></i>');
     place(a);
   }
 
-  function syncActors(s) {
-    const want = s.room.mons.map((id) => (s.box || []).find((m) => m.id === id)).filter(Boolean);
+  function syncActors(Rm, want) {
     const keep = new Set(want.map((m) => m.id));
-    for (const [id, a] of actors) if (!keep.has(id)) { a.el.remove(); actors.delete(id); }
+    for (const [id, a] of Rm.actors) if (!keep.has(id)) { a.el.remove(); Rm.actors.delete(id); }
     for (const m of want) {
-      const a = actors.get(m.id) || makeActor(m);
-      actors.set(m.id, a);
+      const a = Rm.actors.get(m.id) || makeActor(Rm, m);
+      Rm.actors.set(m.id, a);
       dress(a, m);
     }
-    $("rmEmpty").hidden = want.length > 0;
+    Rm.el.querySelector(".rm-empty").hidden = want.length > 0;
   }
 
   /** 자리가 사라졌으면(가구를 치웠으면) 하던 일을 그만둔다 */
-  function release() {
-    for (const a of actors.values()) {
-      if (["sit", "sleep", "eat", "watch"].includes(a.state) || a.goal) { a.state = "idle"; a.goal = null; a.z = null; a.t = rand(0.2, 1); a.el.classList.remove("sit", "sleep"); }
+  function release(Rm) {
+    for (const a of Rm.actors.values()) {
+      if (["sit", "sleep", "eat", "watch"].includes(a.state) || a.goal) {
+        a.state = "idle"; a.goal = null; a.z = null; a.at = null; a.t = rand(0.2, 1);
+        a.el.classList.remove("sit", "sleep");
+        a.bub.className = "rm-bub";
+        if (a.y < WALK.y0) a.y = WALK.y0 + 1;
+      }
     }
   }
 
-  const busyAt = (spot) => [...actors.values()].some((a) => a.goal === spot || a.at === spot);
+  const busyAt = (Rm, spot) => [...Rm.actors.values()].some((a) => a.goal === spot || a.at === spot);
 
   function walkTo(a, x, y, goal = null) {
     a.tx = x; a.ty = y; a.goal = goal; a.state = "walk"; a.at = null;
@@ -561,21 +739,29 @@
 
   /** 다음에 무엇을 할까 */
   function decide(a) {
-    const on = scene ? scene.on : new Set();
+    const Rm = a.R;
+    const on = Rm.scene ? Rm.scene.on : new Set();
     const opts = [["walk", 5], ["idle", 1.5]];
-    if (on.has("plant") && !busyAt("plant")) opts.push(["plant", 1.2]);
-    if (on.has("cushion") && a.small && !busyAt("cushion")) opts.push(["cushion", 1.3]);
-    if (on.has("tv") && !busyAt("tv")) opts.push(["tv", 1]);
-    opts.push(["sleep", nightish() ? 3.5 : 0.25]);
+    if (on.has("plant") && !busyAt(Rm, "plant")) opts.push(["plant", 1.2]);
+    if (on.has("cushion") && a.small && !busyAt(Rm, "cushion")) opts.push(["cushion", 1.3]);
+    if (on.has("tv") && !busyAt(Rm, "tv")) opts.push(["tv", 1]);
+    if (on.has("fountain")) opts.push(["fountain", 1.4]);
+    if (!(Rm.scene && Rm.scene.hall)) opts.push(["sleep", nightish(Rm) ? 3.5 : 0.25]);
     let r = Math.random() * opts.reduce((n, o) => n + o[1], 0);
     const pick = opts.find((o) => (r -= o[1]) <= 0)[0];
 
-    if (pick === "walk") walkTo(a, rand(WALK.x0, WALK.x1), rand(WALK.y0, WALK.y1));
+    if (pick === "walk") {
+      let x, y;
+      // 홀에서는 분수 뒤에 서지 않는다 — 가려서 누가 누군지 안 보인다
+      do { x = rand(WALK.x0, WALK.x1); y = rand(WALK.y0, WALK.y1); } while (Rm.scene && Rm.scene.hall && x > 36 && x < 64 && y < 87);
+      walkTo(a, x, y);
+    }
     else if (pick === "idle") { a.state = "idle"; a.t = rand(1.5, 4); }
     else if (pick === "sleep") {
-      if (on.has("bed") && !busyAt("bed")) walkTo(a, SPOT.bed.x - 3, WALK.y0 + 1, "bed");
+      if (on.has("bed") && !busyAt(Rm, "bed")) walkTo(a, SPOT.bed.x - 3, WALK.y0 + 1, "bed");
       else { a.state = "sleep"; a.t = rand(6, 12); a.el.classList.add("sleep"); say(a, "Z z", 0, "z"); }
-    } else walkTo(a, SPOT[pick].x + rand(-1.5, 1.5), SPOT[pick].y, pick);
+    } else if (pick === "fountain") walkTo(a, SPOT.fountain.x + (Math.random() < 0.5 ? -1 : 1) * rand(10, 16), SPOT.fountain.y + rand(-2, 4), "fountain");
+    else walkTo(a, SPOT[pick].x + rand(-1.5, 1.5), SPOT[pick].y, pick);
   }
 
   function arrive(a) {
@@ -586,8 +772,9 @@
     if (goal === "plant") { a.state = "eat"; a.t = rand(3, 5); a.face = SPOT.plant.face; say(a, "냠냠", 2600); }
     else if (goal === "cushion") { a.state = "sit"; a.t = rand(6, 12); a.x = SPOT.cushion.x; a.y = SPOT.cushion.y; a.z = 1910; a.el.classList.add("sit"); }
     else if (goal === "tv") { a.state = "watch"; a.t = rand(5, 9); a.face = 1; say(a, "♪", 2000); }
+    else if (goal === "fountain") { a.state = "watch"; a.t = rand(3, 6); a.face = a.x > SPOT.fountain.x ? 1 : -1; say(a, Math.random() < 0.5 ? "✨" : "♪", 1800); }
     else if (goal === "bed") {
-      a.state = "sleep"; a.t = nightish() ? rand(14, 26) : rand(6, 10);
+      a.state = "sleep"; a.t = nightish(a.R) ? rand(14, 26) : rand(6, 10);
       a.x = SPOT.bed.x; a.y = SPOT.bed.y; a.z = 1345; a.face = 1;
       a.el.classList.add("sleep"); say(a, "Z z", 0, "z");
     }
@@ -622,7 +809,7 @@
         if (a.state === "sleep") { a.bub.className = "rm-bub"; a.el.classList.remove("sleep"); }
         if (a.state === "sit") a.el.classList.remove("sit");
         a.z = null;
-        if (wasAt === "bed") { a.y = WALK.y0 + 1; }
+        if (wasAt === "bed") a.y = WALK.y0 + 1;
         decide(a);
       }
     }
@@ -631,8 +818,8 @@
   }
 
   /** 가까이 마주치면 서로 본다 — 하트나 음표 */
-  function meet() {
-    const list = [...actors.values()].filter((a) => (a.state === "walk" || a.state === "idle") && a.cool <= 0);
+  function meet(Rm) {
+    const list = [...Rm.actors.values()].filter((a) => (a.state === "walk" || a.state === "idle") && a.cool <= 0);
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
       const a = list[i], b = list[j];
       if (Math.abs(a.x - b.x) < 9 && Math.abs(a.y - b.y) < 5) {
@@ -652,13 +839,22 @@
     requestAnimationFrame(tick);
     const dt = Math.min(0.1, (now - lastT) / 1000 || 0);
     lastT = now;
-    if ($("tab-room").hidden || !actors.size) return; // 안 보이면 쉰다
-    for (const a of actors.values()) step(a, dt);
-    meet();
+    for (const Rm of rooms) {
+      if (!Rm.actors.size || !Rm.el.offsetParent) continue; // 안 보이는 방은 쉰다
+      for (const a of Rm.actors.values()) step(a, dt);
+      meet(Rm);
+    }
   }
   requestAnimationFrame(tick);
 
-  /* ================= 꾸미기 패널 ================= */
+  // 길드 화면(guild.js)이 길드원의 방을 그릴 때 쓴다
+  window.ptbRoom = { create, FURN_IDS: Object.keys(FURN) };
+
+  /* ================= 내 방 ================= */
+
+  const mine = create($("rmRoom"));
+  mine.setEmpty("아래에서 방에 둘 포켓몬을 골라 주세요");
+  const BADGE_NOTE = [1, 10, 30, 100];
 
   function renderPanel(s) {
     const R0 = s.room;
@@ -680,7 +876,7 @@
       .join("");
 
     const dex = s.dex || { seen: 0, total: 0 };
-    const next = BADGE_AT.find((n) => R0.wins < n);
+    const next = BADGE_NOTE.find((n) => R0.wins < n);
     $("rmRec").innerHTML = [
       `🖼️ <b>도감 액자</b> — 도감 ${dex.seen}/${dex.total}. 만날수록 숫자가 오른다`,
       `🏅 <b>결투 배지 진열장</b> — ${R0.wins}승${next ? ` · ${next}승이면 배지가 하나 더 빛난다` : " · 배지를 다 모았다"}`,
@@ -695,25 +891,34 @@
       .join("") || '<span class="rm-rec">알만 있습니다. 부화하면 방에 둘 수 있습니다.</span>';
   }
 
+  /** 갱신 값 → 방 그릴 거리 */
+  function myRoom(s) {
+    const R0 = s.room;
+    return {
+      theme: R0.theme,
+      furni: R0.furni.filter((f) => f.on).map((f) => f.id),
+      mons: R0.mons.map((id) => (s.box || []).find((m) => m.id === id)).filter(Boolean),
+      dex: s.dex || { seen: 0, total: 0 },
+      wins: R0.wins,
+      graduated: R0.graduated,
+      lastGrad: R0.lastGrad,
+      trainer: (s.friend && s.friend.trainer) || "나",
+    };
+  }
+
   /* ================= 연결 ================= */
 
-  function render(s) {
+  function renderMine(s) {
     if (!s || !s.room) return;
     last = s;
-    const R0 = s.room;
-    const dex = s.dex || { seen: 0 };
-    const key = JSON.stringify([R0.theme, R0.furni.filter((f) => f.on).map((f) => f.id), dex.seen, dex.total, R0.wins, R0.graduated, R0.lastGrad, s.friend && s.friend.trainer, period(R0.theme)]);
-    if (key !== sceneKey) {
-      sceneKey = key;
-      paintScene(s);
-      release();
-    }
-    syncActors(s);
+    mine.render(myRoom(s));
     renderPanel(s);
   }
 
-  // 낮 → 저녁 → 밤이 바뀌면 창밖을 다시 그린다
-  setInterval(() => last && render(last), 60_000);
+  // 낮 → 저녁 → 밤이 바뀌면 창밖을 다시 그린다(그림 열쇠에 시간대가 들어 있다)
+  setInterval(() => {
+    for (const Rm of rooms) if (Rm.data) render(Rm, Rm.data);
+  }, 60_000);
 
   const done = (r) => {
     if (!r || !r.ok) toast((r && r.reason) || "하지 못했습니다", "bad");
@@ -736,5 +941,5 @@
     }
   });
 
-  window.ptb.onStats(render);
+  window.ptb.onStats(renderMine);
 })();
