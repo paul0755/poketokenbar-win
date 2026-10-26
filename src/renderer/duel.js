@@ -85,6 +85,10 @@ function attach({ img, body, flipClass }) {
       case "say":
         duelSayText(d.text, d.kind);
         break;
+      case "transform": // 메타몽의 변신 — 상대 모습이 된다
+        if (d.url) img.src = d.url;
+        replay(img, "hit");
+        break;
       case "status":
         h.querySelector(".st").textContent = d.status ? AIL_HUD[d.status] || "" : "";
         break;

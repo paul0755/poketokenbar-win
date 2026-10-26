@@ -7,6 +7,16 @@
  * 제약: 5세대 흑백 애니메이션 스프라이트가 있는 도감 1~649번만 쓴다.
  *       라인 전체가 이 범위 안에 들어와야 채택한다 (중간만 움직이면 이상하다).
  *
+ * ── 진화하지 않는 종 (single) ──
+ * 전설·환상·메타몽·켄타로스처럼 진화가 없는 종은 알에서 키우는 재미가 없어서 처음엔 뺐다.
+ * 지금은 "만나는" 포켓몬으로 넣는다 — 알에서는 안 나오고 야생에서만 나온다(pokemon.roll 이 거른다).
+ * 다섯 칸에 같은 종을 채우고 single: true 를 단다.
+ *
+ * ── 순서를 바꾸면 안 된다 ──
+ * 세이브는 라인 번호(이 배열의 순서)로 포켓몬을 기억한다. 순서가 바뀌면 키우던 아이가 다른 종이
+ * 된다. 그래서 진화 라인은 예전처럼 정렬하고 진화 없는 종은 그 뒤에 붙인다. 이미 있는
+ * lines.json 과 앞부분이 하나라도 다르면 쓰지 않고 멈춘다.
+ *
  *   node scripts/build-lines.mjs
  */
 import fs from "node:fs";
@@ -105,17 +115,21 @@ const chains = await mapLimit(ids, CONCURRENCY, (id) =>
 );
 
 const candidates = [];
+const singleDex = []; // 진화하지 않는 종 — 뒤에 따로 붙인다
 for (const c of chains) {
   if (!c || !c.chain) continue;
   const stages = flatten(c.chain);
-  if (stages.length < 2) continue; // 진화 안 하는 종은 키우는 재미가 없다
   if (stages.some((s) => s.dex > MAX_DEX)) continue; // 애니메이션 스프라이트 없음
+  if (stages.length < 2) {
+    if (!(c.chain.evolves_to || []).length) singleDex.push(stages[0].dex);
+    continue;
+  }
   candidates.push(stages);
 }
-console.log(`  진화하는 라인 ${candidates.length}개`);
+console.log(`  진화하는 라인 ${candidates.length}개 · 진화 없는 종 ${singleDex.length}개`);
 
 console.log("종 정보(이름·포획률) 조회 중…");
-const dexes = [...new Set(candidates.flat().map((s) => s.dex))];
+const dexes = [...new Set([...candidates.flat().map((s) => s.dex), ...singleDex])];
 const info = new Map();
 await mapLimit(dexes, CONCURRENCY, async (d) => info.set(d, await species(d)));
 
@@ -147,9 +161,39 @@ for (const stages of candidates) {
 
 lines.sort((a, b) => a.ids[1] - b.ids[1]);
 
+// 진화 없는 종 — 진화 라인 뒤에, 도감 번호 순으로
+const singles = singleDex
+  .filter((d) => info.get(d) && info.get(d).name)
+  .sort((a, b) => a - b)
+  .map((d) => {
+    const i = info.get(d);
+    return {
+      line: i.name,
+      ids: [null, d, d, d, d],
+      names: ["알", i.name, i.name, i.name, i.name],
+      captureRate: i.captureRate,
+      legendary: Boolean(i.isLegendary || i.isMythical),
+      ...(i.isMythical ? { mythical: true } : {}),
+      single: true,
+    };
+  });
+
 const out = path.join(process.cwd(), "src", "main", "lines.json");
-fs.writeFileSync(out, JSON.stringify(lines, null, 1), "utf8");
-console.log(`\n✅ ${lines.length}개 라인 → ${path.relative(process.cwd(), out)}`);
+// 이미 있는 순서를 지킨다 — 세이브가 라인 번호로 포켓몬을 기억한다
+if (fs.existsSync(out)) {
+  const old = JSON.parse(fs.readFileSync(out, "utf8"));
+  const all = [...lines, ...singles];
+  const bad = old.findIndex((o, i) => !all[i] || JSON.stringify(o.ids) !== JSON.stringify(all[i].ids));
+  if (bad >= 0) {
+    console.error(`\n❌ 라인 ${bad}(${old[bad].line})의 순서·종이 예전과 다릅니다. 세이브가 깨지므로 쓰지 않습니다.`);
+    process.exit(1);
+  }
+}
+const all = [...lines, ...singles];
+fs.writeFileSync(out, JSON.stringify(all, null, 1), "utf8");
+console.log(`\n✅ 진화 라인 ${lines.length}개 + 진화 없는 종 ${singles.length}개 → ${path.relative(process.cwd(), out)}`);
+console.log(`   진화 없는 종 중 전설·환상 ${singles.filter((l) => l.legendary).length}개: ${singles.filter((l) => l.legendary).map((l) => l.line).join(", ")}`);
+console.log(`   그 밖: ${singles.filter((l) => !l.legendary).map((l) => l.line).join(", ")}`);
 
 console.log("\n성격 조회 중…");
 const nat = await natures();

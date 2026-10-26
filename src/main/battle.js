@@ -31,6 +31,7 @@ const STAT_OF = { attack: "atk", defense: "def", "special-attack": "spa", "speci
 const STAT_KO = { atk: "공격", def: "방어", spa: "특수공격", spd: "특수방어", spe: "스피드", acc: "명중률", eva: "회피율" };
 const AIL_KO = { paralysis: "마비", burn: "화상", poison: "독", sleep: "잠듦", freeze: "얼음", confusion: "혼란" };
 const MAJOR = new Set(["paralysis", "burn", "poison", "sleep", "freeze"]);
+const TRANSFORM = 144; // 변신 — 메타몽
 
 /**
  * 조사. "방어이(가)"처럼 둘 다 적으면 로그가 읽히지 않는다. 마지막 글자에 받침이
@@ -64,9 +65,12 @@ function fighter(mon, grown, level = null) {
   const st = level
     ? profile.statsOf(p.dexId, level, mon.ivs, mon.nature)
     : Object.fromEntries(p.stats.map((x) => [x.key, x.value]));
+  const d = poke.describe(grown, mon.line, { shiny: mon.shiny });
   return {
     id: mon.id,
-    name: poke.describe(grown, mon.line, { shiny: mon.shiny }).name,
+    name: d.name,
+    dexId: p.dexId, // 변신하면 상대 모습을 그린다
+    shiny: d.isShiny,
     level: level || p.level,
     types: s.types,
     stats: st,
@@ -254,6 +258,21 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
     say({ t: "info", side: i, stat: k, change: ch, text: `${nm(i)}의 ${josa(STAT_KO[k], "이가")} ${how ? how + " " : ""}${ch > 0 ? "올랐다" : "떨어졌다"}!` });
   };
 
+  /**
+   * 변신 — 원작처럼 상대의 타입 · 능력치(HP 빼고) · 랭크 · 기술을 그대로 복사한다.
+   * 화면은 transform 을 보고 상대 모습으로 바꿔 그린다. 메타몽끼리면 서로 변신만 하다 끝난다.
+   */
+  const transform = (i, j) => {
+    const me = F[i];
+    const foe = F[j];
+    me.types = [...foe.types];
+    me.stats = { ...foe.stats, hp: me.stats.hp };
+    me.stage = { ...foe.stage };
+    me.moves = foe.moves.map((m) => ({ ...m }));
+    me.transformed = true;
+    say({ t: "info", side: i, transform: { dexId: foe.dexId, shiny: foe.shiny, side: j }, text: `${josa(nm(i), "은는")} ${nm(j)}(으)로 변신했다!` });
+  };
+
   const applyAilment = (i, ail) => {
     const f = F[i];
     if (ail === "confusion") {
@@ -315,6 +334,8 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
       const acc = mv.a * stageMul(me.stage.acc - foe.stage.eva, true);
       if (rng() * 100 >= acc) return void say({ t: "info", side: i, text: `그러나 ${nm(j)}에게는 맞지 않았다!` });
     }
+
+    if (mv.id === TRANSFORM) return void transform(i, j);
 
     if (mv.c === "status") {
       let did = false;

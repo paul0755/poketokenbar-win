@@ -876,7 +876,7 @@ function toggleStone(id) {
 const SHOP = [
   { id: "egg", name: "포켓몬 알", cost: 2, desc: "평범한 알. 박스에 한 마리 늘어난다", icon: "🥚" },
   { id: "egg-super", name: "슈퍼 알", cost: 7, desc: "★3 이상 확정", icon: "🥚" },
-  { id: "egg-legend", name: "전설 알", cost: 18, desc: "★4 이상 확정", icon: "🥚" },
+  { id: "egg-legend", name: "희귀 알", cost: 18, desc: "★4 이상 확정. 진짜 전설은 알에서 안 나오고 야생에서만 만난다", icon: "🥚" },
   { id: "rare-candy", name: "이상한사탕", cost: 1, desc: "키우는 아이를 1000만 만큼 자라게 한다", icon: "🍬" },
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
   { id: "everstone", name: "변하지않는돌", cost: 3, desc: "지닌 아이는 진화하지 않는다. 박스 › 상세에서 지니게 하거나 뺀다. 빼면 돌아온다", icon: "🪨" },
@@ -1196,7 +1196,7 @@ function buy(itemId) {
   let msg = "";
   if (itemId === "egg") { hatch(0); msg = "새 알을 받았습니다"; }
   else if (itemId === "egg-super") { hatch(3); msg = "슈퍼 알 — ★3 이상"; }
-  else if (itemId === "egg-legend") { hatch(4); msg = "전설 알 — ★4 이상"; }
+  else if (itemId === "egg-legend") { hatch(4); msg = "희귀 알 — ★4 이상"; }
   else if (itemId === "mint") {
     const a = box.active(save);
     if (!a) { save.candySpent -= cost; return { ok: false, reason: "키우는 아이가 없습니다" }; }
@@ -2335,6 +2335,13 @@ async function playDuel(send, r) {
       send[ev.side]({ t: "faint" });
       await wait(900);
     } else if (ev.side >= 0) {
+      if (ev.transform) {
+        const p = await poke.spriteWithFallback({ dexId: ev.transform.dexId, isShiny: ev.transform.shiny }, CACHE, "anim").catch(() => null);
+        if (p) send[ev.side]({ t: "transform", url: pathToFileURL(p).href });
+        send[ev.side]({ t: "say", text: "변신!", kind: "up" });
+        await wait(900);
+        continue;
+      }
       if (ev.status !== undefined) send[ev.side]({ t: "status", status: ev.status && ev.status !== "unconfused" ? ev.status : null });
       const s = duelSay(ev);
       if (s && s.text) {
@@ -2601,9 +2608,12 @@ async function spawnWild() {
   W.ball.showInactive();
 
   if (save.notifyEnabled && Notification.isSupported()) {
+    const L = poke.LINES[r.line] || {};
     new Notification({
-      title: `야생 ${r.shiny ? "★ " : ""}${battle.josa(d.name, "이가")} 나타났다!`,
-      body: (isNew ? "처음 보는 포켓몬입니다. " : "") + "화면 아래 몬스터볼을 잡고 던져 보세요",
+      title: L.legendary && L.single
+        ? `✨ ${L.mythical ? "환상" : "전설"}의 포켓몬 ${battle.josa(d.name, "이가")} 나타났다!`
+        : `야생 ${r.shiny ? "★ " : ""}${battle.josa(d.name, "이가")} 나타났다!`,
+      body: (L.legendary && L.single ? "아주 잡기 어렵습니다. 결투로 약하게 만들고 하이퍼볼을 쓰세요. " : "") + (isNew ? "처음 보는 포켓몬입니다. " : "") + "화면 아래 몬스터볼을 잡고 던져 보세요",
       silent: false,
     }).show();
   }

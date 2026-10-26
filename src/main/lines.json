@@ -4252,5 +4252,1916 @@
   ],
   "captureRate": 45,
   "legendary": false
+ },
+ {
+  "line": "캥카",
+  "ids": [
+   null,
+   115,
+   115,
+   115,
+   115
+  ],
+  "names": [
+   "알",
+   "캥카",
+   "캥카",
+   "캥카",
+   "캥카"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "쁘사이저",
+  "ids": [
+   null,
+   127,
+   127,
+   127,
+   127
+  ],
+  "names": [
+   "알",
+   "쁘사이저",
+   "쁘사이저",
+   "쁘사이저",
+   "쁘사이저"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "켄타로스",
+  "ids": [
+   null,
+   128,
+   128,
+   128,
+   128
+  ],
+  "names": [
+   "알",
+   "켄타로스",
+   "켄타로스",
+   "켄타로스",
+   "켄타로스"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "라프라스",
+  "ids": [
+   null,
+   131,
+   131,
+   131,
+   131
+  ],
+  "names": [
+   "알",
+   "라프라스",
+   "라프라스",
+   "라프라스",
+   "라프라스"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "메타몽",
+  "ids": [
+   null,
+   132,
+   132,
+   132,
+   132
+  ],
+  "names": [
+   "알",
+   "메타몽",
+   "메타몽",
+   "메타몽",
+   "메타몽"
+  ],
+  "captureRate": 35,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "프테라",
+  "ids": [
+   null,
+   142,
+   142,
+   142,
+   142
+  ],
+  "names": [
+   "알",
+   "프테라",
+   "프테라",
+   "프테라",
+   "프테라"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "프리져",
+  "ids": [
+   null,
+   144,
+   144,
+   144,
+   144
+  ],
+  "names": [
+   "알",
+   "프리져",
+   "프리져",
+   "프리져",
+   "프리져"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "썬더",
+  "ids": [
+   null,
+   145,
+   145,
+   145,
+   145
+  ],
+  "names": [
+   "알",
+   "썬더",
+   "썬더",
+   "썬더",
+   "썬더"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "파이어",
+  "ids": [
+   null,
+   146,
+   146,
+   146,
+   146
+  ],
+  "names": [
+   "알",
+   "파이어",
+   "파이어",
+   "파이어",
+   "파이어"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "뮤츠",
+  "ids": [
+   null,
+   150,
+   150,
+   150,
+   150
+  ],
+  "names": [
+   "알",
+   "뮤츠",
+   "뮤츠",
+   "뮤츠",
+   "뮤츠"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "뮤",
+  "ids": [
+   null,
+   151,
+   151,
+   151,
+   151
+  ],
+  "names": [
+   "알",
+   "뮤",
+   "뮤",
+   "뮤",
+   "뮤"
+  ],
+  "captureRate": 45,
+  "legendary": true,
+  "mythical": true,
+  "single": true
+ },
+ {
+  "line": "안농",
+  "ids": [
+   null,
+   201,
+   201,
+   201,
+   201
+  ],
+  "names": [
+   "알",
+   "안농",
+   "안농",
+   "안농",
+   "안농"
+  ],
+  "captureRate": 225,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "단단지",
+  "ids": [
+   null,
+   213,
+   213,
+   213,
+   213
+  ],
+  "names": [
+   "알",
+   "단단지",
+   "단단지",
+   "단단지",
+   "단단지"
+  ],
+  "captureRate": 190,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "헤라크로스",
+  "ids": [
+   null,
+   214,
+   214,
+   214,
+   214
+  ],
+  "names": [
+   "알",
+   "헤라크로스",
+   "헤라크로스",
+   "헤라크로스",
+   "헤라크로스"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "딜리버드",
+  "ids": [
+   null,
+   225,
+   225,
+   225,
+   225
+  ],
+  "names": [
+   "알",
+   "딜리버드",
+   "딜리버드",
+   "딜리버드",
+   "딜리버드"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "무장조",
+  "ids": [
+   null,
+   227,
+   227,
+   227,
+   227
+  ],
+  "names": [
+   "알",
+   "무장조",
+   "무장조",
+   "무장조",
+   "무장조"
+  ],
+  "captureRate": 25,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "루브도",
+  "ids": [
+   null,
+   235,
+   235,
+   235,
+   235
+  ],
+  "names": [
+   "알",
+   "루브도",
+   "루브도",
+   "루브도",
+   "루브도"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "밀탱크",
+  "ids": [
+   null,
+   241,
+   241,
+   241,
+   241
+  ],
+  "names": [
+   "알",
+   "밀탱크",
+   "밀탱크",
+   "밀탱크",
+   "밀탱크"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "라이코",
+  "ids": [
+   null,
+   243,
+   243,
+   243,
+   243
+  ],
+  "names": [
+   "알",
+   "라이코",
+   "라이코",
+   "라이코",
+   "라이코"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "앤테이",
+  "ids": [
+   null,
+   244,
+   244,
+   244,
+   244
+  ],
+  "names": [
+   "알",
+   "앤테이",
+   "앤테이",
+   "앤테이",
+   "앤테이"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "스이쿤",
+  "ids": [
+   null,
+   245,
+   245,
+   245,
+   245
+  ],
+  "names": [
+   "알",
+   "스이쿤",
+   "스이쿤",
+   "스이쿤",
+   "스이쿤"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "루기아",
+  "ids": [
+   null,
+   249,
+   249,
+   249,
+   249
+  ],
+  "names": [
+   "알",
+   "루기아",
+   "루기아",
+   "루기아",
+   "루기아"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "칠색조",
+  "ids": [
+   null,
+   250,
+   250,
+   250,
+   250
+  ],
+  "names": [
+   "알",
+   "칠색조",
+   "칠색조",
+   "칠색조",
+   "칠색조"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "세레비",
+  "ids": [
+   null,
+   251,
+   251,
+   251,
+   251
+  ],
+  "names": [
+   "알",
+   "세레비",
+   "세레비",
+   "세레비",
+   "세레비"
+  ],
+  "captureRate": 45,
+  "legendary": true,
+  "mythical": true,
+  "single": true
+ },
+ {
+  "line": "깜까미",
+  "ids": [
+   null,
+   302,
+   302,
+   302,
+   302
+  ],
+  "names": [
+   "알",
+   "깜까미",
+   "깜까미",
+   "깜까미",
+   "깜까미"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "입치트",
+  "ids": [
+   null,
+   303,
+   303,
+   303,
+   303
+  ],
+  "names": [
+   "알",
+   "입치트",
+   "입치트",
+   "입치트",
+   "입치트"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "플러시",
+  "ids": [
+   null,
+   311,
+   311,
+   311,
+   311
+  ],
+  "names": [
+   "알",
+   "플러시",
+   "플러시",
+   "플러시",
+   "플러시"
+  ],
+  "captureRate": 200,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "마이농",
+  "ids": [
+   null,
+   312,
+   312,
+   312,
+   312
+  ],
+  "names": [
+   "알",
+   "마이농",
+   "마이농",
+   "마이농",
+   "마이농"
+  ],
+  "captureRate": 200,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "볼비트",
+  "ids": [
+   null,
+   313,
+   313,
+   313,
+   313
+  ],
+  "names": [
+   "알",
+   "볼비트",
+   "볼비트",
+   "볼비트",
+   "볼비트"
+  ],
+  "captureRate": 150,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "네오비트",
+  "ids": [
+   null,
+   314,
+   314,
+   314,
+   314
+  ],
+  "names": [
+   "알",
+   "네오비트",
+   "네오비트",
+   "네오비트",
+   "네오비트"
+  ],
+  "captureRate": 150,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "코터스",
+  "ids": [
+   null,
+   324,
+   324,
+   324,
+   324
+  ],
+  "names": [
+   "알",
+   "코터스",
+   "코터스",
+   "코터스",
+   "코터스"
+  ],
+  "captureRate": 90,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "얼루기",
+  "ids": [
+   null,
+   327,
+   327,
+   327,
+   327
+  ],
+  "names": [
+   "알",
+   "얼루기",
+   "얼루기",
+   "얼루기",
+   "얼루기"
+  ],
+  "captureRate": 255,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "쟝고",
+  "ids": [
+   null,
+   335,
+   335,
+   335,
+   335
+  ],
+  "names": [
+   "알",
+   "쟝고",
+   "쟝고",
+   "쟝고",
+   "쟝고"
+  ],
+  "captureRate": 90,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "세비퍼",
+  "ids": [
+   null,
+   336,
+   336,
+   336,
+   336
+  ],
+  "names": [
+   "알",
+   "세비퍼",
+   "세비퍼",
+   "세비퍼",
+   "세비퍼"
+  ],
+  "captureRate": 90,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "루나톤",
+  "ids": [
+   null,
+   337,
+   337,
+   337,
+   337
+  ],
+  "names": [
+   "알",
+   "루나톤",
+   "루나톤",
+   "루나톤",
+   "루나톤"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "솔록",
+  "ids": [
+   null,
+   338,
+   338,
+   338,
+   338
+  ],
+  "names": [
+   "알",
+   "솔록",
+   "솔록",
+   "솔록",
+   "솔록"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "캐스퐁",
+  "ids": [
+   null,
+   351,
+   351,
+   351,
+   351
+  ],
+  "names": [
+   "알",
+   "캐스퐁",
+   "캐스퐁",
+   "캐스퐁",
+   "캐스퐁"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "켈리몬",
+  "ids": [
+   null,
+   352,
+   352,
+   352,
+   352
+  ],
+  "names": [
+   "알",
+   "켈리몬",
+   "켈리몬",
+   "켈리몬",
+   "켈리몬"
+  ],
+  "captureRate": 200,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "트로피우스",
+  "ids": [
+   null,
+   357,
+   357,
+   357,
+   357
+  ],
+  "names": [
+   "알",
+   "트로피우스",
+   "트로피우스",
+   "트로피우스",
+   "트로피우스"
+  ],
+  "captureRate": 200,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "앱솔",
+  "ids": [
+   null,
+   359,
+   359,
+   359,
+   359
+  ],
+  "names": [
+   "알",
+   "앱솔",
+   "앱솔",
+   "앱솔",
+   "앱솔"
+  ],
+  "captureRate": 30,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "시라칸",
+  "ids": [
+   null,
+   369,
+   369,
+   369,
+   369
+  ],
+  "names": [
+   "알",
+   "시라칸",
+   "시라칸",
+   "시라칸",
+   "시라칸"
+  ],
+  "captureRate": 25,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "사랑동이",
+  "ids": [
+   null,
+   370,
+   370,
+   370,
+   370
+  ],
+  "names": [
+   "알",
+   "사랑동이",
+   "사랑동이",
+   "사랑동이",
+   "사랑동이"
+  ],
+  "captureRate": 225,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "레지락",
+  "ids": [
+   null,
+   377,
+   377,
+   377,
+   377
+  ],
+  "names": [
+   "알",
+   "레지락",
+   "레지락",
+   "레지락",
+   "레지락"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "레지아이스",
+  "ids": [
+   null,
+   378,
+   378,
+   378,
+   378
+  ],
+  "names": [
+   "알",
+   "레지아이스",
+   "레지아이스",
+   "레지아이스",
+   "레지아이스"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "레지스틸",
+  "ids": [
+   null,
+   379,
+   379,
+   379,
+   379
+  ],
+  "names": [
+   "알",
+   "레지스틸",
+   "레지스틸",
+   "레지스틸",
+   "레지스틸"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "라티아스",
+  "ids": [
+   null,
+   380,
+   380,
+   380,
+   380
+  ],
+  "names": [
+   "알",
+   "라티아스",
+   "라티아스",
+   "라티아스",
+   "라티아스"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "라티오스",
+  "ids": [
+   null,
+   381,
+   381,
+   381,
+   381
+  ],
+  "names": [
+   "알",
+   "라티오스",
+   "라티오스",
+   "라티오스",
+   "라티오스"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "가이오가",
+  "ids": [
+   null,
+   382,
+   382,
+   382,
+   382
+  ],
+  "names": [
+   "알",
+   "가이오가",
+   "가이오가",
+   "가이오가",
+   "가이오가"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "그란돈",
+  "ids": [
+   null,
+   383,
+   383,
+   383,
+   383
+  ],
+  "names": [
+   "알",
+   "그란돈",
+   "그란돈",
+   "그란돈",
+   "그란돈"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "레쿠쟈",
+  "ids": [
+   null,
+   384,
+   384,
+   384,
+   384
+  ],
+  "names": [
+   "알",
+   "레쿠쟈",
+   "레쿠쟈",
+   "레쿠쟈",
+   "레쿠쟈"
+  ],
+  "captureRate": 45,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "지라치",
+  "ids": [
+   null,
+   385,
+   385,
+   385,
+   385
+  ],
+  "names": [
+   "알",
+   "지라치",
+   "지라치",
+   "지라치",
+   "지라치"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "mythical": true,
+  "single": true
+ },
+ {
+  "line": "테오키스",
+  "ids": [
+   null,
+   386,
+   386,
+   386,
+   386
+  ],
+  "names": [
+   "알",
+   "테오키스",
+   "테오키스",
+   "테오키스",
+   "테오키스"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "mythical": true,
+  "single": true
+ },
+ {
+  "line": "파치리스",
+  "ids": [
+   null,
+   417,
+   417,
+   417,
+   417
+  ],
+  "names": [
+   "알",
+   "파치리스",
+   "파치리스",
+   "파치리스",
+   "파치리스"
+  ],
+  "captureRate": 200,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "페라페",
+  "ids": [
+   null,
+   441,
+   441,
+   441,
+   441
+  ],
+  "names": [
+   "알",
+   "페라페",
+   "페라페",
+   "페라페",
+   "페라페"
+  ],
+  "captureRate": 30,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "화강돌",
+  "ids": [
+   null,
+   442,
+   442,
+   442,
+   442
+  ],
+  "names": [
+   "알",
+   "화강돌",
+   "화강돌",
+   "화강돌",
+   "화강돌"
+  ],
+  "captureRate": 100,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "무스틈니",
+  "ids": [
+   null,
+   455,
+   455,
+   455,
+   455
+  ],
+  "names": [
+   "알",
+   "무스틈니",
+   "무스틈니",
+   "무스틈니",
+   "무스틈니"
+  ],
+  "captureRate": 200,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "로토무",
+  "ids": [
+   null,
+   479,
+   479,
+   479,
+   479
+  ],
+  "names": [
+   "알",
+   "로토무",
+   "로토무",
+   "로토무",
+   "로토무"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "유크시",
+  "ids": [
+   null,
+   480,
+   480,
+   480,
+   480
+  ],
+  "names": [
+   "알",
+   "유크시",
+   "유크시",
+   "유크시",
+   "유크시"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "엠라이트",
+  "ids": [
+   null,
+   481,
+   481,
+   481,
+   481
+  ],
+  "names": [
+   "알",
+   "엠라이트",
+   "엠라이트",
+   "엠라이트",
+   "엠라이트"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "아그놈",
+  "ids": [
+   null,
+   482,
+   482,
+   482,
+   482
+  ],
+  "names": [
+   "알",
+   "아그놈",
+   "아그놈",
+   "아그놈",
+   "아그놈"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "디아루가",
+  "ids": [
+   null,
+   483,
+   483,
+   483,
+   483
+  ],
+  "names": [
+   "알",
+   "디아루가",
+   "디아루가",
+   "디아루가",
+   "디아루가"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "펄기아",
+  "ids": [
+   null,
+   484,
+   484,
+   484,
+   484
+  ],
+  "names": [
+   "알",
+   "펄기아",
+   "펄기아",
+   "펄기아",
+   "펄기아"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "히드런",
+  "ids": [
+   null,
+   485,
+   485,
+   485,
+   485
+  ],
+  "names": [
+   "알",
+   "히드런",
+   "히드런",
+   "히드런",
+   "히드런"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "레지기가스",
+  "ids": [
+   null,
+   486,
+   486,
+   486,
+   486
+  ],
+  "names": [
+   "알",
+   "레지기가스",
+   "레지기가스",
+   "레지기가스",
+   "레지기가스"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "기라티나",
+  "ids": [
+   null,
+   487,
+   487,
+   487,
+   487
+  ],
+  "names": [
+   "알",
+   "기라티나",
+   "기라티나",
+   "기라티나",
+   "기라티나"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "크레세리아",
+  "ids": [
+   null,
+   488,
+   488,
+   488,
+   488
+  ],
+  "names": [
+   "알",
+   "크레세리아",
+   "크레세리아",
+   "크레세리아",
+   "크레세리아"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "다크라이",
+  "ids": [
+   null,
+   491,
+   491,
+   491,
+   491
+  ],
+  "names": [
+   "알",
+   "다크라이",
+   "다크라이",
+   "다크라이",
+   "다크라이"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "mythical": true,
+  "single": true
+ },
+ {
+  "line": "쉐이미",
+  "ids": [
+   null,
+   492,
+   492,
+   492,
+   492
+  ],
+  "names": [
+   "알",
+   "쉐이미",
+   "쉐이미",
+   "쉐이미",
+   "쉐이미"
+  ],
+  "captureRate": 45,
+  "legendary": true,
+  "mythical": true,
+  "single": true
+ },
+ {
+  "line": "아르세우스",
+  "ids": [
+   null,
+   493,
+   493,
+   493,
+   493
+  ],
+  "names": [
+   "알",
+   "아르세우스",
+   "아르세우스",
+   "아르세우스",
+   "아르세우스"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "mythical": true,
+  "single": true
+ },
+ {
+  "line": "비크티니",
+  "ids": [
+   null,
+   494,
+   494,
+   494,
+   494
+  ],
+  "names": [
+   "알",
+   "비크티니",
+   "비크티니",
+   "비크티니",
+   "비크티니"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "mythical": true,
+  "single": true
+ },
+ {
+  "line": "다부니",
+  "ids": [
+   null,
+   531,
+   531,
+   531,
+   531
+  ],
+  "names": [
+   "알",
+   "다부니",
+   "다부니",
+   "다부니",
+   "다부니"
+  ],
+  "captureRate": 255,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "던지미",
+  "ids": [
+   null,
+   538,
+   538,
+   538,
+   538
+  ],
+  "names": [
+   "알",
+   "던지미",
+   "던지미",
+   "던지미",
+   "던지미"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "타격귀",
+  "ids": [
+   null,
+   539,
+   539,
+   539,
+   539
+  ],
+  "names": [
+   "알",
+   "타격귀",
+   "타격귀",
+   "타격귀",
+   "타격귀"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "마라카치",
+  "ids": [
+   null,
+   556,
+   556,
+   556,
+   556
+  ],
+  "names": [
+   "알",
+   "마라카치",
+   "마라카치",
+   "마라카치",
+   "마라카치"
+  ],
+  "captureRate": 255,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "심보러",
+  "ids": [
+   null,
+   561,
+   561,
+   561,
+   561
+  ],
+  "names": [
+   "알",
+   "심보러",
+   "심보러",
+   "심보러",
+   "심보러"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "에몽가",
+  "ids": [
+   null,
+   587,
+   587,
+   587,
+   587
+  ],
+  "names": [
+   "알",
+   "에몽가",
+   "에몽가",
+   "에몽가",
+   "에몽가"
+  ],
+  "captureRate": 200,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "맘복치",
+  "ids": [
+   null,
+   594,
+   594,
+   594,
+   594
+  ],
+  "names": [
+   "알",
+   "맘복치",
+   "맘복치",
+   "맘복치",
+   "맘복치"
+  ],
+  "captureRate": 75,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "프리지오",
+  "ids": [
+   null,
+   615,
+   615,
+   615,
+   615
+  ],
+  "names": [
+   "알",
+   "프리지오",
+   "프리지오",
+   "프리지오",
+   "프리지오"
+  ],
+  "captureRate": 25,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "메더",
+  "ids": [
+   null,
+   618,
+   618,
+   618,
+   618
+  ],
+  "names": [
+   "알",
+   "메더",
+   "메더",
+   "메더",
+   "메더"
+  ],
+  "captureRate": 75,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "크리만",
+  "ids": [
+   null,
+   621,
+   621,
+   621,
+   621
+  ],
+  "names": [
+   "알",
+   "크리만",
+   "크리만",
+   "크리만",
+   "크리만"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "버프론",
+  "ids": [
+   null,
+   626,
+   626,
+   626,
+   626
+  ],
+  "names": [
+   "알",
+   "버프론",
+   "버프론",
+   "버프론",
+   "버프론"
+  ],
+  "captureRate": 45,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "앤티골",
+  "ids": [
+   null,
+   631,
+   631,
+   631,
+   631
+  ],
+  "names": [
+   "알",
+   "앤티골",
+   "앤티골",
+   "앤티골",
+   "앤티골"
+  ],
+  "captureRate": 90,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "아이앤트",
+  "ids": [
+   null,
+   632,
+   632,
+   632,
+   632
+  ],
+  "names": [
+   "알",
+   "아이앤트",
+   "아이앤트",
+   "아이앤트",
+   "아이앤트"
+  ],
+  "captureRate": 90,
+  "legendary": false,
+  "single": true
+ },
+ {
+  "line": "코바르온",
+  "ids": [
+   null,
+   638,
+   638,
+   638,
+   638
+  ],
+  "names": [
+   "알",
+   "코바르온",
+   "코바르온",
+   "코바르온",
+   "코바르온"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "테라키온",
+  "ids": [
+   null,
+   639,
+   639,
+   639,
+   639
+  ],
+  "names": [
+   "알",
+   "테라키온",
+   "테라키온",
+   "테라키온",
+   "테라키온"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "비리디온",
+  "ids": [
+   null,
+   640,
+   640,
+   640,
+   640
+  ],
+  "names": [
+   "알",
+   "비리디온",
+   "비리디온",
+   "비리디온",
+   "비리디온"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "토네로스",
+  "ids": [
+   null,
+   641,
+   641,
+   641,
+   641
+  ],
+  "names": [
+   "알",
+   "토네로스",
+   "토네로스",
+   "토네로스",
+   "토네로스"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "볼트로스",
+  "ids": [
+   null,
+   642,
+   642,
+   642,
+   642
+  ],
+  "names": [
+   "알",
+   "볼트로스",
+   "볼트로스",
+   "볼트로스",
+   "볼트로스"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "레시라무",
+  "ids": [
+   null,
+   643,
+   643,
+   643,
+   643
+  ],
+  "names": [
+   "알",
+   "레시라무",
+   "레시라무",
+   "레시라무",
+   "레시라무"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "제크로무",
+  "ids": [
+   null,
+   644,
+   644,
+   644,
+   644
+  ],
+  "names": [
+   "알",
+   "제크로무",
+   "제크로무",
+   "제크로무",
+   "제크로무"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "랜드로스",
+  "ids": [
+   null,
+   645,
+   645,
+   645,
+   645
+  ],
+  "names": [
+   "알",
+   "랜드로스",
+   "랜드로스",
+   "랜드로스",
+   "랜드로스"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "큐레무",
+  "ids": [
+   null,
+   646,
+   646,
+   646,
+   646
+  ],
+  "names": [
+   "알",
+   "큐레무",
+   "큐레무",
+   "큐레무",
+   "큐레무"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "single": true
+ },
+ {
+  "line": "케르디오",
+  "ids": [
+   null,
+   647,
+   647,
+   647,
+   647
+  ],
+  "names": [
+   "알",
+   "케르디오",
+   "케르디오",
+   "케르디오",
+   "케르디오"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "mythical": true,
+  "single": true
+ },
+ {
+  "line": "메로엣타",
+  "ids": [
+   null,
+   648,
+   648,
+   648,
+   648
+  ],
+  "names": [
+   "알",
+   "메로엣타",
+   "메로엣타",
+   "메로엣타",
+   "메로엣타"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "mythical": true,
+  "single": true
+ },
+ {
+  "line": "게노세크트",
+  "ids": [
+   null,
+   649,
+   649,
+   649,
+   649
+  ],
+  "names": [
+   "알",
+   "게노세크트",
+   "게노세크트",
+   "게노세크트",
+   "게노세크트"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "mythical": true,
+  "single": true
  }
 ]

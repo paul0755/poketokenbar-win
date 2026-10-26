@@ -40,7 +40,7 @@ function nextDelay(level) {
  */
 function roll(hasCharm) {
   return {
-    line: poke.roll(),
+    line: poke.rollWild(), // 진화 없는 종 · 전설은 야생에서만 만난다
     shiny: poke.rollShiny(Boolean(hasCharm)),
     nature: poke.rollNature(),
   };

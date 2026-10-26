@@ -50,6 +50,24 @@ const RARITY = [
   { max: Infinity, weight: 20, label: "흔함", stars: 1 },
 ];
 
+/**
+ * 진화하지 않는 종(전설·환상·메타몽 등) — lines.json 의 single. 알에서는 안 나오고 야생에서만
+ * 만난다. 다섯 칸이 같은 종이라 모습은 그대로고 레벨만 오른다. 마스터에 닿으면 이로치.
+ */
+const isSingle = (lineIndex) => Boolean((LINES[lineIndex] || {}).single);
+
+/**
+ * 야생에서 만날 가중치. 진화 라인과 진화 없는 보통 종은 희귀도 그대로, 전설은 아주 드물게.
+ * 하루 4~10번 나오는데 전설이 몇 주에 한 번쯤 — 전체의 0.7% 남짓이 되게 잡았다.
+ */
+const LEGEND_WEIGHT = 0.6;
+const MYTHICAL_WEIGHT = 0.3;
+function wildWeight(lineIndex) {
+  const L = LINES[lineIndex];
+  if (L && L.single && L.legendary) return L.mythical ? MYTHICAL_WEIGHT : LEGEND_WEIGHT;
+  return rarityOf(lineIndex).weight;
+}
+
 function rarityOf(lineIndex) {
   const L = LINES[lineIndex % LINES.length];
   const cr = L.captureRate ?? 45;
@@ -57,10 +75,26 @@ function rarityOf(lineIndex) {
   return { ...tier, captureRate: cr, legendary: Boolean(L.legendary) };
 }
 
-/** 각 라인의 뽑기 확률(%) — 설명용 */
+/** 각 라인의 뽑기 확률(%) — 설명용. 진화 없는 종은 알에서 안 나오니 야생에서 만날 확률 */
 function rollChance(lineIndex) {
-  const total = LINES.reduce((a, _, i) => a + rarityOf(i).weight, 0);
+  if (isSingle(lineIndex)) {
+    const total = LINES.reduce((a, _, i) => a + wildWeight(i), 0);
+    return (wildWeight(lineIndex) / total) * 100;
+  }
+  const total = LINES.reduce((a, _, i) => a + (isSingle(i) ? 0 : rarityOf(i).weight), 0);
   return (rarityOf(lineIndex).weight / total) * 100;
+}
+
+/** 야생 — 진화 없는 종(전설 포함)도 나온다 */
+function rollWild() {
+  const weights = LINES.map((_, i) => wildWeight(i));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return i;
+  }
+  return 0;
 }
 
 /**
@@ -70,7 +104,8 @@ function rollChance(lineIndex) {
  */
 function roll(exclude = null) {
   if (LINES.length < 2) return 0;
-  const weights = LINES.map((_, i) => (i === exclude ? 0 : rarityOf(i).weight));
+  // 진화 없는 종은 알에서 안 나온다 — 야생에서만(rollWild)
+  const weights = LINES.map((_, i) => (i === exclude || isSingle(i) ? 0 : rarityOf(i).weight));
   const total = weights.reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
   for (let i = 0; i < weights.length; i++) {
@@ -88,7 +123,7 @@ function roll(exclude = null) {
  */
 function rollAtLeast(minStars, exclude = null) {
   const pool = LINES.map((_, i) => i).filter(
-    (i) => i !== exclude && rarityOf(i).stars >= minStars,
+    (i) => i !== exclude && !isSingle(i) && rarityOf(i).stars >= minStars,
   );
   if (!pool.length) return roll(exclude); // 그런 등급이 없으면 일반 뽑기로
   const weights = pool.map((i) => rarityOf(i).weight);
@@ -152,6 +187,7 @@ function progress(total) {
 function describe(total, lineIndex = 0, opts = {}) {
   const L = LINES[lineIndex % LINES.length];
   const i = stageFor(total);
+  if (L.single) return describeSingle(L, total, i, opts);
   return {
     line: L.line,
     name: L.names[i],
@@ -162,6 +198,32 @@ function describe(total, lineIndex = 0, opts = {}) {
     // 마스터는 보상으로 이로치가 되고, 부화 때 이로치로 태어난 개체는 처음부터 이로치다
     isShiny: STAGES[i].key === "master" || Boolean(opts.shiny),
     progress: progress(total),
+  };
+}
+
+/**
+ * 진화 없는 종. 부화·1차·최종이 같은 모습이라 단계 이름 대신 "전설의 포켓몬" 같은 이름을 쓰고,
+ * 다음 목표는 곧장 마스터(이로치)다. stageIndex 도 마스터 전까지 1 로 둔다 — 알림이 레벨이
+ * 오를 때마다 "진화했다"고 하지 않게(notify 는 stageIndex 가 오르면 진화로 본다).
+ * 크기는 다 자란 모습(final)으로 그린다.
+ */
+function describeSingle(L, total, i, opts) {
+  const master = STAGES[i].key === "master";
+  const label = master ? STAGES[4].label : L.mythical ? "환상의 포켓몬" : L.legendary ? "전설의 포켓몬" : "진화 없음";
+  const from = STAGES[1].at;
+  const to = STAGES[4].at;
+  return {
+    line: L.line,
+    name: L.names[i],
+    stageIndex: master ? 4 : 1,
+    stage: { ...STAGES[i], key: master ? "master" : i === 0 ? "egg" : "final", label },
+    dexId: L.ids[i],
+    isEgg: i === 0,
+    isShiny: master || Boolean(opts.shiny),
+    single: true,
+    progress: master
+      ? { ratio: 1, remaining: 0, next: null }
+      : { ratio: Math.max(0, Math.min(1, (total - from) / (to - from))), remaining: to - total, next: "마스터(이로치)" },
   };
 }
 
@@ -248,4 +310,4 @@ async function spriteWithFallback(mon, cacheDir, kind) {
   catch (e) { console.error("[sprite] 실패 " + mon.dexId + " " + kind + ": " + e.message); return null; }
 }
 
-module.exports = { STAGES, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };
+module.exports = { STAGES, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollWild, isSingle, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };

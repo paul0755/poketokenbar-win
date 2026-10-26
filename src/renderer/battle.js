@@ -537,6 +537,12 @@
         line(ev.text, "ft");
         await sleep(700);
       } else {
+        if (ev.transform && ev.side >= 0) {
+          // 변신 — 상대 그림을 그대로 쓴다. 바라보는 방향은 내 자리 그대로
+          const mine = $("body" + SIDE[ev.side]).querySelector("img");
+          const theirs = $("body" + SIDE[ev.transform.side]).querySelector("img");
+          if (mine && theirs) mine.src = theirs.src;
+        }
         if (ev.status !== undefined && ev.side >= 0) {
           $("side" + SIDE[ev.side]).querySelector(".st").textContent =
             ev.status && ev.status !== "unconfused" ? AIL_SHORT[ev.status] || "" : "";
