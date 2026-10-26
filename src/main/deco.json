@@ -1,0 +1,19 @@
+{
+  "themes": [
+    { "id": "pcenter", "name": "포켓몬센터", "icon": "🏥", "coins": 1000, "desc": "흰 벽에 빨간 띠, 분홍 징두리" },
+    { "id": "gym", "name": "체육관 배틀필드", "icon": "🏟️", "coins": 1200, "desc": "조명과 깃발, 초록 배틀필드" },
+    { "id": "pillar", "name": "하늘기둥", "icon": "🐉", "coins": 1500, "desc": "우주와 초록 오로라, 낡은 돌기둥" }
+  ],
+  "furni": [
+    { "id": "clock", "name": "몬스터볼 벽시계", "icon": "🕰️", "coins": 80, "desc": "지금 시각을 가리킨다" },
+    { "id": "neon", "name": "네온사인", "icon": "💗", "coins": 120, "desc": "밤이면 반짝이며 깜빡인다" },
+    { "id": "beanbag", "name": "잠만보 빈백", "icon": "💤", "coins": 300, "desc": "큰 아이도 올라가 낮잠을 잔다" },
+    { "id": "jukebox", "name": "주크박스", "icon": "🎵", "coins": 350, "desc": "음표가 뜨고 아이들이 춤춘다" },
+    { "id": "arcade", "name": "아케이드 게임기", "icon": "🕹️", "coins": 400, "desc": "둘이 붙어서 게임을 한다" },
+    { "id": "fireplace", "name": "벽난로", "icon": "🔥", "coins": 450, "desc": "불꽃이 흔들리고 불 타입이 모인다" },
+    { "id": "pond", "name": "잉어킹 연못", "icon": "🐟", "coins": 500, "desc": "물 타입이 들어가 첨벙거린다" },
+    { "id": "healer", "name": "포켓몬센터 회복기", "icon": "➕", "coins": 600, "desc": "결투에서 진 아이가 들어가 회복한다" },
+    { "id": "masterball", "name": "마스터볼 진열대", "icon": "🟣", "coins": 800, "desc": "유리 진열장 속에서 반짝인다" },
+    { "id": "statue", "name": "전설 석상", "icon": "🗿", "coins": 1000, "desc": "내가 가진 전설의 모습으로 깎인다", "needs": "legend" }
+  ]
+}

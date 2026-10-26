@@ -524,6 +524,8 @@ function guildSnap() {
     trainer: save.trainerName || "",
     theme: st.theme,
     furni: st.furni.filter((f) => f.on).map((f) => f.id),
+    statue: st.furni.some((f) => f.id === "statue" && f.on) ? st.statue : null,
+    pos: Object.fromEntries(Object.entries(st.pos || {}).filter(([id]) => st.furni.some((f) => f.id === id && f.on))), // 놓은 가구의 옮긴 자리만
     mons,
     dex: dexCount(),
     graduated: st.graduated,
@@ -593,6 +595,13 @@ function guildGone(r) {
   }
 }
 
+/**
+ * 방 사진에 코인 꾸미기가 있으면 지갑 열쇠를 같이 보낸다 — 서버가 그 지갑이 내 것인지, 정말
+ * 샀는지 보고 안 산 것은 지운다(guild.js checkDeco). 열쇠는 저장되지 않는다. 없으면 안 보낸다
+ */
+const walletKeyFor = (snap) =>
+  save.wallet && save.wallet.key && (room.isCoin(snap.theme) || snap.furni.some(room.isCoin)) ? { walletKey: save.wallet.key } : {};
+
 let guildPushed = { body: "", room: "", at: 0 };
 /**
  * 바뀐 게 있으면 올린다. 갱신마다 불리지만 같으면 보내지 않는다.
@@ -608,7 +617,7 @@ async function guildPush(force = false) {
   const gap = roomPart !== guildPushed.room ? 60_000 : 5 * 60_000;
   if (!force && (body === guildPushed.body || Date.now() - guildPushed.at < gap)) return;
   guildPushed = { body, room: roomPart, at: Date.now() };
-  const r = await guildCall(`/${g.code}/update`, { memberId: g.memberId, key: g.key, member: snap });
+  const r = await guildCall(`/${g.code}/update`, { memberId: g.memberId, key: g.key, member: snap, ...walletKeyFor(snap) });
   if (r.ok && Boolean(r.leader) !== Boolean(g.leader)) { g.leader = Boolean(r.leader); writeSave(); }
   if (!r.ok) {
     if (r.status === 429) guildPushed.body = guildPushed.room = ""; // 너무 잦았다 — 다음 갱신 때 다시
@@ -627,7 +636,8 @@ async function guildCreate({ name, trainer } = {}) {
   if (save.guild && !save.guild.gone) return { ok: false, reason: "이미 길드에 들어가 있습니다. 나간 뒤에 만들어 주세요" };
   if (!setTrainer(trainer)) return { ok: false, reason: "트레이너 이름을 넣어 주세요" };
   if (!String(name || "").trim()) return { ok: false, reason: "길드 이름을 넣어 주세요" };
-  const r = await guildCall("", { name: String(name).trim().slice(0, 20), member: guildSnap() });
+  const snap = guildSnap();
+  const r = await guildCall("", { name: String(name).trim().slice(0, 20), member: snap, ...walletKeyFor(snap) });
   if (!r.ok) return r;
   save.guild = { code: r.code, name: r.name, memberId: r.memberId, key: r.key, leader: true };
   guildPushed = { body: "", room: "", at: Date.now() };
@@ -641,7 +651,8 @@ async function guildJoin({ code, trainer } = {}) {
   if (!setTrainer(trainer)) return { ok: false, reason: "트레이너 이름을 넣어 주세요" };
   const c = String(code || "").toUpperCase().replace(/^GLD-?/, "").replace(/[^A-Z0-9]/g, "");
   if (!/^[A-HJ-NP-Z2-9]{8}$/.test(c)) return { ok: false, reason: "길드 코드는 8글자입니다 (예: GLD-ABCD2345)" };
-  const r = await guildCall(`/${c}/join`, { member: guildSnap() });
+  const snap = guildSnap();
+  const r = await guildCall(`/${c}/join`, { member: snap, ...walletKeyFor(snap) });
   if (!r.ok) return r;
   save.guild = { code: c, name: r.name, memberId: r.memberId, key: r.key, leader: false };
   guildPushed = { body: "", room: "", at: Date.now() };
@@ -742,7 +753,7 @@ async function guildView() {
       updated: m.updated,
       canBattle: Boolean(s.team) && m.id !== g.memberId,
       usage: s.usage || null, // 공개를 끈 사람은 null
-      room: { theme: s.theme, furni: s.furni || [], mons, dex: s.dex || { seen: 0, total: 0 }, wins: s.wins || 0, graduated: s.graduated || 0, lastGrad: s.lastGrad || "", weekTop: s.weekTop || 0 },
+      room: { theme: s.theme, furni: s.furni || [], statue: s.statue || null, pos: s.pos || {}, mons, dex: s.dex || { seen: 0, total: 0 }, wins: s.wins || 0, graduated: s.graduated || 0, lastGrad: s.lastGrad || "", weekTop: s.weekTop || 0 },
     };
   }));
   // 주간 기록 — 그 주의 1위 포켓몬 그림은 지금 길드원 카드에서 가져온다(화면이 한다)
@@ -780,6 +791,7 @@ async function walletInfo() {
   if (!e.ok) return e;
   const r = await walletCall("/" + save.wallet.id, { key: save.wallet.key });
   if (!r.ok) return r;
+  decoFrom(r);
   const today = dayKey(new Date());
   return {
     ok: true,
@@ -1020,8 +1032,21 @@ function roomState() {
   const r = save.room;
   return {
     theme: r.theme,
-    themes: room.THEMES.map((t) => ({ ...t, cost: roomPrice(t.cost), owned: r.themes.includes(t.id) })),
-    furni: room.FURNI.map((f) => ({ ...f, cost: roomPrice(f.cost), owned: r.owned.includes(f.id), on: r.owned.includes(f.id) && !r.off.includes(f.id) })),
+    themes: [
+      ...room.THEMES.map((t) => ({ ...t, cost: roomPrice(t.cost), owned: r.themes.includes(t.id) })),
+      ...room.COIN_THEMES.map((t) => ({ ...t, coin: true, cost: t.coins, owned: r.coin.includes(t.id) })),
+    ],
+    furni: [
+      ...room.FURNI.map((f) => ({ ...f, cost: roomPrice(f.cost), owned: r.owned.includes(f.id), on: r.owned.includes(f.id) && !r.off.includes(f.id) })),
+      ...room.COIN_FURNI.map((f) => ({ ...f, coin: true, cost: f.coins, owned: r.coin.includes(f.id), on: r.coin.includes(f.id) && !r.off.includes(f.id) })),
+    ],
+    // 코인 꾸미기 — 잔액은 서버가 들고 있어 마지막으로 받아 둔 값을 보인다(방 탭을 열 때 다시 받는다)
+    coins: coinCache ? coinCache.balance : null,
+    online: onlineCfg().enabled,
+    hasLegend: hasLegend(),
+    statue: statueDex(), // 전설 석상에 깎을 전설(도감 번호)
+    pos: r.pos, // 끌어 옮긴 가구 자리
+    tags: r.tags, // 이름표 늘 보이기
     mons: room.monsIn(save, isEggMon),
     max: room.MAX_MONS,
     // 기록 장식 — 졸업 트로피(마지막 졸업생 이름), 결투 배지(친선 + 박스 결투 승수)
@@ -1032,8 +1057,9 @@ function roomState() {
   };
 }
 
-/** 배경·가구를 산다. 사탕은 상점과 같은 지갑에서 나간다 */
+/** 배경·가구를 산다. 사탕은 상점과 같은 지갑에서 나간다. 코인 꾸미기는 코인 지갑으로(coinBuy) */
 function roomBuy(kind, id) {
+  if (room.isCoin(id)) return coinBuy(kind, id);
   room.normalize(save);
   const r = save.room;
   const list = kind === "theme" ? room.THEMES : room.FURNI;
@@ -1052,18 +1078,103 @@ function roomBuy(kind, id) {
   return { ok: true, message: kind === "theme" ? `${it.name} 배경으로 바꿨습니다` : `${battle.josa(it.name, "을를")} 방에 놓았습니다` };
 }
 
+/* ---- 코인 꾸미기 (server/src/wallet.js buy) ----
+   코인으로만 사는 배경·가구. 산 것은 서버 지갑이 기억하고 세이브(room.coin)에는 받아 둔 목록만
+   있다 — 꺼져 있을 때도 방을 그리려고. 지갑을 볼 때마다(상점 탭 · 방 탭) 서버 목록으로 맞춘다. */
+
+let coinCache = null; // { balance, at } — 방 탭에 보일 코인
+
+/** 전설 석상은 전설이 있어야 산다 — 내가 가진 전설의 모습으로 깎인다 */
+const hasLegend = () => save.box.some((m) => !isEggMon(m) && (poke.LINES[m.line] || {}).legendary);
+
+/** 전설 석상의 모델 — 방에 둔 전설이 있으면 그 아이, 없으면 가장 많이 자란 전설 */
+function statueDex() {
+  const legends = save.box.filter((m) => !isEggMon(m) && (poke.LINES[m.line] || {}).legendary);
+  if (!legends.length) return null;
+  const inRoom = room.monsIn(save, isEggMon);
+  const m = legends.find((x) => inRoom.includes(x.id)) || legends.reduce((a, x) => (box.effOf(x, growthSpeed()) > box.effOf(a, growthSpeed()) ? x : a));
+  return poke.describe(box.effOf(m, growthSpeed()), m.line).dexId;
+}
+
+/** 석상 그림 — 화면이 캔버스로 읽어 돌 색으로 바꾼다. file: 그림은 캔버스로 못 읽어서 data: 로 준다 */
+const statueImages = new Map();
+async function statueImage(dexId) {
+  dexId = Number(dexId);
+  if (!Number.isInteger(dexId) || dexId < 1 || dexId > 1100) return null;
+  if (!statueImages.has(dexId)) {
+    statueImages.set(dexId, (async () => {
+      const p = await poke.spriteWithFallback({ dexId, isShiny: false }, CACHE, "still").catch(() => null);
+      return p ? "data:image/png;base64," + fs.readFileSync(p).toString("base64") : null;
+    })());
+  }
+  const v = await statueImages.get(dexId);
+  if (!v) statueImages.delete(dexId); // 못 받았으면 다음에 다시
+  return v;
+}
+
+/** 지갑이 알려 준 잔액 · 산 목록을 받아 둔다. 서버 목록이 맞다 */
+function decoFrom(r) {
+  coinCache = { balance: r.balance, at: Date.now() };
+  room.normalize(save);
+  const next = (r.deco || []).filter(room.isCoin);
+  if (JSON.stringify(next) !== JSON.stringify(save.room.coin)) {
+    save.room.coin = next;
+    room.normalize(save); // 없어진 배경을 바르고 있었으면 오두막으로
+    writeSave();
+  }
+}
+
+/** 방 탭을 열 때 — 지갑이 있으면 잔액 · 산 목록을 다시 받는다. 지갑을 새로 만들지는 않는다 */
+async function roomCoins() {
+  if (!onlineCfg().enabled || !save.wallet || !save.wallet.id) return { ok: true };
+  const r = await walletCall("/" + save.wallet.id, { key: save.wallet.key });
+  if (!r.ok) return r;
+  decoFrom(r);
+  refresh(true);
+  return { ok: true };
+}
+
+async function coinBuy(kind, id) {
+  const it = (kind === "theme" ? room.COIN_THEMES : room.COIN_FURNI).find((x) => x.id === id);
+  if (!it) return { ok: false, reason: "없는 물건입니다" };
+  room.normalize(save);
+  if (save.room.coin.includes(id)) return { ok: false, reason: "이미 가지고 있습니다" };
+  if (it.needs === "legend" && !hasLegend()) return { ok: false, reason: "전설의 포켓몬이 있어야 살 수 있습니다 — 석상은 내가 가진 전설의 모습으로 깎입니다" };
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await walletCall(`/${save.wallet.id}/buy`, { key: save.wallet.key, item: id });
+  if (!r.ok) {
+    if (r.status === 409) await roomCoins(); // 다른 PC 에서 이미 샀다 — 목록을 맞춘다
+    return r;
+  }
+  decoFrom(r);
+  if (kind === "theme") save.room.theme = id; // 산 배경은 바로 바른다
+  writeSave();
+  refresh(true);
+  return { ok: true, message: `${kind === "theme" ? `${it.name} 배경으로 바꿨습니다` : `${battle.josa(it.name, "을를")} 방에 놓았습니다`} (🪙${r.balance} 남음)` };
+}
+
 /** 배경 바꾸기 · 가구 놓기/치우기 · 둘 아이 고르기 */
 function roomSet(patch = {}) {
   room.normalize(save);
   const r = save.room;
   if (patch.theme != null) {
-    if (!r.themes.includes(patch.theme)) return { ok: false, reason: "아직 없는 배경입니다" };
+    if (!r.themes.includes(patch.theme) && !r.coin.includes(patch.theme)) return { ok: false, reason: "아직 없는 배경입니다" };
     r.theme = patch.theme;
   }
   if (patch.toggle != null) {
-    if (!r.owned.includes(patch.toggle)) return { ok: false, reason: "아직 없는 가구입니다" };
+    if (!r.owned.includes(patch.toggle) && !r.coin.includes(patch.toggle)) return { ok: false, reason: "아직 없는 가구입니다" };
     r.off = r.off.includes(patch.toggle) ? r.off.filter((x) => x !== patch.toggle) : [...r.off, patch.toggle];
   }
+  // 가구 옮기기 — { id, x, y } 그림 좌표. 가진 가구만. reset 이면 모두 처음 자리로
+  if (patch.pos) {
+    const { id, x, y } = patch.pos;
+    if (!room.MOVABLE.includes(id) || !(r.owned.includes(id) || r.coin.includes(id))) return { ok: false, reason: "옮길 수 없는 가구입니다" };
+    if (!room.okPos([x, y])) return { ok: false, reason: "자리가 올바르지 않습니다" };
+    r.pos = { ...r.pos, [id]: [x, y] };
+  }
+  if (patch.posReset) r.pos = {};
+  if (patch.tags != null) r.tags = Boolean(patch.tags);
   if (Array.isArray(patch.mons)) {
     const ok = (id) => { const m = box.find(save.box, id); return m && !isEggMon(m); };
     r.mons = [...new Set(patch.mons.map(String))].filter(ok).slice(0, room.MAX_MONS);
@@ -3365,6 +3476,8 @@ app.whenReady().then(async () => {
   ipcMain.handle("market-cancel", (_e, id) => marketCancel(String(id || "")));
   ipcMain.handle("guild-battle", (_e, id) => guildBattle(String(id || "")));
   ipcMain.handle("room-buy", (_e, { kind, id } = {}) => roomBuy(kind, id));
+  ipcMain.handle("room-coins", () => roomCoins());
+  ipcMain.handle("statue-image", (_e, dexId) => statueImage(dexId));
   ipcMain.handle("room-set", (_e, patch) => roomSet(patch || {}));
   ipcMain.handle("toggle-stone", (_e, id) => toggleStone(id));
   ipcMain.handle("feed-berry", (_e, { id, key } = {}) => feedBerry(id, key));

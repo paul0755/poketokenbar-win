@@ -14,6 +14,12 @@
  *                                 몰에서 사람에게 파는 게 이득이어야 몰이 돈다
  *   몰 판매 대금 · 길드 주간 보상  — 길드 객체가 credit 으로 넣는다(아래)
  *
+ * ── 코인 꾸미기 (buy) ──
+ * 코인이 빠져나가는 곳. 코인으로만 사는 배경·가구(src/main/deco.json — 앱과 같은 파일)를 산다.
+ * 값은 서버가 카탈로그에서 정하고, 산 것은 지갑에 적어 둔다(deco). 사탕 가구는 세이브에만
+ * 있어서 고치면 생기지만, 코인 꾸미기는 길드 객체가 지갑의 산 목록과 맞춰 보고 안 산 것은
+ * 길드 방에서 지운다(guild.js). 되팔기 · 선물은 없다 — 쓴 코인은 그대로 사라진다.
+ *
  * ── 계정 없이 ──
  * 만들 때 지갑 번호와 열쇠를 한 번 준다. 서버에는 열쇠의 해시만 둔다. 열쇠를 잃으면 지갑도
  * 잃는다(앱은 세이브에 두고, 세이브 백업에 같이 들어간다).
@@ -33,12 +39,18 @@
  *   POST /wallet/w0123456789ab/checkin    출석   { key, day }
  *   POST /wallet/w0123456789ab/exchange   환전   { key, day, n }
  *   POST /wallet/w0123456789ab/sell       상점에 팔기 { key, day, mon: { line, grown, shiny } }
+ *   POST /wallet/w0123456789ab/buy        코인 꾸미기 사기 { key, item }  → { ...보기, item }
  *
  * debit · credit 은 밖에서 부를 수 없다 — walletRoute 가 넘기지 않고, 길드 객체(몰·주간 보상)만
  * 지갑 객체를 직접 부른다. debit 은 그래도 열쇠를 본다(사는 사람이 열쇠를 넘겨야 빠진다).
  */
 
 import LINES from "../../src/main/lines.json" with { type: "json" };
+import DECO from "../../src/main/deco.json" with { type: "json" };
+
+/** 코인 꾸미기 카탈로그 — id → { name, coins } (배경·가구 id 는 겹치지 않는다) */
+export const DECO_ITEMS = new Map([...DECO.themes, ...DECO.furni].map((d) => [d.id, d]));
+export const DECO_THEMES = new Set(DECO.themes.map((d) => d.id));
 
 export const GATE_PER_DAY = 5;
 export const BUY_WAIT_MS = 2 * 86_400_000;
@@ -97,6 +109,7 @@ export class Wallet {
       sellDay: (w.sell || {}).day || "",
       sellLeft: SELL_MAX - ((w.sell || {}).n || 0),
       sellCoinsLeft: SELL_COINS - ((w.sell || {}).coins || 0),
+      deco: w.deco || [], // 산 코인 꾸미기
       log: w.log.slice(-LOG_KEEP).reverse(),
     };
   }
@@ -184,6 +197,18 @@ export class Wallet {
       return json({ ...this.view(w), got, price });
     }
 
+    if (action === "buy") {
+      const it = DECO_ITEMS.get(String(body.item || ""));
+      if (!it) return fail("없는 물건입니다");
+      w.deco = w.deco || [];
+      if (w.deco.includes(it.id)) return fail("이미 가지고 있습니다", 409);
+      if (w.balance < it.coins) return fail(`코인이 모자랍니다 (🪙${w.balance} / 🪙${it.coins})`, 402);
+      w.balance -= it.coins;
+      w.deco.push(it.id);
+      await this.save(w, -it.coins, `꾸미기 · ${it.name}`);
+      return json({ ...this.view(w), item: it.id });
+    }
+
     // 길드 객체만 부른다 — 몰에서 살 때. 사는 사람의 열쇠는 위에서 이미 봤다
     if (action === "debit") {
       const n = Number(body.amount);
@@ -205,7 +230,7 @@ export async function walletCall(env, id, action, body) {
   return { status: res.status, ...(await res.json().catch(() => ({ ok: false, reason: "지갑 응답을 읽지 못했습니다" }))) };
 }
 
-/** Worker 쪽 — 밖에서 부를 수 있는 건 만들기 · 보기 · 출석 · 환전뿐이다 */
+/** Worker 쪽 — 밖에서 부를 수 있는 건 만들기 · 보기 · 출석 · 환전 · 상점에 팔기 · 꾸미기 사기뿐이다 */
 export async function walletRoute(request, env, id, action) {
   if (request.method !== "POST") return fail("POST 로 보내 주세요", 405);
   const len = Number(request.headers.get("content-length") || 0);
@@ -224,6 +249,6 @@ export async function walletRoute(request, env, id, action) {
     }
     return fail("지갑을 만들지 못했습니다. 다시 시도해 주세요", 503);
   }
-  if (!["checkin", "exchange", "sell"].includes(action || "") && action) return fail("모르는 요청입니다", 404);
+  if (!["checkin", "exchange", "sell", "buy"].includes(action || "") && action) return fail("모르는 요청입니다", 404);
   return walletStub(env, id).fetch("https://wallet/" + (action || "view"), { method: "POST", body: await request.text() });
 }

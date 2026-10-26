@@ -15,7 +15,7 @@
  *   POST /guild                    만들기   { name, member }        → { code, memberId, key }
  *   GET  /guild/ABCD2345           보기                              → { name, leader, members[] }
  *   POST /guild/ABCD2345/join      들어가기 { member }              → { memberId, key }
- *   POST /guild/ABCD2345/update    내 방 올리기 { memberId, key, member }
+ *   POST /guild/ABCD2345/update    내 방 올리기 { memberId, key, member, walletKey? }
  *   POST /guild/ABCD2345/leave     나가기   { memberId, key }        — 내 칸은 바로 지운다
  *   POST /guild/ABCD2345/kick      내보내기 { memberId, key, target } (길드장)
  *   POST /guild/ABCD2345/disband   길드 없애기 { memberId, key }    (길드장)
@@ -33,10 +33,20 @@
  * 지난주가 확정되면(다음 주가 시작하고 36시간 뒤 — 늦게 켠 사람의 마무리를 기다린다) 1위에게
  * 🪙REWARD_TOP, 칭호마다 🪙REWARD_TITLE 을 그 사람 지갑(snap.walletId)에 한 번 넣는다.
  *
+ * ── 코인 꾸미기 ──
+ * 코인으로 산 배경·가구(wallet.js buy)는 산 사람 방에만 보여야 한다. 방 사진을 받을 때 지갑의
+ * 산 목록과 맞춰 보고 안 산 것은 지운다(checkDeco). 지갑 번호는 길드 보기에 드러나 있어서
+ * 남의 지갑 번호를 적어 낼 수 있다 — 그래서 지갑 열쇠(walletKey)도 받아 그 지갑이 이 사람
+ * 것인지 본다. 열쇠는 저장하지 않는다.
+ *
  * ── 길드 몰 ── market.js
  */
 import { marketView, marketAction, returnListingsOf, listings } from "./market.js";
-import { WALLET_ID, walletCall } from "./wallet.js";
+import { WALLET_ID, walletCall, DECO_ITEMS, DECO_THEMES } from "./wallet.js";
+import LINES from "../../src/main/lines.json" with { type: "json" };
+
+// 전설 석상에 깎을 수 있는 도감 번호 — 전설 · 환상만
+const LEGEND_DEX = new Set(LINES.filter((l) => l.single && l.legendary).map((l) => l.ids[1]));
 
 export const MAX_MEMBERS = 30;
 const UPDATE_GAP_MS = 15_000; // 내 방 올리기는 15초에 한 번까지
@@ -95,6 +105,13 @@ const STAGES = ["baby", "mid", "final", "master"];
  * 앱이 올린 방 사진을 꼴만 본다. 내용이 진짜인지는 알 수 없다(세이브는 그 사람 PC에 있다) —
  * 그래서 보상 없이 구경과 친선뿐이다. 모르는 칸은 버리고, 틀린 값은 빼고 받는다.
  */
+/** 가구 자리 — { id: [x, y] } 그림 좌표(320×200). 가구는 24개까지 */
+function cleanPos(p) {
+  if (!p || typeof p !== "object" || Array.isArray(p)) return {};
+  const ok = (v) => Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0 && n <= 320);
+  return Object.fromEntries(Object.entries(p).filter(([id, v]) => ID.test(id) && ok(v)).slice(0, 24));
+}
+
 export function cleanSnap(m) {
   if (!m || typeof m !== "object") return null;
   const trainer = str(m.trainer, 16);
@@ -113,6 +130,8 @@ export function cleanSnap(m) {
     trainer,
     theme: isId(m.theme) ? m.theme : "cabin",
     furni: (Array.isArray(m.furni) ? m.furni : []).filter(isId).slice(0, 24),
+    statue: LEGEND_DEX.has(m.statue) ? m.statue : null, // 전설 석상의 모델
+    pos: cleanPos(m.pos), // 끌어 옮긴 가구 자리
     mons,
     dex: { seen: int(dex.seen, 0, 5000) ?? 0, total: int(dex.total, 0, 5000) ?? 0 },
     graduated: int(m.graduated, 0, 100000) ?? 0,
@@ -123,6 +142,19 @@ export function cleanSnap(m) {
     usage: cleanUsage(m.usage),
     weekTop: int(m.weekTop, 0, 10000) ?? 0, // 주간 1위를 몇 번 했나 — 방의 메달 액자
   };
+}
+
+/** 코인 꾸미기 중 산 것만 남긴다. 코인 꾸미기가 없으면 지갑을 부르지 않는다 */
+async function checkDeco(env, snap, walletKey) {
+  const coin = snap.furni.filter((id) => DECO_ITEMS.has(id));
+  if (!coin.length && !DECO_THEMES.has(snap.theme)) return;
+  let owned = [];
+  if (snap.walletId && typeof walletKey === "string") {
+    const r = await walletCall(env, snap.walletId, "view", { key: walletKey });
+    if (r.ok) owned = r.deco || [];
+  }
+  snap.furni = snap.furni.filter((id) => !DECO_ITEMS.has(id) || owned.includes(id));
+  if (DECO_THEMES.has(snap.theme) && !owned.includes(snap.theme)) snap.theme = "cabin";
 }
 
 export class Guild {
@@ -268,6 +300,7 @@ export class Guild {
       const snap = cleanSnap(body.member);
       if (!name) return fail("길드 이름을 넣어 주세요");
       if (!snap) return fail("트레이너 이름이 없습니다");
+      await checkDeco(this.env, snap, body.walletKey);
       const me = await this.add(snap);
       await this.store.put("meta", { code: str(body.code, 8), name, leader: me.memberId, created: Date.now() });
       await this.record(me.memberId, snap, Date.now());
@@ -282,6 +315,7 @@ export class Guild {
       const snap = cleanSnap(body.member);
       if (!snap) return fail("트레이너 이름이 없습니다");
       if ((await this.members()).length >= MAX_MEMBERS) return fail(`길드가 꽉 찼습니다 (${MAX_MEMBERS}명)`, 403);
+      await checkDeco(this.env, snap, body.walletKey);
       const me = await this.add(snap);
       await this.record(me.memberId, snap, Date.now());
       return json({ ok: true, code: meta.code, name: meta.name, ...me, leader: false });
@@ -294,6 +328,7 @@ export class Guild {
       const snap = cleanSnap(body.member);
       if (!snap) return fail("트레이너 이름이 없습니다");
       if (Date.now() - me.updated < UPDATE_GAP_MS) return fail("잠시 뒤에 다시 올려 주세요", 429);
+      await checkDeco(this.env, snap, body.walletKey);
       await this.store.put("m:" + me.id, { ...me, snap, updated: Date.now() });
       await this.record(me.id, snap, me.joined);
       return json({ ok: true, leader: meta.leader === me.id });

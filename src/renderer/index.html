@@ -558,10 +558,19 @@
       <div class="rm-empty" id="rmEmpty" hidden>아래에서 방에 둘 포켓몬을 골라 주세요</div>
     </div>
     <div class="rm-panel" id="rmPanel">
+      <div class="rm-tools">
+        <button data-tool="edit" id="rmEdit">✋ 가구 옮기기</button>
+        <button data-tool="reset" id="rmReset" hidden>↺ 처음 자리로</button>
+        <button data-tool="tags" id="rmTags">🏷️ 이름표 늘 보이기</button>
+      </div>
       <h5>배경<span class="w" id="rmWallet">🍬 –</span></h5>
       <div class="rm-chips" id="rmThemes"></div>
       <h5>가구</h5>
       <div class="rm-furni" id="rmFurni"></div>
+      <h5>🪙 코인 꾸미기 — 코인으로만 산다<span class="w" id="rmCoins">🪙 –</span></h5>
+      <div class="rm-coin-note" id="rmCoinNote"></div>
+      <div class="rm-chips" id="rmCoinThemes"></div>
+      <div class="rm-furni" id="rmCoinFurni"></div>
       <h5>방에 둘 포켓몬 <span id="rmMonsCount"></span></h5>
       <div class="rm-chips" id="rmMons"></div>
       <h5>키운 기록 — 사지 않아도 저절로 생긴다</h5>

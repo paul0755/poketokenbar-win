@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld("ptb", {
   toggleStone: (id) => ipcRenderer.invoke("toggle-stone", id),
   // 미니룸
   roomBuy: (a) => ipcRenderer.invoke("room-buy", a),
+  roomCoins: () => ipcRenderer.invoke("room-coins"),
+  statueImage: (dexId) => ipcRenderer.invoke("statue-image", dexId),
   roomSet: (patch) => ipcRenderer.invoke("room-set", patch),
   // 길드
   guildCreate: (a) => ipcRenderer.invoke("guild-create", a),

@@ -13,10 +13,21 @@
 .rm-room canvas { image-rendering: pixelated; position: absolute; display: block; }
 .rm-base { inset: 0; width: 100%; height: 100%; }
 .rm-f { pointer-events: none; }
+/* 가구 옮기기 — 옮길 수 있는 가구에 점선, 끌면 노란 선. 포켓몬은 흐리게 비켜 둔다 */
+.rm-room.edit { touch-action: none; }
+.rm-room.edit .rm-f[data-move] { pointer-events: auto; cursor: grab; outline: 1px dashed rgba(255, 255, 255, .6); outline-offset: -1px; }
+.rm-room.edit .rm-f.drag { cursor: grabbing; outline: 1px solid var(--accent); }
+.rm-room.edit .rm-actors { opacity: .3; }
+.rm-room.edit::after { content: "가구를 끌어서 옮기세요 · 창문 · 러그 · 포스터는 벽지라 못 옮깁니다"; position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); background: rgba(15, 16, 22, .82); color: #fff; font-size: 10.5px; padding: 3px 9px; border-radius: 7px; z-index: 6000; pointer-events: none; white-space: nowrap; }
+/* 이름표 늘 보이기 — 길드 홀은 이미 주인 이름표가 늘 떠 있어서 뺀다 */
+body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
+.rm-tools { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.rm-tools button { font: inherit; font-size: 11.5px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+.rm-tools button.on { background: var(--accent); color: #14151a; border-color: var(--accent); font-weight: 700; }
 /* 바닥 그림은 밤이면 어둡게 칠한다. 따로 그린 가구·아이들도 맞춰 어둡게 — 램프만 빼고 */
 .rm-room[data-per="evening"] .rm-f { filter: brightness(.9); }
 .rm-room[data-per="night"] .rm-f { filter: brightness(.72) saturate(.85); }
-.rm-room .rm-f[data-f="lamp"] { filter: none; }
+.rm-room .rm-f[data-f="lamp"], .rm-room .rm-f[data-c="neon"], .rm-room .rm-f[data-c="fireplace"] { filter: none; } /* 빛나는 것은 밤에도 밝다 */
 .rm-room[data-per="night"] .rm-mon .rm-body { filter: brightness(.86); }
 
 /* 캔버스 위에 얹는 글자 */
@@ -55,6 +66,7 @@
 @keyframes rm-z { 50% { transform: translateY(-20%); } }
 .rm-tag { position: absolute; left: 50%; top: 100%; translate: -50% 0; margin-top: 2px; white-space: nowrap; background: rgba(15, 16, 22, .88); color: #fff; font-size: 10.5px; padding: 2px 7px; border-radius: 6px; opacity: 0; transition: opacity .15s; pointer-events: none; }
 .rm-mon:hover .rm-tag, .rm-mon.show .rm-tag { opacity: 1; }
+.rm-mon.tagup .rm-tag { top: auto; bottom: 100%; margin: 0 0 2px; }
 /* 길드 홀 — 트레이너 이름표를 늘 단다. 마우스를 올리면 자세한 이름표로 바뀐다 */
 .rm-own { position: absolute; left: 50%; top: 100%; translate: -50% 0; margin-top: 1px; white-space: nowrap; padding: .15cqw .8cqw; border-radius: .8cqw; font: 700 1.5cqw/1.3 "Malgun Gothic", sans-serif; color: #fff; background: rgba(15, 16, 22, .7); border: 1px solid rgba(255, 255, 255, .25); pointer-events: none; transition: opacity .15s; }
 .rm-own.me { background: rgba(255, 203, 5, .9); color: #14151a; border-color: #ffcb05; }
@@ -85,6 +97,12 @@
 .rm-furni .it button { font: inherit; font-size: 10.5px; padding: 3px 7px; border-radius: 7px; border: 1px solid var(--line); background: var(--card2); color: var(--text); cursor: pointer; white-space: nowrap; }
 .rm-furni .it button.buy { color: var(--accent); }
 .rm-furni .it button:disabled { opacity: .45; cursor: default; }
+/* 코인 꾸미기 — 사탕 가구와 같은 모양, 값만 코인 색 */
+.rm-coin-note { font-size: 10.5px; color: var(--dim); margin: -2px 0 6px; line-height: 1.4; }
+.rm-coin-note:empty { display: none; }
+#rmCoinThemes:not(:empty) { margin-bottom: 5px; }
+.rm-chips button .c.coin, .rm-furni .it button.coin, .rm-panel h5 .w.coin { color: #f5c542; }
+.rm-furni .it.coin { border-color: #f5c54255; }
 .rm-rec { font-size: 11px; color: var(--muted); line-height: 1.6; }
 .rm-rec b { color: var(--text); }
 
@@ -163,3 +181,8 @@
 .gd-hof .wk .chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
 .gd-hof .wk .chips span { font-size: 9.5px; padding: 2px 6px; border-radius: 99px; background: var(--card2); border: 1px solid var(--line); white-space: nowrap; }
 .gd-hof .more { margin-top: 6px; width: 100%; }
+
+/* 코인 가구 앞에서 — 주크박스 춤 · 회복기 빛 */
+.rm-mon.dance .rm-body { animation: rm-dance .5s ease-in-out infinite; }
+@keyframes rm-dance { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-8%) rotate(6deg); } }
+.rm-mon.heal img { filter: drop-shadow(0 0 2px #ff8ab0) drop-shadow(0 0 4px #ffc1d6); }

@@ -39,6 +39,7 @@ function setTab(name) {
     if (window.ptbMall) window.ptbMall.open(); // 코인 지갑 · 상점에 팔기 · 길드 몰
   }
   if (name === "dex") window.ptb.requestDex();
+  if (name === "room") window.ptb.roomCoins(); // 코인 꾸미기 — 잔액 · 산 목록을 서버에서 다시
 }
 for (const b of document.querySelectorAll("nav button[data-tab]")) {
   b.onclick = () => setTab(b.dataset.tab);
