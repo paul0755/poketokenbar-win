@@ -1,7 +1,7 @@
 {
   "name": "poketokenbar-win",
   "productName": "PokeTokenBar",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "토큰을 써서 포켓몬을 키우는 Windows 트레이 앱 + 데스크톱 펫",
   "keywords": [
     "electron",
