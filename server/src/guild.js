@@ -27,11 +27,26 @@
  * 동안 쓴 몫까지 넣어 지난주 칸을 마무리한다.
  * 최근 KEEP_WEEKS 주만 둔다. 길드를 나가거나 내보내지면 그 사람의 줄은 모든 주에서 지운다.
  * 순위·칭호는 앱이 이 기록으로 계산한다 — 서버는 적어 두기만 한다.
+ * 끝난 주는 고칠 수 없다 — "이번 주"는 서버 시각으로 지금인 주만, 지난주는 마무리(prev)로만 받는다.
+ *
+ * ── 주간 코인 보상 ──
+ * 지난주가 확정되면(다음 주가 시작하고 36시간 뒤 — 늦게 켠 사람의 마무리를 기다린다) 1위에게
+ * 🪙REWARD_TOP, 칭호마다 🪙REWARD_TITLE 을 그 사람 지갑(snap.walletId)에 한 번 넣는다.
+ *
+ * ── 길드 몰 ── market.js
  */
+import { marketView, marketAction, returnListingsOf, listings } from "./market.js";
+import { WALLET_ID, walletCall } from "./wallet.js";
 
 export const MAX_MEMBERS = 30;
 const UPDATE_GAP_MS = 15_000; // 내 방 올리기는 15초에 한 번까지
 const KEEP_WEEKS = 26; // 반년치 주간 기록
+export const REWARD_TOP = 50;
+export const REWARD_TITLE = 10;
+// 칭호 — 앱(guild.js TITLES)과 같아야 한다
+const TITLE_KEYS = ["week", "burn", "core", "night", "dawn", "morning"];
+const DAY_MS = 86_400_000;
+const shiftDay = (key, days) => new Date(Date.parse(key + "T00:00:00Z") + days * DAY_MS).toISOString().slice(0, 10);
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
@@ -104,15 +119,17 @@ export function cleanSnap(m) {
     lastGrad: str(m.lastGrad, 20),
     wins: int(m.wins, 0, 10_000_000) ?? 0,
     team,
+    walletId: typeof m.walletId === "string" && WALLET_ID.test(m.walletId) ? m.walletId : "", // 주간 코인 보상을 넣을 곳
     usage: cleanUsage(m.usage),
     weekTop: int(m.weekTop, 0, 10000) ?? 0, // 주간 1위를 몇 번 했나 — 방의 메달 액자
   };
 }
 
 export class Guild {
-  constructor(state) {
+  constructor(state, env) {
     this.state = state;
     this.store = state.storage;
+    this.env = env;
   }
 
   async members() {
@@ -155,8 +172,12 @@ export class Guild {
   async record(id, snap, joined) {
     const u = snap && snap.usage;
     if (!u) return;
+    // 이번 주는 서버 시각으로 정말 지금인 주만 받는다 — 끝난 주를 "이번 주"라고 보내 고치지 못하게
+    const now = Date.now();
+    if (!(u.weekStart <= now + 3_600_000 && now - u.weekStart < 7 * DAY_MS + 3_600_000)) return;
     await this.writeWeek(u.weekKey, id, snap.trainer, u);
-    if (u.prev && Number.isFinite(u.weekStart) && joined <= u.weekStart) await this.writeWeek(u.prev.weekKey, id, snap.trainer, u.prev);
+    // 지난주는 바로 앞 주만, 그 주가 끝나기 전에 이미 길드원이었던 사람만 마무리한다
+    if (u.prev && u.prev.weekKey === shiftDay(u.weekKey, -7) && joined <= u.weekStart) await this.writeWeek(u.prev.weekKey, id, snap.trainer, u.prev);
     const keys = [...(await this.store.list({ prefix: "wk:" })).keys()].sort();
     if (keys.length > KEEP_WEEKS) await this.store.delete(keys.slice(0, keys.length - KEEP_WEEKS));
   }
@@ -171,14 +192,46 @@ export class Guild {
     }
   }
 
+  /**
+   * 확정된 주의 코인 보상. 한 주에 한 번 — 줄 목록을 먼저 적어 두고(paid), 넣을 때마다 표시한다.
+   * 지갑에 넣다 실패한 건 다음 보기 때 다시 넣는다.
+   */
+  async payWeeks() {
+    const members = new Map((await this.members()).map((m) => [m.id, m]));
+    for (const [key, wk] of await this.store.list({ prefix: "wk:" })) {
+      const closedAt = Date.parse(shiftDay(wk.key, 7) + "T00:00:00Z") + 36 * 3_600_000;
+      if (Date.now() < closedAt) continue;
+      if (!wk.paid) {
+        const rows = Object.entries(wk.rows || {}).map(([id, r]) => ({ id, ...r }));
+        wk.rewards = [];
+        for (const k of TITLE_KEYS) {
+          const best = rows.reduce((a, r) => ((r[k] || 0) > (a ? a[k] || 0 : 0) ? r : a), null);
+          if (best) wk.rewards.push({ id: best.id, title: k, coins: k === "week" ? REWARD_TOP : REWARD_TITLE, done: false });
+        }
+        wk.paid = true;
+        await this.store.put(key, wk);
+      }
+      let dirty = false;
+      for (const rw of wk.rewards || []) {
+        if (rw.done) continue;
+        const wallet = members.get(rw.id) && members.get(rw.id).snap.walletId;
+        if (!wallet) { rw.done = true; rw.skipped = true; dirty = true; continue; } // 지갑이 없거나 나갔다
+        const r = await walletCall(this.env, wallet, "credit", { amount: rw.coins, memo: `길드 주간 ${rw.title === "week" ? "1위" : "칭호"} (${wk.key})` });
+        if (r.ok || r.status === 404) { rw.done = true; dirty = true; }
+      }
+      if (dirty) await this.store.put(key, wk);
+    }
+  }
+
   async weeks() {
     const all = await this.store.list({ prefix: "wk:" });
     return [...all.values()]
       .sort((a, b) => (a.key < b.key ? 1 : -1))
-      .map((wk) => ({ key: wk.key, rows: Object.entries(wk.rows || {}).map(([id, r]) => ({ id, ...r })) }));
+      .map((wk) => ({ key: wk.key, rows: Object.entries(wk.rows || {}).map(([id, r]) => ({ id, ...r })), rewards: (wk.rewards || []).filter((x) => x.done && !x.skipped).map(({ id, title, coins }) => ({ id, title, coins })) }));
   }
 
   async view(meta) {
+    await this.payWeeks().catch(() => {});
     const list = await this.members();
     return json({
       ok: true,
@@ -197,7 +250,10 @@ export class Guild {
     const action = url.pathname.slice(1);
     const meta = await this.store.get("meta");
 
-    if (request.method === "GET") return meta ? this.view(meta) : fail("없는 길드입니다. 코드를 확인해 주세요", 404);
+    if (request.method === "GET") {
+      if (!meta) return fail("없는 길드입니다. 코드를 확인해 주세요", 404);
+      return action === "market" ? marketView(this) : this.view(meta);
+    }
 
     let body;
     try {
@@ -219,6 +275,8 @@ export class Guild {
     }
 
     if (!meta) return fail("없는 길드입니다. 코드를 확인해 주세요", 404);
+
+    if (action.startsWith("market/")) return marketAction(this, action.slice(7), body, meta);
 
     if (action === "join") {
       const snap = cleanSnap(body.member);
@@ -244,8 +302,10 @@ export class Guild {
     if (action === "leave") {
       await this.store.delete("m:" + me.id);
       await this.forget(me.id);
+      await returnListingsOf(this, me.id); // 앱이 먼저 돌려받지만, 못 했으면 지갑 열쇠로 돌려받을 수 있게 둔다
       const rest = await this.members();
-      if (!rest.length) await this.store.deleteAll(); // 마지막 사람이 나가면 길드도 없어진다
+      // 마지막 사람이 나가면 길드도 없어진다 — 맡겨 둔 포켓몬이 남았으면 돌려받을 때까지 둔다
+      if (!rest.length && !(await listings(this)).length) await this.store.deleteAll();
       else if (meta.leader === me.id) await this.store.put("meta", { ...meta, leader: rest[0].id }); // 가장 오래된 길드원이 맡는다
       return json({ ok: true });
     }
@@ -256,11 +316,13 @@ export class Guild {
       if (!target || target === me.id) return fail("내보낼 길드원을 골라 주세요");
       await this.store.delete("m:" + target);
       await this.forget(target);
+      await returnListingsOf(this, target); // 매물은 지갑 열쇠로 돌려받을 수 있게 둔다
       return json({ ok: true });
     }
 
     if (action === "disband") {
       if (meta.leader !== me.id) return fail("길드장만 길드를 없앨 수 있습니다", 403);
+      if ((await listings(this)).length) return fail("몰에 맡겨 둔 포켓몬이 있어 없앨 수 없습니다. 모두 돌려받은 뒤에 없애 주세요");
       await this.store.deleteAll();
       return json({ ok: true });
     }
@@ -290,6 +352,7 @@ export async function guildRoute(request, env, code, action) {
     return fail("코드를 만들지 못했습니다. 다시 시도해 주세요", 503);
   }
   if (request.method === "GET" && !action) return stub(code).fetch("https://guild/view");
+  if (request.method === "GET" && action === "market") return stub(code).fetch("https://guild/market");
   if (request.method !== "POST" || !action) return fail("잘못된 요청입니다", 405);
   return stub(code).fetch("https://guild/" + action, { method: "POST", body: await request.text() });
 }
