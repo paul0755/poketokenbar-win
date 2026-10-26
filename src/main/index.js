@@ -320,6 +320,8 @@ function tradeEvolves(line, grown) {
  * 실수로 보냈으면 그 코드를 내가 다시 받으면 돌아온다(아래 tradeReceive).
  */
 async function tradeSend(id) {
+  // 교환 보내기는 길드 몰로 바뀌었다. 이미 보낸 코드는 0.8.x 동안 받을 수 있다(tradeReceive)
+  if (id !== "__legacy__") return { ok: false, reason: "교환 보내기는 없어졌습니다. 방 탭의 길드 › 상점 탭의 길드 몰을 쓰세요" };
   const m = box.find(save.box, id);
   if (!m) return { ok: false, reason: "없는 아이입니다" };
   if (save.box.length <= 1) return { ok: false, reason: "마지막 한 마리는 보낼 수 없습니다" };
@@ -460,12 +462,14 @@ function feedBerry(id, key) {
    온라인 기능을 켰을 때만 서버에 닿는다. 토큰은 길드 순위용 합계(이번 주·오늘·버닝 몫)만,
    그것도 공개를 켰을 때만 보낸다(guildShare). 기록(로그) 자체는 보내지 않는다. */
 
-const guildBase = () => onlineCfg().relay.replace(/^ws(s?):/, "http$1:").replace(/\/+$/, "") + "/guild";
+const httpBase = () => onlineCfg().relay.replace(/^ws(s?):/, "http$1:").replace(/\/+$/, "");
+const guildCall = (path, body) => serverCall("/guild" + path, body);
 
-async function guildCall(path, body) {
-  if (!onlineCfg().enabled) return { ok: false, reason: "설정 › 온라인 기능을 켜야 길드를 쓸 수 있습니다" };
+/** 중계 서버에 HTTP 로 묻는다 — 길드 · 지갑 · 몰이 같이 쓴다 */
+async function serverCall(path, body) {
+  if (!onlineCfg().enabled) return { ok: false, reason: "설정 › 온라인 기능을 켜야 쓸 수 있습니다", offline: true };
   try {
-    const res = await fetch(guildBase() + path, {
+    const res = await fetch(httpBase() + path, {
       method: body ? "POST" : "GET",
       headers: body ? { "content-type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
@@ -529,6 +533,7 @@ function guildSnap() {
     // 공개를 끈 사람은 아예 보내지 않는다 — 서버에도 남지 않는다
     usage: save.guildShare !== false && guildUsage ? guildUsage : null,
     weekTop: (save.weekTop || []).length,
+    walletId: (save.wallet && save.wallet.id) || "", // 길드 주간 코인 보상을 넣을 곳
   };
 }
 
@@ -648,6 +653,7 @@ async function guildJoin({ code, trainer } = {}) {
 async function guildLeave() {
   const g = save.guild;
   if (!g) return { ok: true };
+  await marketReclaimAll().catch(() => {}); // 몰에 맡겨 둔 아이부터 돌려받는다(내보내졌어도 지갑 열쇠로)
   if (!g.gone) {
     const r = await guildCall(`/${g.code}/leave`, { memberId: g.memberId, key: g.key });
     // 이미 내보내졌거나 길드가 없으면 서버에 지울 것도 없다 — 내 쪽만 지우면 된다
@@ -750,6 +756,240 @@ async function guildBattle(memberId) {
   const mine = guildTeamCode();
   if (!mine) return { ok: false, reason: "방에 둘 포켓몬이 없습니다(알은 싸울 수 없습니다)" };
   return friendBattle(theirs, { team: mine });
+}
+
+/* ---------------- 코인 지갑 · 상점에 팔기 · 길드 몰 (server/src/wallet.js · market.js) ----------------
+   코인(🪙)은 서버가 잔액을 들고 있다 — 여기서는 지갑 번호와 열쇠만 세이브에 둔다(save.wallet).
+   길드 몰은 포켓몬을 서버에 맡겨서 판다. 맡기면 박스에서 빠지고, 팔리면 산 사람에게 간다.
+   취소·만료·내보내짐이면 돌려받는다. 상점에 팔기는 사람 대신 상점이 바로 사 준다(박스 정리). */
+
+const walletCall = (path, body) => serverCall("/wallet" + path, body);
+
+/** 지갑이 없으면 만든다. 처음 지원금은 없다 — 지갑만 만들어 코인을 모으지 못하게(wallet.js) */
+async function walletEnsure() {
+  if (save.wallet && save.wallet.id) return { ok: true, wallet: save.wallet };
+  const r = await walletCall("", {});
+  if (!r.ok) return r;
+  save.wallet = { id: r.walletId, key: r.key };
+  writeSave();
+  return { ok: true, wallet: save.wallet, created: true };
+}
+
+async function walletInfo() {
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await walletCall("/" + save.wallet.id, { key: save.wallet.key });
+  if (!r.ok) return r;
+  const today = dayKey(new Date());
+  return {
+    ok: true,
+    id: save.wallet.id,
+    created: Boolean(e.created),
+    balance: r.balance,
+    canBuyAt: r.canBuyAt || 0, // 새 지갑은 이틀 뒤부터 몰에서 산다
+    checkedIn: r.checkin === today,
+    exLeft: r.exDay === today ? r.exLeft : 5,
+    sellLeft: r.sellDay === today ? r.sellLeft : 10,
+    sellCoinsLeft: r.sellDay === today ? r.sellCoinsLeft : 100,
+    log: r.log || [],
+    candy: candy().left,
+  };
+}
+
+async function walletCheckin() {
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await walletCall(`/${save.wallet.id}/checkin`, { key: save.wallet.key, day: dayKey(new Date()) });
+  return r.ok ? { ok: true, message: `출석 코인 🪙${r.got}을 받았습니다 (🪙${r.balance})` } : r;
+}
+
+/** 사탕 → 코인. 사탕은 내 세이브에서 빠진다(서버는 확인할 수 없어 하루 한도로 묶는다) */
+async function walletExchange(n) {
+  n = Math.floor(Number(n) || 0);
+  if (n < 1 || n > 5) return { ok: false, reason: "환전은 한 번에 사탕 1~5개입니다" };
+  if (candy().left < n) return { ok: false, reason: "사탕이 모자랍니다" };
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await walletCall(`/${save.wallet.id}/exchange`, { key: save.wallet.key, day: dayKey(new Date()), n });
+  if (!r.ok) return r;
+  save.candySpent = (save.candySpent ?? 0) + n;
+  writeSave();
+  refresh(true);
+  pushShop();
+  return { ok: true, message: `🍬${n} → 🪙${r.got} 환전했습니다 (🪙${r.balance})` };
+}
+
+/** 박스에서 뺀다 — 팔거나 몰에 맡길 때. 키우던 아이·펫·방에서도 정리한다 */
+function removeMon(id) {
+  save.box = save.box.filter((x) => x.id !== id);
+  save.petIds = (save.petIds || []).filter((x) => x !== id);
+  if (save.activeId === id) save.activeId = save.box[0].id; // 키우던 아이가 빠지면 다른 아이가 자란다
+  destroyPet(id);
+  writeSave();
+  syncPets();
+  refresh(true);
+  pushDex();
+}
+
+/** 팔거나 맡길 수 있나 — 알과 마지막 한 마리는 안 된다 */
+function sellable(id) {
+  const m = box.find(save.box, id);
+  if (!m) return { ok: false, reason: "없는 아이입니다" };
+  if (save.box.length <= 1) return { ok: false, reason: "마지막 한 마리는 팔 수 없습니다" };
+  if (isEggMon(m)) return { ok: false, reason: "알은 팔 수 없습니다" };
+  return { ok: true, m };
+}
+
+/** 상점에 판다. 값은 서버가 다시 센다(pokemon.shopPrice 는 화면에 보일 값) */
+async function shopSell(id) {
+  const c = sellable(id);
+  if (!c.ok) return c;
+  const m = c.m;
+  const grown = box.effOf(m, growthSpeed());
+  const name = poke.describe(grown, m.line, { shiny: m.shiny }).name;
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await walletCall(`/${save.wallet.id}/sell`, { key: save.wallet.key, day: dayKey(new Date()), mon: { line: m.line, grown: Math.round(grown), shiny: Boolean(m.shiny) } });
+  if (!r.ok) return r;
+  if (m.hold === "everstone") save.items = { ...(save.items || {}), everstone: stoneCount() + 1 }; // 돌은 가방으로
+  removeMon(id);
+  return { ok: true, message: `${battle.josa(name, "을를")} 상점에 팔았습니다 +🪙${r.got}${r.got < r.price ? " (오늘 한도까지)" : ""}` };
+}
+
+/** 몰에 올릴 내용 — 교환 코드와 같다. 변하지않는돌을 지녔으면 레벨용 성장량도 */
+function monPayload(m) {
+  const grown = box.effOf(m, growthSpeed());
+  const lv = box.withLv(m, growthSpeed()).lvGrown;
+  return {
+    line: m.line, nature: m.nature ?? 0, shiny: Boolean(m.shiny), ivs: m.ivs, gender: m.gender, ability: m.ability ?? 0,
+    eggMoves: m.eggMoves || [], tmMoves: m.tmMoves || [], grown: Math.round(grown), lvGrown: lv > grown ? Math.round(lv) : null,
+    hold: m.hold === "everstone", ot: m.ot || save.trainerName || "", caughtAt: m.caughtAt || null,
+  };
+}
+
+/**
+ * 몰에서 산(또는 돌려받은) 아이를 박스에 넣는다. 산 아이는 교환 진화 — 원작에서 교환으로 진화하는
+ * 아이는 사는 순간 진화한다(교환 대신 몰이 그 자리를 맡는다). 돌려받을 때는 진화하지 않는다.
+ */
+function addMon(p, { evolve = false } = {}) {
+  let grown = p.grown;
+  const evo = evolve && !p.hold ? tradeEvolves(p.line, grown) : -1;
+  const before = poke.describe(grown, p.line, { shiny: p.shiny }).name;
+  if (evo >= 0) grown = Math.max(grown, poke.STAGES[evo + 1].at);
+  const st = poke.stageFor(grown);
+  const m = {
+    id: box.newId(),
+    line: p.line, nature: p.nature, shiny: Boolean(p.shiny), ivs: p.ivs, gender: p.gender, ability: p.ability,
+    eggMoves: p.eggMoves || [], tmMoves: p.tmMoves || [],
+    raw: 0, bonus: 0, boost: 0, fed: grown, maxStage: st,
+    caughtAt: p.caughtAt || new Date().toISOString().slice(0, 10), graduatedAt: null,
+    ot: p.ot || "", traded: evolve ? new Date().toISOString().slice(0, 10) : undefined,
+  };
+  if (p.hold) {
+    const cap = poke.stoneCap(m.line, grown);
+    if (cap != null) Object.assign(m, { hold: "everstone", holdCap: cap, fed: Math.max(grown, p.lvGrown || 0) });
+    else save.items = { ...(save.items || {}), everstone: stoneCount() + 1 };
+  }
+  save.box.push(m);
+  if (!save.seen.includes(m.line)) save.seen.push(m.line);
+  save.maxStage[m.line] = Math.max(save.maxStage[m.line] ?? -1, st);
+  writeSave();
+  refresh(true);
+  pushDex();
+  const after = poke.describe(grown, m.line, { shiny: m.shiny }).name;
+  if (evo >= 0 && save.notifyEnabled && Notification.isSupported()) {
+    new Notification({ title: `${battle.josa(before, "이가")} 진화했다!`, body: `몰에서 데려오자 ${after}(으)로 진화했습니다`, silent: false }).show();
+  }
+  return { name: after, before, evolved: evo >= 0 };
+}
+
+const mallReady = () => {
+  if (!onlineCfg().enabled) return { ok: false, reason: "설정 › 온라인 기능을 켜야 몰을 쓸 수 있습니다", offline: true };
+  if (!save.guild || save.guild.gone) return { ok: false, reason: "길드에 들어가야 길드 몰을 쓸 수 있습니다", noGuild: true };
+  return { ok: true };
+};
+const auth = () => ({ memberId: save.guild.memberId, key: save.guild.key, walletId: save.wallet.id, walletKey: save.wallet.key });
+
+/** 몰 보기 — 매물마다 그림·레벨·개체값·성격·특성을 붙이고, 사기 전에 말이 되는 값인지 본다 */
+async function marketView() {
+  const ready = mallReady();
+  if (!ready.ok) return ready;
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await guildCall(`/${save.guild.code}/market`);
+  if (!r.ok) return r;
+  const url = async (d, kind) => {
+    const p = await poke.spriteWithFallback(d, CACHE, kind).catch(() => null);
+    return p ? pathToFileURL(p).href : null;
+  };
+  // 내 매물 중 만료됐거나 내보내져서 돌려받을 것은 저절로 돌려받는다
+  for (const l of r.listings) {
+    if (l.wallet === save.wallet.id && (l.expired || l.state === "returned")) await marketCancel(l.id, true);
+  }
+  const live = r.listings.filter((l) => !(l.wallet === save.wallet.id && (l.expired || l.state === "returned")));
+  const listings = await Promise.all(live.map(async (l) => {
+    const mon = l.mon;
+    const d = poke.describe(mon.grown, mon.line, { shiny: mon.shiny });
+    const p = profile.build({ ...mon, lvGrown: mon.lvGrown || undefined }, mon.grown);
+    const bad = friend.validate(mon, mon.grown);
+    const rr = poke.rarityOf(mon.line);
+    return {
+      id: l.id, price: l.price, seller: l.trainer, mine: l.wallet === save.wallet.id, state: l.state, expired: l.expired, expires: l.expires,
+      name: d.name, stage: d.stage.label, stageKey: d.stage.key, shiny: d.isShiny, stars: rr.stars, rarity: rr.label, legendary: Boolean((poke.LINES[mon.line] || {}).legendary),
+      level: p ? p.level : null, ivTotal: p ? p.ivTotal : null, types: p ? p.types : [], typeKeys: p ? p.typeKeys : [],
+      nature: (poke.NATURES[mon.nature] || {}).name || "", ability: p ? p.ability : "", passives: p ? p.eggMoves.map((x) => x.name) : [],
+      hold: mon.hold, ot: mon.ot, evolvesTo: !mon.hold && tradeEvolves(mon.line, mon.grown) >= 0 ? poke.LINES[mon.line].names[tradeEvolves(mon.line, mon.grown) + 1] : null,
+      valid: !bad, invalidWhy: bad || null,
+      url: await url(d, "still"), animUrl: await url(d, "anim"),
+    };
+  }));
+  const sales = (r.sales || []).slice(0, 15).map((s) => ({ ...s, name: poke.describe(s.grown, s.line, { shiny: s.shiny }).name }));
+  return { ok: true, listings, sales, fee: r.fee, max: r.max };
+}
+
+async function marketList({ id, price } = {}) {
+  const ready = mallReady();
+  if (!ready.ok) return ready;
+  const c = sellable(id);
+  if (!c.ok) return c;
+  price = Math.floor(Number(price) || 0);
+  if (price < 1 || price > 9999) return { ok: false, reason: "가격은 🪙1~9999 입니다" };
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const m = c.m;
+  const name = poke.describe(box.effOf(m, growthSpeed()), m.line, { shiny: m.shiny }).name;
+  const r = await guildCall(`/${save.guild.code}/market/list`, { ...auth(), mon: monPayload(m), price });
+  if (!r.ok) return r;
+  removeMon(id); // 서버가 맡았다
+  return { ok: true, message: `${battle.josa(name, "을를")} 🪙${price}에 올렸습니다. 7일 안에 안 팔리면 돌아옵니다` };
+}
+
+async function marketBuy(listingId) {
+  const ready = mallReady();
+  if (!ready.ok) return ready;
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await guildCall(`/${save.guild.code}/market/buy`, { ...auth(), listingId });
+  if (!r.ok) return r;
+  const got = addMon(r.mon, { evolve: true });
+  return { ok: true, message: got.evolved ? `${got.before}을(를) 데려오자 ${got.name}(으)로 진화했다! (🪙${r.balance})` : `${battle.josa(got.name, "을를")} 🪙${r.price}에 샀습니다 (🪙${r.balance})` };
+}
+
+/** 내 매물을 돌려받는다 — 취소 · 만료 · 내보내짐 */
+async function marketCancel(listingId, quiet = false) {
+  if (!save.guild || !save.wallet) return { ok: false, reason: "길드와 지갑이 있어야 합니다" };
+  const r = await guildCall(`/${save.guild.code}/market/cancel`, { walletId: save.wallet.id, walletKey: save.wallet.key, listingId });
+  if (!r.ok) return r;
+  const got = addMon(r.mon);
+  return { ok: true, message: quiet ? "" : `${battle.josa(got.name, "을를")} 돌려받았습니다` };
+}
+
+/** 길드를 떠나기 전에 맡겨 둔 아이를 모두 돌려받는다 */
+async function marketReclaimAll() {
+  if (!save.guild || !save.wallet || !onlineCfg().enabled) return;
+  const r = await guildCall(`/${save.guild.code}/market`);
+  if (!r.ok) return;
+  for (const l of r.listings || []) if (l.wallet === save.wallet.id) await marketCancel(l.id, true);
 }
 
 /* ---------------- 버닝타임 (burning.js) ---------------- */
@@ -997,6 +1237,8 @@ let save = {
   guild: null,
   /** 길드 순위에 내 토큰 합계(이번 주·오늘)를 공개하나. 끄면 순위에 "비공개"로 나온다 */
   guildShare: true,
+  /** 코인 지갑 { id, key } — 잔액은 서버에 있다(server/src/wallet.js). 열쇠를 잃으면 지갑도 잃는다 */
+  wallet: null,
   /** 길드 주간 1위를 한 주들. [{ guild, week }] — 방에 메달 액자로 걸린다 */
   weekTop: [],
   /** 버닝타임 — 정해 둔 시간에 쓴 토큰은 성장 몇 배 (burning.js). 없으면 기본(코어 10~16 · 야근 18~0, 4배) */
@@ -1366,6 +1608,7 @@ async function buildStats() {
         likes: tasteOf(m).likes,
         dislikes: tasteOf(m).dislikes,
         boost: m.boost || 0,
+        sellPrice: poke.shopPrice(m.line, e, m.shiny), // 상점에 팔면 받을 코인(서버가 다시 센다)
         // 변하지않는돌. evolveTo — 지금 빼면 무엇으로 진화하나(쌓인 토큰이 문턱을 넘었을 때만)
         stone: m.hold === "everstone",
         evolveTo: (() => {
@@ -3111,6 +3354,15 @@ app.whenReady().then(async () => {
   ipcMain.handle("guild-kick", (_e, id) => guildKick(String(id || "")));
   ipcMain.handle("guild-view", () => guildView());
   ipcMain.handle("guild-share", (_e, on) => guildShare(on));
+  // 코인 지갑 · 상점에 팔기 · 길드 몰
+  ipcMain.handle("wallet-info", () => walletInfo());
+  ipcMain.handle("wallet-checkin", () => walletCheckin());
+  ipcMain.handle("wallet-exchange", (_e, n) => walletExchange(n));
+  ipcMain.handle("shop-sell", (_e, id) => shopSell(String(id || "")));
+  ipcMain.handle("market-view", () => marketView());
+  ipcMain.handle("market-list", (_e, a) => marketList(a || {}));
+  ipcMain.handle("market-buy", (_e, id) => marketBuy(String(id || "")));
+  ipcMain.handle("market-cancel", (_e, id) => marketCancel(String(id || "")));
   ipcMain.handle("guild-battle", (_e, id) => guildBattle(String(id || "")));
   ipcMain.handle("room-buy", (_e, { kind, id } = {}) => roomBuy(kind, id));
   ipcMain.handle("room-set", (_e, patch) => roomSet(patch || {}));

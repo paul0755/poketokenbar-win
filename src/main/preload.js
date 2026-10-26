@@ -48,6 +48,15 @@ contextBridge.exposeInMainWorld("ptb", {
   guildView: () => ipcRenderer.invoke("guild-view"),
   guildBattle: (id) => ipcRenderer.invoke("guild-battle", id),
   guildShare: (on) => ipcRenderer.invoke("guild-share", on),
+  // 코인 지갑 · 상점에 팔기 · 길드 몰
+  walletInfo: () => ipcRenderer.invoke("wallet-info"),
+  walletCheckin: () => ipcRenderer.invoke("wallet-checkin"),
+  walletExchange: (n) => ipcRenderer.invoke("wallet-exchange", n),
+  shopSell: (id) => ipcRenderer.invoke("shop-sell", id),
+  marketView: () => ipcRenderer.invoke("market-view"),
+  marketList: (a) => ipcRenderer.invoke("market-list", a),
+  marketBuy: (id) => ipcRenderer.invoke("market-buy", id),
+  marketCancel: (id) => ipcRenderer.invoke("market-cancel", id),
   battleDesktop: (a) => ipcRenderer.invoke("battle-desktop", a),
   // 친선 배틀 — 코드 만들기 · 받은 코드 보기 · 싸우기
   friendRegister: (a) => ipcRenderer.invoke("friend-register", a),

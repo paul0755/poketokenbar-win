@@ -27,7 +27,7 @@ export default {
     const url = new URL(request.url);
     const g = /^\/guild(?:\/([A-HJ-NP-Z2-9]{8}))?(?:\/(join|update|leave|kick|disband|market(?:\/(?:list|buy|cancel))?))?$/.exec(url.pathname);
     if (g) return guildRoute(request, env, g[1], g[2]);
-    const w = /^\/wallet(?:\/(w[0-9a-f]{12}))?(?:\/(checkin|exchange))?$/.exec(url.pathname);
+    const w = /^\/wallet(?:\/(w[0-9a-f]{12}))?(?:\/(checkin|exchange|sell))?$/.exec(url.pathname);
     if (w) return walletRoute(request, env, w[1], w[2]);
     const m = /^\/room\/(\d{6})$/.exec(url.pathname);
     if (!m) return new Response(`PokeTokenBar relay (protocol ${PROTOCOL})`, { headers: { "content-type": "text/plain; charset=utf-8" } });

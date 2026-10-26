@@ -171,6 +171,20 @@ function stoneCap(lineIndex, total) {
   return null;
 }
 
+/**
+ * 상점이 사 주는 값(🪙) — 희귀도 × 진화 단계 × 이로치, 전설은 기본 15. 화면에 보일 값이다.
+ * 실제로 주는 건 서버(server/src/wallet.js shopPrice)가 같은 셈으로 다시 센다.
+ */
+const STAR_COINS = { 1: 1, 2: 2, 3: 3, 4: 5, 5: 8 };
+const STAGE_COINS = [0, 1, 1.5, 2, 3];
+function shopPrice(lineIndex, total, shiny) {
+  const L = LINES[lineIndex];
+  const st = stageFor(total);
+  if (!L || !st) return 0;
+  const base = L.single && L.legendary ? 15 : STAR_COINS[rarityOf(lineIndex).stars];
+  return Math.max(1, Math.round(base * STAGE_COINS[st] * (shiny ? 3 : 1)));
+}
+
 /** 다음 단계까지 얼마나 남았나 (마스터면 next: null) */
 function progress(total) {
   const i = stageFor(total);
@@ -310,4 +324,4 @@ async function spriteWithFallback(mon, cacheDir, kind) {
   catch (e) { console.error("[sprite] 실패 " + mon.dexId + " " + kind + ": " + e.message); return null; }
 }
 
-module.exports = { STAGES, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollWild, isSingle, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };
+module.exports = { STAGES, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollWild, isSingle, shopPrice, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };

@@ -34,7 +34,10 @@ function setTab(name) {
   for (const id of ["home", "shop", "box", "room", "battle", "dex"]) $("tab-" + id).hidden = id !== name;
   document.querySelector(".scroll").scrollTop = 0;
   // 열 때 최신 값을 받아온다. 상점·도감은 홈과 갱신 주기가 다르다.
-  if (name === "shop") window.ptb.requestShop();
+  if (name === "shop") {
+    window.ptb.requestShop();
+    if (window.ptbMall) window.ptbMall.open(); // 코인 지갑 · 상점에 팔기 · 길드 몰
+  }
   if (name === "dex") window.ptb.requestDex();
 }
 for (const b of document.querySelectorAll("nav button[data-tab]")) {

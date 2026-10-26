@@ -1,0 +1,64 @@
+/* 상점에 팔기 · 길드 몰 — mall.js. 상점 탭 위의 바꾸기 단추는 room.css 의 .rm-switch 를 같이 쓴다 */
+
+.ml-box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 9px; }
+.ml-box .hd { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; font-size: 12px; }
+.ml-box .hd span { margin-left: auto; font-size: 10.5px; color: var(--muted); }
+.ml-box .hd .mini2 { padding: 2px 8px; }
+.ml-box .note { margin-top: 2px; }
+
+/* 코인 지갑 */
+.ml-wallet { background: linear-gradient(135deg, #2b2616, #1c1e25); border: 1px solid #4a3a16; border-radius: 12px; padding: 11px 13px; }
+.ml-wallet .bal { display: flex; align-items: baseline; gap: 8px; }
+.ml-wallet .bal .lab { font-size: 10.5px; color: var(--muted); }
+.ml-wallet .bal b { font-size: 24px; font-weight: 800; color: var(--accent); letter-spacing: -0.5px; }
+.ml-wallet .acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.ml-wallet .ex { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); margin-left: auto; }
+.ml-wallet .ex select { padding: 3px 5px; font: inherit; font-size: 11px; color: var(--text); background: var(--card2); border: 1px solid var(--line); border-radius: 7px; }
+.ml-wallet .sub { margin-top: 6px; font-size: 10px; color: var(--dim); line-height: 1.5; }
+.ml-off { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+
+/* 상점에 팔기 */
+.ss-row { display: flex; align-items: center; gap: 9px; padding: 5px 2px; border-top: 1px solid var(--line); }
+.ss-row:first-child { border-top: 0; }
+.ss-row .pic { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; }
+.ss-row .pic img { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }
+.ss-row .t { flex: 1; min-width: 0; font-size: 12px; }
+.ss-row .t span { display: block; font-size: 10px; color: var(--dim); }
+.ss-row .t .tag { display: inline; font-size: 8.5px; font-weight: 700; padding: 1px 5px; margin-left: 4px; border-radius: 5px; background: var(--accent); color: #14151a; }
+.ss-row .t .tag.pet { background: var(--blue); color: #fff; }
+
+/* 몰 */
+.ml-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 7px; }
+.ml-card { display: flex; flex-direction: column; gap: 3px; padding: 8px 9px; background: var(--card2); border: 1px solid var(--line); border-radius: 10px; font-size: 10.5px; }
+.ml-card.mine { border-color: #33507a; }
+.ml-card.legend { border-color: #6a5420; background: linear-gradient(160deg, #2b2616, var(--card2) 60%); }
+.ml-card .pic { height: 64px; display: grid; place-items: center; }
+.ml-card .pic img { max-height: 64px; max-width: 100%; object-fit: contain; image-rendering: pixelated; }
+.ml-card .nm { font-size: 12.5px; font-weight: 800; }
+.ml-card .nm .lv { font-size: 10.5px; color: var(--accent); }
+.ml-card .ty { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.ml-card .ty .t { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 99px; background: #33363f; }
+.ml-card .ty .st { margin-left: auto; font-size: 9.5px; color: var(--muted); }
+.ml-card .meta { color: var(--muted); }
+.ml-card .evo { color: var(--accent); font-weight: 700; }
+.ml-card .bad { color: var(--red); }
+.ml-card .ft { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--dim); font-size: 9.5px; }
+.ml-card .ft button { margin-left: auto; }
+.ml-card .ft .buy:not(:disabled) { color: #14151a; background: var(--accent); border-color: var(--accent); }
+/* 타입 색은 index.html 의 .ty.t-* 와 같다 */
+.ml-card .t.t-normal{background:#9099a1}.ml-card .t.t-fire{background:#e8703a}.ml-card .t.t-water{background:#4a90d9}
+.ml-card .t.t-electric{background:#e0c63a;color:#14151a}.ml-card .t.t-grass{background:#63b75c;color:#14151a}
+.ml-card .t.t-ice{background:#68c5c5;color:#14151a}.ml-card .t.t-fighting{background:#c2452f}.ml-card .t.t-poison{background:#9a5ca8}
+.ml-card .t.t-ground{background:#b0894a}.ml-card .t.t-flying{background:#8c9fd8}.ml-card .t.t-psychic{background:#e06b8b}
+.ml-card .t.t-bug{background:#8fb92a;color:#14151a}.ml-card .t.t-rock{background:#b0a253;color:#14151a}
+.ml-card .t.t-ghost{background:#6b5a9b}.ml-card .t.t-dragon{background:#5a5ac4}.ml-card .t.t-dark{background:#5a4a44}
+.ml-card .t.t-steel{background:#8f9fb0;color:#14151a}.ml-card .t.t-fairy{background:#e79cd6;color:#14151a}
+
+.ml-put { display: flex; gap: 6px; }
+.ml-put select { flex: 1; min-width: 0; padding: 6px 7px; font: inherit; font-size: 11px; color: var(--text); background: var(--card2); border: 1px solid var(--line); border-radius: 8px; }
+.ml-put input { width: 80px; padding: 6px 7px; font: inherit; font-size: 11px; color: var(--text); background: var(--card2); border: 1px solid var(--line); border-radius: 8px; user-select: text; }
+.sale { display: flex; gap: 8px; padding: 4px 2px; border-top: 1px solid var(--line); font-size: 11px; }
+.sale:first-child { border-top: 0; }
+.sale span:first-child { flex: 1; font-weight: 700; }
+.sale span:nth-child(2) { color: var(--dim); }
+.sale b { color: var(--accent); }

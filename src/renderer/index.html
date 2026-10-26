@@ -419,6 +419,7 @@
 </style>
 <link rel="stylesheet" href="moves.css" />
 <link rel="stylesheet" href="room.css" />
+<link rel="stylesheet" href="mall.css" />
 
 <nav>
   <button data-tab="home" class="on">홈</button>
@@ -489,12 +490,49 @@
 
   <!-- ---------------- 상점 ---------------- -->
   <section id="tab-shop" hidden>
+    <!-- 상점(사탕) · 길드 몰(코인) — mall.js -->
+    <div class="rm-switch" id="shSwitch">
+      <button data-view="shop" class="on">🏪 상점</button>
+      <button data-view="mall">🛒 길드 몰</button>
+      <span class="c" id="shCoin"></span>
+    </div>
+    <div id="shShop">
     <div class="wallet">
       <div class="lab">쓸 수 있는 사탕</div>
       <div class="n" id="wallet">🍬 –</div>
       <div class="sub" id="walletSub"></div>
     </div>
     <div id="items"></div>
+    <div class="ml-box" id="ssBox">
+      <div class="hd"><b>🐾 포켓몬을 상점에 팔기</b><span id="ssLeft"></span></div>
+      <div class="note" id="ssNote">박스 정리용입니다. 상점이 코인(🪙)으로 바로 사 줍니다. 좋은 아이는 길드 몰에서 사람에게 파는 게 더 받습니다.</div>
+      <div id="ssList"></div>
+    </div>
+    </div>
+
+    <div id="shMall" hidden>
+      <div class="ml-wallet" id="mlWallet"></div>
+      <div class="gd-box" id="mlGate" hidden></div>
+      <div id="mlBody" hidden>
+        <div class="ml-box">
+          <div class="hd"><b>🛒 매물</b><span id="mlCount"></span><button class="mini2" id="mlRefresh">↻</button></div>
+          <div id="mlList" class="ml-grid"></div>
+        </div>
+        <div class="ml-box">
+          <div class="hd"><b>📦 내 포켓몬 올리기</b><span>수수료 5% · 7일 · 5마리까지</span></div>
+          <div class="ml-put">
+            <select id="mlPick"></select>
+            <input id="mlPrice" type="number" min="1" max="9999" placeholder="가격" />
+            <button class="mini2" id="mlPut">🪙 올리기</button>
+          </div>
+          <div class="note" id="mlHint"></div>
+        </div>
+        <div class="ml-box">
+          <div class="hd"><b>🧾 최근 거래</b></div>
+          <div id="mlSales"></div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ---------------- 박스 ---------------- -->
@@ -665,16 +703,15 @@
       <button id="liveLeave" hidden>나가기</button>
     </div>
 
-    <h4>교환 — 친구와 코드로</h4>
+    <h4>교환 받기 — 이미 받은 코드만</h4>
     <div class="note">
-      보낼 아이를 고르면 박스에서 빠지고 교환 코드가 나옵니다. 친구가 넣으면 받습니다.
-      같은 코드는 한 번만 받을 수 있습니다. 원작에서 교환으로 진화하는 아이(윤겔라·근육몬·데구리·고우스트 등)는
-      받는 순간 진화합니다.
+      교환은 <b>상점 탭의 길드 몰</b>로 바뀌었습니다. 예전에 받은 교환 코드(PTBT-…)는 다음 몇 버전 동안 여기서 받을 수 있습니다.
+      원작에서 교환으로 진화하는 아이는 이제 몰에서 데려올 때 진화합니다.
     </div>
-    <div class="btlpick">
+    <div class="btlpick" hidden>
       <select id="trMine"></select>
     </div>
-    <div class="btlrow"><button id="trSend">교환 보내기</button></div>
+    <div class="btlrow" hidden><button id="trSend">교환 보내기</button></div>
     <div class="frcode" id="trSentBox" hidden>
       <textarea id="trSentCode" readonly rows="2"></textarea>
       <button id="trCopy">복사</button>
@@ -714,3 +751,4 @@
 <script src="battle.js"></script>
 <script src="room.js"></script>
 <script src="guild.js"></script>
+<script src="mall.js"></script>
