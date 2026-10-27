@@ -629,8 +629,14 @@
           <button class="mini2" id="gdRefresh">↻ 새로고침</button>
           <label class="gd-share" title="이번 주·오늘 토큰 합계와 그중 버닝타임 몫만 올라갑니다. 기록(로그)은 보내지 않습니다"><input type="checkbox" id="gdShare" /> 내 토큰 합계 공개</label>
           <span class="sp"></span>
+          <button class="mini2" id="gdBrowseBtn">🔎 다른 길드 보기</button>
           <button class="mini2" id="gdRename">✏️ 내 이름</button>
           <button class="mini2 del" id="gdLeave">길드 나가기</button>
+        </div>
+        <div class="gd-box gd-find" id="gdBrowse" hidden>
+          <div class="hd"><b>🔎 길드 목록</b><span class="sp"></span><input class="gd-in" id="gdBrowseQ" maxlength="20" placeholder="이름 · 소개로 찾기" /><button class="mini2" id="gdBrowseRe" title="다시 불러오기">↻</button><button class="mini2" id="gdBrowseNo" title="닫기">✕</button></div>
+          <div class="sub" id="gdBrowseNote"></div>
+          <div class="gd-list" id="gdBrowseList"></div>
         </div>
         <div class="gd-box gd-listing" id="gdListing" hidden>
           <label class="gd-share"><input type="checkbox" id="gdListed" /> <b>📋 길드 목록에 올리기</b></label>

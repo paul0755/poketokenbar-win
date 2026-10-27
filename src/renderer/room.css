@@ -137,7 +137,7 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .gd-m .acts button:hover:not(:disabled) { border-color: var(--accent); }
 .gd-m .acts button:disabled { opacity: .4; cursor: default; }
 .gd-m .acts button.del:hover { border-color: var(--red); color: var(--red); }
-.gd-foot { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; }
+.gd-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 4px; }
 .gd-foot .sp { flex: 1; }
 .gd-foot .del:hover { color: var(--red); border-color: var(--red); }
 .gd-rename { margin: 0 0 8px; }
@@ -157,6 +157,13 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .gd-list .g .mt .hot { color: #4ee39a; }
 .gd-list .g .mini2 { flex: none; padding: 5px 10px; }
 .gd-list .g.full { opacity: .55; }
+.gd-list .g.mine { border-color: var(--accent); }
+.gd-list .g .tag { display: inline-block; margin-left: 5px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #14151a; font-size: 9.5px; font-weight: 700; vertical-align: 1px; }
+.gd-list .g .mini2.off { opacity: .55; }
+.gd-find > .sub { font-size: 10px; color: var(--muted); margin: -2px 0 7px; line-height: 1.5; }
+.gd-find > .sub:empty { display: none; }
+.gd-find > .sub b { display: inline; margin: 0; font-size: inherit; color: var(--text); }
+.gd-share.gd-pub { white-space: normal; }
 .gd-list .empty { color: var(--muted); font-size: 10.5px; padding: 10px 2px; text-align: center; line-height: 1.6; }
 .gd-pub { margin-top: 7px; }
 .gd-listing .gd-share { margin-bottom: 6px; color: var(--text); }
@@ -223,7 +230,7 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .gd-rank .ft { margin-top: 6px; font-size: 10.5px; color: var(--muted); }
 .gd-rank .ft b { color: var(--text); }
 .gd-rank .ft.dim { font-size: 9.5px; color: var(--dim); }
-.gd-share { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); cursor: pointer; }
+.gd-share { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .gd-share input { accent-color: var(--accent); margin: 0; }
 .gd-m .t .ld { display: inline; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 5px; background: #3a2f16; color: var(--accent); }
 

@@ -339,52 +339,85 @@
   let found = null; // 마지막으로 받은 목록 { guilds, at }
   let finding = false;
 
+  /** 지금 들어가 있는 길드 코드 — 없으면 null */
+  const myCode = () => (last && last.guild && !last.guild.gone ? last.guild.code : null);
+  /** 목록 칸 둘 — 길드가 없을 때(gdList)와 길드 안에서 둘러볼 때(gdBrowseList) */
+  const listBoxes = () => [$("gdList"), $("gdBrowseList")];
+
   /** 목록을 받아 온다. 1분 안에 받은 게 있으면 그대로 쓴다(force 면 다시) */
   async function loadList(force = false) {
     if (finding) return;
     if (!force && found && Date.now() - found.at < 60_000) return renderList();
     finding = true;
-    $("gdFindRe").disabled = true;
-    if (!found) $("gdList").innerHTML = '<div class="empty">길드 목록을 불러오는 중…</div>';
+    $("gdFindRe").disabled = $("gdBrowseRe").disabled = true;
+    if (!found) for (const el of listBoxes()) el.innerHTML = '<div class="empty">길드 목록을 불러오는 중…</div>';
     try {
       const r = await window.ptb.guildList();
       if (!r || !r.ok) {
         found = null;
-        $("gdList").innerHTML = `<div class="empty">${esc((r && r.reason) || "길드 목록을 불러오지 못했습니다")}</div>`;
+        for (const el of listBoxes()) el.innerHTML = `<div class="empty">${esc((r && r.reason) || "길드 목록을 불러오지 못했습니다")}</div>`;
         return;
       }
       found = { guilds: r.guilds, at: Date.now() };
       renderList();
     } finally {
       finding = false;
-      $("gdFindRe").disabled = false;
+      $("gdFindRe").disabled = $("gdBrowseRe").disabled = false;
     }
   }
 
   function renderList() {
     if (!found) return;
-    const q = $("gdFindQ").value.trim().toLowerCase();
+    const mine = myCode();
+    $("gdList").innerHTML = listHtml($("gdFindQ").value, null, '아직 목록에 올라온 길드가 없습니다.<br>아래에서 길드를 만들어 첫 길드가 되어 보세요');
+    $("gdBrowseList").innerHTML = listHtml($("gdBrowseQ").value, mine, "아직 목록에 올라온 길드가 없습니다");
+    // 길드 안에서 — 다른 길드는 나간 뒤에 들어간다. 내 길드가 목록에 없으면 그것도 알린다
+    const listed = mine && found.guilds.some((x) => x.code === mine);
+    $("gdBrowseNote").innerHTML = `한 번에 한 길드에만 있을 수 있어서, 다른 길드에는 <b>지금 길드를 나간 뒤</b> 들어갈 수 있습니다.${
+      mine && !listed ? ` 내 길드는 목록에 없습니다${guild && guild.leader ? " — 아래 📋 길드 목록에 올리기로 올릴 수 있습니다" : "(코드를 아는 사람만 들어옵니다)"}.` : ""}`;
+  }
+
+  /** 목록 줄들. mine 이 있으면(길드 안) 그 길드에 "내 길드"를 달고, 다른 길드는 들어가기 대신 "나간 뒤" 안내 */
+  function listHtml(query, mine, emptyMsg) {
+    const q = query.trim().toLowerCase();
+    if (!found.guilds.length) return `<div class="empty">${emptyMsg}</div>`;
     const list = found.guilds.filter((x) => !q || (x.name + " " + (x.intro || "") + " " + (x.leader || "")).toLowerCase().includes(q));
-    if (!found.guilds.length) {
-      $("gdList").innerHTML = '<div class="empty">아직 목록에 올라온 길드가 없습니다.<br>아래에서 길드를 만들어 첫 길드가 되어 보세요</div>';
-      return;
-    }
-    if (!list.length) {
-      $("gdList").innerHTML = `<div class="empty">"${esc(q)}"(이)가 들어간 길드가 없습니다</div>`;
-      return;
-    }
-    $("gdList").innerHTML = list.map((x) => {
+    if (!list.length) return `<div class="empty">"${esc(q)}"(이)가 들어간 길드가 없습니다</div>`;
+    return list.map((x) => {
       const full = x.members >= x.max;
-      return `<div class="g${full ? " full" : ""}" data-code="${esc(x.code)}">
+      const me = mine && x.code === mine;
+      const btn = me ? "" : !mine
+        ? `<button class="mini2" data-join ${full ? "disabled" : ""}>${full ? "꽉 참" : "들어가기"}</button>`
+        : `<button class="mini2 off" data-later title="지금 길드를 나간 뒤 들어갈 수 있습니다">${full ? "꽉 참" : "들어가기"}</button>`;
+      return `<div class="g${full && !me ? " full" : ""}${me ? " mine" : ""}" data-code="${esc(x.code)}" data-name="${esc(x.name)}">
         <div class="tx">
-          <div class="nm">${esc(x.name)}<span>👥 ${x.members}/${x.max}</span></div>
+          <div class="nm">${esc(x.name)}${me ? '<i class="tag">내 길드</i>' : ""}<span>👥 ${x.members}/${x.max}</span></div>
           ${x.intro ? `<div class="in">${esc(x.intro)}</div>` : ""}
           <div class="mt">${x.active ? `<span class="hot">이번 주 ${x.active}명 활동</span> · ` : ""}길드장 ${esc(x.leader || "–")}${x.hall ? ` · 🏗️ 홀 장식 ${x.hall}` : ""} · ${ago(x.at)} 움직임</div>
         </div>
-        <button class="mini2" data-join ${full ? "disabled" : ""}>${full ? "꽉 참" : "들어가기"}</button>
+        ${btn}
       </div>`;
     }).join("");
   }
+
+  // 길드 안에서 둘러보기 — 열고 닫기
+  const browse = (on) => {
+    $("gdBrowse").hidden = !on;
+    $("gdBrowseBtn").classList.toggle("on", on);
+    if (!on) return;
+    loadList();
+    $("gdBrowse").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+  $("gdBrowseBtn").onclick = () => browse($("gdBrowse").hidden);
+  $("gdBrowseNo").onclick = () => browse(false);
+  $("gdBrowseRe").onclick = () => loadList(true);
+  $("gdBrowseQ").addEventListener("input", () => renderList());
+  $("gdBrowseList").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-later]");
+    if (!b) return;
+    const name = b.closest("[data-name]").dataset.name;
+    toast(`"${name}"에 들어가려면 먼저 지금 길드를 나가 주세요 — 한 번에 한 길드에만 있을 수 있습니다`, "bad");
+  });
 
   $("gdList").addEventListener("click", async (e) => {
     const b = e.target.closest("button[data-join]");
@@ -418,7 +451,12 @@
     $("gdListingOk").disabled = true;
     const r = await window.ptb.guildListing({ listed: $("gdListed").checked, intro: $("gdIntro").value });
     $("gdListingOk").disabled = false;
-    if (done(r) && guild) { guild.listed = r.listed; guild.intro = r.intro; renderListing(guild); }
+    if (done(r) && guild) {
+      guild.listed = r.listed;
+      guild.intro = r.intro;
+      renderListing(guild);
+      if (!$("gdBrowse").hidden) loadList(true); // 둘러보는 중이면 내 길드 줄도 바로 바뀐다
+    }
     else if (guild) renderListing(guild);
   };
   $("gdListed").onchange = saveListing;
@@ -544,7 +582,7 @@
     last = s;
     const now = s.guild ? s.guild.code + (s.guild.gone || "") : "";
     const moved = before !== now; // 들어가거나 나갔다 — 나갔으면 길드 목록을 다시 받는다
-    if (moved) { guild = null; visiting = null; found = null; }
+    if (moved) { guild = null; visiting = null; found = null; $("gdBrowse").hidden = true; $("gdBrowseBtn").classList.remove("on"); }
     if (view === "guild") show(moved);
   });
 })();
