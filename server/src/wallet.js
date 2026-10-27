@@ -33,6 +33,14 @@
  *   - 새 지갑은 BUY_WAIT_MS 가 지나야 몰에서 살 수 있다(market.js). 파는 건 바로 된다
  * 완전히 막을 수는 없다 — 몰이 길드 안에서만 돌아서, 길드장이 낯선 길드원을 내보낼 수 있다.
  *
+ * ── 길드 주간 보상은 주마다 길드 하나에서만 ──
+ * 서버는 같은 사람인지 모른다(계정이 없다). 세이브를 하나 더 쓰거나 서버를 직접 부르면 같은 지갑으로
+ * 여러 길드에 들어가 길드마다 주간 보상(1위 · 칭호 · 공동 목표)을 받을 수 있었다. 그래서 지갑이
+ * 주마다 "그 주 보상을 준 길드"를 적어 두고(guildWeeks), 같은 주 보상을 다른 길드가 넣으려 하면
+ * 409 로 거절한다. 같은 길드는 그 주에 여러 번(1위 + 칭호 + 목표) 넣을 수 있다.
+ * 묶을 때가 아니라 넣을 때 본다 — 묶을 때만 보면, 길드 A 에 묶고 보상을 받은 뒤 B 로 옮겨 또 받는다.
+ * 앱을 그대로 쓰는 사람은 한 번에 한 길드라 걸리지 않는다(길드를 나가면 그 길드의 내 기록도 지워진다).
+ *
  * ── 주소 (walletRoute) ──
  *   POST /wallet                          만들기            → { walletId, key, balance }
  *   POST /wallet/w0123456789ab            보기   { key }    → { balance, checkin, exLeft, log }
@@ -91,6 +99,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 /** 그 사람 PC 의 날짜가 말이 되나 — 서버 시각에서 ±36시간(시간대 차이) 안 */
 const sane = (day) => DAY.test(day) && Math.abs(Date.parse(day + "T12:00:00Z") - Date.now()) < 36 * 3_600_000;
 const memo = (s) => String(s ?? "").replace(/[\u0000-\u001f]/g, "").slice(0, 40);
+const GUILD_WEEKS_KEEP = 26; // 주간 보상을 준 길드를 기억하는 주 — 길드의 주간 기록과 같다
 
 export class Wallet {
   constructor(state) {
@@ -146,10 +155,20 @@ export class Wallet {
     }
     if (!w) return fail("없는 지갑입니다", 404);
 
-    // 길드 객체만 부른다 — 판매 대금 · 주간 보상
+    // 길드 객체만 부른다 — 판매 대금 · 주간 보상. 주간 보상은 guild · week 를 같이 보낸다
     if (action === "credit") {
       const n = Number(body.amount);
       if (!Number.isSafeInteger(n) || n <= 0 || n > 1_000_000) return fail("금액이 맞지 않습니다");
+      if (body.guild && body.week) {
+        const guild = String(body.guild).slice(0, 8);
+        const week = String(body.week).slice(0, 10);
+        w.guildWeeks = w.guildWeeks || {};
+        const paidBy = w.guildWeeks[week];
+        if (paidBy && paidBy !== guild) return fail("이 지갑은 그 주 길드 보상을 이미 다른 길드에서 받았습니다", 409);
+        w.guildWeeks[week] = guild;
+        const weeks = Object.keys(w.guildWeeks).sort();
+        for (const k of weeks.slice(0, Math.max(0, weeks.length - GUILD_WEEKS_KEEP))) delete w.guildWeeks[k];
+      }
       w.balance += n;
       await this.save(w, n, body.memo);
       return json({ ok: true, balance: w.balance });

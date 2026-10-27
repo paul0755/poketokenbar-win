@@ -38,6 +38,8 @@
  * 적어 낼 수 있어서, 부계정이 받을 보상을 본계정 지갑으로 몰 수 있었다. 앱이 지갑 열쇠를 같이
  * 보내면 그 지갑이 정말 이 사람 것인지 보고 묶는다. 한 길드에서 지갑 하나는 한 사람에게만.
  * 아직 지갑이 확인되지 않은 사람의 보상은 버리지 않고 PENDING_DAYS 동안 기다린다.
+ * 지갑 하나는 한 주에 길드 하나에서만 보상을 받는다 — 길드 코드와 주를 같이 넘기고, 그 주 보상을
+ * 이미 다른 길드에서 받은 지갑이면 지갑이 거절한다(409, wallet.js). 거절된 보상은 넘긴다.
  *
  * ── 공동 목표 ──
  * 주마다 길드 합계 목표가 셋(🥉 🥈 🥇) — 최근 GOAL_WEEKS 주 합계 평균의 GOAL_TIERS 배. 기록이
@@ -358,6 +360,7 @@ export class Guild {
    */
   async payWeeks() {
     const members = new Map((await this.members()).map((m) => [m.id, m]));
+    const code = ((await this.store.get("meta")) || {}).code; // 지갑이 "그 주 보상을 준 길드"로 적는다
     for (const [key, wk] of await this.store.list({ prefix: "wk:" })) {
       const closedAt = Date.parse(shiftDay(wk.key, 7) + "T00:00:00Z") + 36 * 3_600_000;
       if (Date.now() < closedAt) continue;
@@ -390,8 +393,9 @@ export class Guild {
         if (!m || (!wallet && Date.now() > closedAt + PENDING_DAYS * DAY_MS)) { rw.done = true; rw.skipped = true; dirty = true; continue; } // 나갔거나 끝내 지갑을 확인하지 못했다
         if (!wallet) continue; // 앱이 지갑 열쇠를 보내 확인될 때까지 기다린다
         const what = rw.title === "week" ? "1위" : rw.title === "goal" ? `목표 ${["🥉", "🥈", "🥇"][GOAL_COINS.indexOf(rw.coins)] || ""}` : "칭호";
-        const r = await walletCall(this.env, wallet, "credit", { amount: rw.coins, memo: `길드 주간 ${what} (${wk.key})` });
+        const r = await walletCall(this.env, wallet, "credit", { amount: rw.coins, memo: `길드 주간 ${what} (${wk.key})`, guild: code, week: wk.key });
         if (r.ok || r.status === 404) { rw.done = true; dirty = true; }
+        else if (r.status === 409) { rw.done = true; rw.skipped = true; dirty = true; } // 그 주 보상을 이미 다른 길드에서 받은 지갑
       }
       if (dirty) await this.store.put(key, wk);
     }
