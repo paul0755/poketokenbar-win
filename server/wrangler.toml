@@ -17,6 +17,10 @@ class_name = "Guild"
 name = "WALLETS"
 class_name = "Wallet"
 
+[[durable_objects.bindings]]
+name = "DIRECTORY"
+class_name = "Directory"
+
 # 무료 요금제는 SQLite 저장소를 쓰는 Durable Object 만 된다. Room 은 저장하지 않지만 형식은 맞춘다
 [[migrations]]
 tag = "v1"
@@ -31,3 +35,8 @@ new_sqlite_classes = ["Guild"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["Wallet"]
+
+# 길드 목록 — 목록에 올린 길드의 요약
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["Directory"]

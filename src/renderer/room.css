@@ -141,6 +141,27 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .gd-foot .sp { flex: 1; }
 .gd-foot .del:hover { color: var(--red); border-color: var(--red); }
 .gd-rename { margin: 0 0 8px; }
+/* 길드 찾기 — 목록에 올린 길드 */
+.gd-find .hd { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+.gd-find .hd b { margin: 0; white-space: nowrap; }
+.gd-find .hd .sp { flex: 1; }
+.gd-find .hd .gd-in { flex: 0 1 160px; padding: 4px 8px; font-size: 11px; }
+.gd-find .hd .mini2 { padding: 3px 8px; }
+.gd-list { display: flex; flex-direction: column; gap: 5px; max-height: 300px; overflow-y: auto; }
+.gd-list .g { display: flex; align-items: center; gap: 8px; background: var(--card2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; }
+.gd-list .g .tx { flex: 1; min-width: 0; }
+.gd-list .g .nm { font-weight: 700; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-list .g .nm span { font-weight: 400; color: var(--muted); font-size: 10px; margin-left: 4px; }
+.gd-list .g .in { color: var(--text); font-size: 10.5px; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gd-list .g .mt { color: var(--muted); font-size: 9.5px; margin-top: 2px; }
+.gd-list .g .mt .hot { color: #4ee39a; }
+.gd-list .g .mini2 { flex: none; padding: 5px 10px; }
+.gd-list .g.full { opacity: .55; }
+.gd-list .empty { color: var(--muted); font-size: 10.5px; padding: 10px 2px; text-align: center; line-height: 1.6; }
+.gd-pub { margin-top: 7px; }
+.gd-listing .gd-share { margin-bottom: 6px; color: var(--text); }
+.gd-listing .gd-share b { display: inline; margin: 0; font-size: 11.5px; }
+.gd-listing .sub { margin-top: 5px; font-size: 9.5px; color: var(--dim); }
 /* 길드 공동 목표 — 홀 위 막대. 눈금은 🥉 🥈 🥇 */
 .gd-goal { background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 9px 12px 8px; margin-bottom: 8px; }
 .gd-goal .top { display: flex; align-items: baseline; gap: 8px; font-size: 12px; margin-bottom: 7px; }

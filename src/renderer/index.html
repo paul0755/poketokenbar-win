@@ -597,9 +597,14 @@
           <b>트레이너 이름</b>
           <input class="gd-in" id="gdTrainer" maxlength="16" placeholder="길드원에게 보일 이름" />
         </div>
+        <div class="gd-box gd-find">
+          <div class="hd"><b>🔎 길드 찾기</b><span class="sp"></span><input class="gd-in" id="gdFindQ" maxlength="20" placeholder="이름 · 소개로 찾기" /><button class="mini2" id="gdFindRe" title="다시 불러오기">↻</button></div>
+          <div class="gd-list" id="gdList"></div>
+        </div>
         <div class="gd-box">
           <b>길드 만들기</b>
           <div class="gd-row"><input class="gd-in" id="gdName" maxlength="20" placeholder="길드 이름" /><button class="mini2" id="gdCreate">만들기</button></div>
+          <label class="gd-share gd-pub"><input type="checkbox" id="gdPublic" checked /> 길드 목록에 올리기 — 누구나 목록에서 찾아 들어올 수 있습니다(나중에 바꿀 수 있음)</label>
         </div>
         <div class="gd-box">
           <b>코드로 들어가기</b>
@@ -626,6 +631,11 @@
           <span class="sp"></span>
           <button class="mini2" id="gdRename">✏️ 내 이름</button>
           <button class="mini2 del" id="gdLeave">길드 나가기</button>
+        </div>
+        <div class="gd-box gd-listing" id="gdListing" hidden>
+          <label class="gd-share"><input type="checkbox" id="gdListed" /> <b>📋 길드 목록에 올리기</b></label>
+          <div class="gd-row"><input class="gd-in" id="gdIntro" maxlength="60" placeholder="목록에 보일 한 줄 소개 (예: 매일 쓰는 사람 환영)" /><button class="mini2" id="gdListingOk">저장</button></div>
+          <div class="sub" id="gdListingNote"></div>
         </div>
         <div class="gd-row gd-rename" id="gdRenameRow" hidden>
           <input class="gd-in" id="gdRenameIn" maxlength="16" placeholder="길드원에게 보일 이름" />

@@ -19,6 +19,7 @@
  *   POST /guild/ABCD2345/leave     나가기   { memberId, key }        — 내 칸은 바로 지운다
  *   POST /guild/ABCD2345/kick      내보내기 { memberId, key, target } (길드장)
  *   POST /guild/ABCD2345/disband   길드 없애기 { memberId, key }    (길드장)
+ *   GET  /guilds                   길드 목록 (directory.js)          → { guilds[] }
  *
  * ── 주간 기록 (명예의 전당) ──
  * 길드원이 토큰 합계를 올릴 때마다 그 주(weekKey) 칸에 마지막 값을 적어 둔다("wk:2026-10-19").
@@ -58,12 +59,19 @@
  * 남의 지갑 번호를 적어 낼 수 있다 — 그래서 지갑 열쇠(walletKey)도 받아 그 지갑이 이 사람
  * 것인지 본다. 열쇠는 저장하지 않는다.
  *
+ * ── 길드 목록 ── directory.js
+ * 길드장이 "목록에 올리기"를 켜면 길드 요약(이름 · 소개 · 인원 · 길드장 이름 · 이번 주 활동한 인원 ·
+ * 홀 장식 수)을 목록에 올린다. 코드를 몰라도 목록에서 골라 들어온다. 사람이 들고 나거나 설정을
+ * 바꾸면 바로, 방을 올릴 때는 PUBLISH_GAP_MS 에 한 번 고친다. 끄거나 길드가 없어지면 내린다.
+ *   POST /guild/ABCD2345/listing   { memberId, key, listed, intro }   (길드장)
+ *
  * ── 길드 몰 ── market.js
  */
 import { marketView, marketAction, returnListingsOf, listings } from "./market.js";
 import { WALLET_ID, walletCall, DECO_ITEMS, DECO_THEMES } from "./wallet.js";
 import LINES from "../../src/main/lines.json" with { type: "json" };
 import HALL from "../../src/main/hall.json" with { type: "json" };
+import { directoryCall } from "./directory.js";
 
 const HALL_ITEMS = new Map(HALL.items.map((it) => [it.id, it]));
 
@@ -83,6 +91,7 @@ const GOAL_BASE = 200_000_000; // 기록이 없을 때 공개한 길드원 한 �
 // 칭호 — 앱(guild.js TITLES)과 같아야 한다
 const TITLE_KEYS = ["week", "burn", "core", "night", "dawn", "morning"];
 const DAY_MS = 86_400_000;
+const PUBLISH_GAP_MS = 10 * 60_000; // 방을 올릴 때 목록 요약은 10분에 한 번까지
 const shiftDay = (key, days) => new Date(Date.parse(key + "T00:00:00Z") + days * DAY_MS).toISOString().slice(0, 10);
 
 const json = (body, status = 200) =>
@@ -275,6 +284,35 @@ export class Guild {
     return { funds: h.funds, owned: h.owned, theme: h.theme, donors };
   }
 
+  /**
+   * 목록에 올린 길드면 요약을 고친다. force 가 아니면 PUBLISH_GAP_MS 에 한 번까지.
+   * 목록을 부르는 사이 설정이 바뀌었을 수 있어서, 끝나고 다시 읽어 꺼졌으면 내린다
+   */
+  async publish(meta, force = false) {
+    if (!meta || !meta.listed) return;
+    const now = Date.now();
+    if (!force && now - (meta.pubAt || 0) < PUBLISH_GAP_MS) return;
+    const list = await this.members();
+    if (!list.length) return;
+    const lead = list.find((m) => m.id === meta.leader);
+    const h = await this.hall();
+    await directoryCall(this.env, "put", {
+      code: meta.code,
+      name: meta.name,
+      intro: meta.intro || "",
+      members: list.length,
+      max: MAX_MEMBERS,
+      leader: lead ? lead.snap.trainer : "",
+      active: list.filter((m) => now - m.updated < 7 * DAY_MS).length, // 이번 주(7일) 안에 방을 올린 사람
+      hall: h.owned.length,
+      at: Math.max(...list.map((m) => m.updated)),
+    });
+    const cur = await this.store.get("meta");
+    if (!cur) return;
+    if (!cur.listed) await directoryCall(this.env, "remove", { code: meta.code });
+    else await this.store.put("meta", { ...cur, pubAt: now });
+  }
+
   /** 그 주 칸에 한 사람의 합계를 적는다. 같은 값이면 쓰지 않는다 */
   async writeWeek(weekKey, id, trainer, u) {
     const key = "wk:" + weekKey;
@@ -374,6 +412,8 @@ export class Guild {
       code: meta.code,
       name: meta.name,
       leader: meta.leader,
+      listed: Boolean(meta.listed),
+      intro: meta.intro || "",
       max: MAX_MEMBERS,
       members: list.map((m) => ({ id: m.id, snap: m.snap, joined: m.joined, updated: m.updated, walletOk: Boolean(m.wallet) })),
       weeks: await this.weeks(),
@@ -410,9 +450,11 @@ export class Guild {
       const wv = await walletOf(this.env, snap, body.walletKey);
       checkDeco(snap, wv);
       const me = await this.add(snap, wv);
-      await this.store.put("meta", { code: str(body.code, 8), name, leader: me.memberId, created: Date.now() });
+      const fresh = { code: str(body.code, 8), name, leader: me.memberId, created: Date.now(), listed: Boolean(body.listed), intro: str(body.intro, 60) };
+      await this.store.put("meta", fresh);
       await this.record(me.memberId, snap, Date.now());
-      return json({ ok: true, code: body.code, name, ...me, leader: true });
+      await this.publish(fresh, true);
+      return json({ ok: true, code: body.code, name, ...me, leader: true, listed: fresh.listed });
     }
 
     if (!meta) return fail("없는 길드입니다. 코드를 확인해 주세요", 404);
@@ -427,6 +469,7 @@ export class Guild {
       checkDeco(snap, wv);
       const me = await this.add(snap, wv);
       await this.record(me.memberId, snap, Date.now());
+      await this.publish(meta, true);
       return json({ ok: true, code: meta.code, name: meta.name, ...me, leader: false });
     }
 
@@ -468,6 +511,15 @@ export class Guild {
       return json({ ok: true, item: it.id, used, refunded: pay - used, done, balance, hall: this.publicHall(h) });
     }
 
+    if (action === "listing") {
+      if (meta.leader !== me.id) return fail("길드장만 목록 설정을 바꿀 수 있습니다", 403);
+      const next = { ...meta, listed: Boolean(body.listed), intro: str(body.intro, 60) };
+      await this.store.put("meta", next);
+      if (next.listed) await this.publish(next, true);
+      else await directoryCall(this.env, "remove", { code: meta.code });
+      return json({ ok: true, listed: next.listed, intro: next.intro });
+    }
+
     if (action === "hall/theme") {
       if (meta.leader !== me.id) return fail("길드장만 홀 배경을 바꿀 수 있습니다", 403);
       const h = await this.hall();
@@ -488,6 +540,7 @@ export class Guild {
       const wallet = (wv && (await this.bindable(snap, wv, me.id))) || me.wallet || null; // 확인된 지갑은 열쇠 없이 올려도 그대로
       await this.store.put("m:" + me.id, { ...me, snap, wallet, updated: Date.now() });
       await this.record(me.id, snap, me.joined);
+      await this.publish(meta);
       return json({ ok: true, leader: meta.leader === me.id, walletOk: Boolean(wallet) && wallet === snap.walletId });
     }
 
@@ -497,8 +550,14 @@ export class Guild {
       await returnListingsOf(this, me.id); // 앱이 먼저 돌려받지만, 못 했으면 지갑 열쇠로 돌려받을 수 있게 둔다
       const rest = await this.members();
       // 마지막 사람이 나가면 길드도 없어진다 — 맡겨 둔 포켓몬이 남았으면 돌려받을 때까지 둔다
-      if (!rest.length && !(await listings(this)).length) await this.store.deleteAll();
-      else if (meta.leader === me.id) await this.store.put("meta", { ...meta, leader: rest[0].id }); // 가장 오래된 길드원이 맡는다
+      if (!rest.length) {
+        if (meta.listed) await directoryCall(this.env, "remove", { code: meta.code }); // 아무도 없는 길드는 목록에서 내린다
+        if (!(await listings(this)).length) await this.store.deleteAll();
+      } else {
+        const next = meta.leader === me.id ? { ...meta, leader: rest[0].id } : meta; // 가장 오래된 길드원이 맡는다
+        if (next !== meta) await this.store.put("meta", next);
+        await this.publish(next, true);
+      }
       return json({ ok: true });
     }
 
@@ -509,12 +568,14 @@ export class Guild {
       await this.store.delete("m:" + target);
       await this.forget(target);
       await returnListingsOf(this, target); // 매물은 지갑 열쇠로 돌려받을 수 있게 둔다
+      await this.publish(meta, true);
       return json({ ok: true });
     }
 
     if (action === "disband") {
       if (meta.leader !== me.id) return fail("길드장만 길드를 없앨 수 있습니다", 403);
       if ((await listings(this)).length) return fail("몰에 맡겨 둔 포켓몬이 있어 없앨 수 없습니다. 모두 돌려받은 뒤에 없애 주세요");
+      if (meta.listed) await directoryCall(this.env, "remove", { code: meta.code });
       await this.store.deleteAll();
       return json({ ok: true });
     }

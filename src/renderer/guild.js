@@ -162,6 +162,7 @@
     $("gdIn").hidden = !(online && g && !g.gone);
     if (g && g.gone) $("gdGoneMsg").textContent = g.gone;
     if (online && !g && !$("gdTrainer").value) $("gdTrainer").value = (s.friend && s.friend.trainer) || "";
+    if (online && !g && fetch) loadList(); // 길드가 없으면 목록부터 보여 준다
     if (online && g && !g.gone) {
       $("gdTitle").textContent = g.name;
       $("gdCopy").textContent = "GLD-" + g.code;
@@ -204,6 +205,7 @@
     renderHof(g, closed);
     renderGoal(g, rk);
     renderHall(g);
+    renderListing(g);
     $("gdShare").checked = Boolean(last && last.guild && last.guild.share);
     const sel = visiting && g.members.find((m) => m.id === visiting);
     if (!room) room = window.ptbRoom.create($("gdRoom"));
@@ -332,6 +334,97 @@
     if (done(r)) load();
   });
 
+  /* ---------------- 길드 목록 ---------------- */
+
+  let found = null; // 마지막으로 받은 목록 { guilds, at }
+  let finding = false;
+
+  /** 목록을 받아 온다. 1분 안에 받은 게 있으면 그대로 쓴다(force 면 다시) */
+  async function loadList(force = false) {
+    if (finding) return;
+    if (!force && found && Date.now() - found.at < 60_000) return renderList();
+    finding = true;
+    $("gdFindRe").disabled = true;
+    if (!found) $("gdList").innerHTML = '<div class="empty">길드 목록을 불러오는 중…</div>';
+    try {
+      const r = await window.ptb.guildList();
+      if (!r || !r.ok) {
+        found = null;
+        $("gdList").innerHTML = `<div class="empty">${esc((r && r.reason) || "길드 목록을 불러오지 못했습니다")}</div>`;
+        return;
+      }
+      found = { guilds: r.guilds, at: Date.now() };
+      renderList();
+    } finally {
+      finding = false;
+      $("gdFindRe").disabled = false;
+    }
+  }
+
+  function renderList() {
+    if (!found) return;
+    const q = $("gdFindQ").value.trim().toLowerCase();
+    const list = found.guilds.filter((x) => !q || (x.name + " " + (x.intro || "") + " " + (x.leader || "")).toLowerCase().includes(q));
+    if (!found.guilds.length) {
+      $("gdList").innerHTML = '<div class="empty">아직 목록에 올라온 길드가 없습니다.<br>아래에서 길드를 만들어 첫 길드가 되어 보세요</div>';
+      return;
+    }
+    if (!list.length) {
+      $("gdList").innerHTML = `<div class="empty">"${esc(q)}"(이)가 들어간 길드가 없습니다</div>`;
+      return;
+    }
+    $("gdList").innerHTML = list.map((x) => {
+      const full = x.members >= x.max;
+      return `<div class="g${full ? " full" : ""}" data-code="${esc(x.code)}">
+        <div class="tx">
+          <div class="nm">${esc(x.name)}<span>👥 ${x.members}/${x.max}</span></div>
+          ${x.intro ? `<div class="in">${esc(x.intro)}</div>` : ""}
+          <div class="mt">${x.active ? `<span class="hot">이번 주 ${x.active}명 활동</span> · ` : ""}길드장 ${esc(x.leader || "–")}${x.hall ? ` · 🏗️ 홀 장식 ${x.hall}` : ""} · ${ago(x.at)} 움직임</div>
+        </div>
+        <button class="mini2" data-join ${full ? "disabled" : ""}>${full ? "꽉 참" : "들어가기"}</button>
+      </div>`;
+    }).join("");
+  }
+
+  $("gdList").addEventListener("click", async (e) => {
+    const b = e.target.closest("button[data-join]");
+    if (!b || b.disabled) return;
+    const row = b.closest("[data-code]");
+    if (!$("gdTrainer").value.trim()) {
+      toast("먼저 위에 트레이너 이름을 넣어 주세요", "bad");
+      $("gdTrainer").focus();
+      return;
+    }
+    b.disabled = true;
+    const r = await window.ptb.guildJoin({ code: row.dataset.code, trainer: $("gdTrainer").value });
+    b.disabled = false;
+    if (done(r)) { guild = null; visiting = null; found = null; }
+    else loadList(true); // 그 사이 꽉 찼거나 없어졌을 수 있다
+  });
+  $("gdFindQ").addEventListener("input", () => renderList());
+  $("gdFindRe").onclick = () => loadList(true);
+
+  /** 들어간 길드 — 길드장만 목록에 올리기 · 소개를 바꾼다 */
+  function renderListing(g) {
+    $("gdListing").hidden = !g.leader;
+    if (!g.leader) return;
+    $("gdListed").checked = g.listed;
+    if (document.activeElement !== $("gdIntro")) $("gdIntro").value = g.intro || "";
+    $("gdListingNote").textContent = g.listed
+      ? "목록에 올라 있습니다 — 코드를 몰라도 누구나 목록에서 찾아 들어옵니다. 낯선 길드원은 내보낼 수 있습니다"
+      : "목록에 없습니다 — 길드 코드를 아는 사람만 들어옵니다";
+  }
+  const saveListing = async () => {
+    $("gdListingOk").disabled = true;
+    const r = await window.ptb.guildListing({ listed: $("gdListed").checked, intro: $("gdIntro").value });
+    $("gdListingOk").disabled = false;
+    if (done(r) && guild) { guild.listed = r.listed; guild.intro = r.intro; renderListing(guild); }
+    else if (guild) renderListing(guild);
+  };
+  $("gdListed").onchange = saveListing;
+  $("gdListingOk").onclick = saveListing;
+  $("gdIntro").addEventListener("keydown", (e) => { if (e.key === "Enter") saveListing(); });
+
   /* ---------------- 누르기 ---------------- */
 
   const done = (r) => {
@@ -381,7 +474,7 @@
 
   $("gdCreate").onclick = async () => {
     $("gdCreate").disabled = true;
-    const r = await window.ptb.guildCreate({ name: $("gdName").value, trainer: $("gdTrainer").value });
+    const r = await window.ptb.guildCreate({ name: $("gdName").value, trainer: $("gdTrainer").value, listed: $("gdPublic").checked });
     $("gdCreate").disabled = false;
     if (done(r)) { guild = null; visiting = null; }
   };
@@ -450,7 +543,8 @@
     const before = last && last.guild ? last.guild.code + (last.guild.gone || "") : "";
     last = s;
     const now = s.guild ? s.guild.code + (s.guild.gone || "") : "";
-    if (before !== now) { guild = null; visiting = null; } // 들어가거나 나갔다
-    if (view === "guild") show(false);
+    const moved = before !== now; // 들어가거나 나갔다 — 나갔으면 길드 목록을 다시 받는다
+    if (moved) { guild = null; visiting = null; found = null; }
+    if (view === "guild") show(moved);
   });
 })();

@@ -637,18 +637,18 @@ function setTrainer(trainer) {
   return true;
 }
 
-async function guildCreate({ name, trainer } = {}) {
+async function guildCreate({ name, trainer, listed = false } = {}) {
   if (save.guild && !save.guild.gone) return { ok: false, reason: "이미 길드에 들어가 있습니다. 나간 뒤에 만들어 주세요" };
   if (!setTrainer(trainer)) return { ok: false, reason: "트레이너 이름을 넣어 주세요" };
   if (!String(name || "").trim()) return { ok: false, reason: "길드 이름을 넣어 주세요" };
   const snap = guildSnap();
-  const r = await guildCall("", { name: String(name).trim().slice(0, 20), member: snap, ...walletKeyFor(snap) });
+  const r = await guildCall("", { name: String(name).trim().slice(0, 20), listed: Boolean(listed), member: snap, ...walletKeyFor(snap) });
   if (!r.ok) return r;
   save.guild = { code: r.code, name: r.name, memberId: r.memberId, key: r.key, leader: true, walletOk: Boolean(r.walletOk) };
   guildPushed = { body: "", room: "", at: Date.now() };
   writeSave();
   refresh(true);
-  return { ok: true, code: r.code, message: `길드 "${r.name}"를 만들었습니다. 코드를 친구에게 알려 주세요` };
+  return { ok: true, code: r.code, message: `길드 "${r.name}"를 만들었습니다. ${r.listed ? "길드 목록에 올렸습니다" : "코드를 친구에게 알려 주세요"}` };
 }
 
 async function guildJoin({ code, trainer } = {}) {
@@ -664,6 +664,26 @@ async function guildJoin({ code, trainer } = {}) {
   writeSave();
   refresh(true);
   return { ok: true, message: `길드 "${r.name}"에 들어왔습니다` };
+}
+
+/**
+ * 길드 목록 — 길드장이 목록에 올린 길드들(server/src/directory.js). 코드를 몰라도 골라 들어간다.
+ * 목록에는 길드 요약만 있다(이름 · 소개 · 인원 · 길드장 이름 · 이번 주 활동한 인원 · 홀 장식 수)
+ */
+async function guildList() {
+  const r = await serverCall("/guilds");
+  if (!r.ok) return { ok: false, reason: r.offline ? r.reason : "길드 목록을 불러오지 못했습니다" };
+  return { ok: true, guilds: r.guilds || [], now: r.now || Date.now() };
+}
+
+/** 내 길드를 목록에 올리기 · 내리기, 소개 글 — 길드장만 */
+async function guildListing({ listed, intro } = {}) {
+  const g = save.guild;
+  if (!g || g.gone) return { ok: false, reason: "길드에 들어가 있지 않습니다" };
+  if (!g.leader) return { ok: false, reason: "길드장만 바꿀 수 있습니다" };
+  const r = await guildCall(`/${g.code}/listing`, { memberId: g.memberId, key: g.key, listed: Boolean(listed), intro: String(intro || "").trim().slice(0, 60) });
+  if (!r.ok) { guildGone(r); return r; }
+  return { ok: true, listed: r.listed, intro: r.intro, message: r.listed ? "길드 목록에 올렸습니다 — 누구나 목록에서 찾아 들어올 수 있습니다" : "길드 목록에서 내렸습니다 — 코드로만 들어올 수 있습니다" };
 }
 
 async function guildLeave() {
@@ -797,6 +817,7 @@ async function guildView() {
   // 주간 기록 — 그 주의 1위 포켓몬 그림은 지금 길드원 카드에서 가져온다(화면이 한다)
   return {
     ok: true, code: r.code, name: r.name, max: r.max, leader, members, weeks: r.weeks || [], thisWeek: week, medal, now: r.now,
+    listed: Boolean(r.listed), intro: r.intro || "",
     goal: (r.goals || {})[week] || null, goalCoins, lastGoal, goalNew,
     hall: r.hall || { funds: {}, owned: [], theme: null, donors: {} }, hallItems: HALL.items,
     walletOk: Boolean(me && me.walletOk), hasWallet: Boolean(save.wallet), coins: coinCache ? coinCache.balance : null,
@@ -3549,6 +3570,8 @@ app.whenReady().then(async () => {
   ipcMain.handle("guild-view", () => guildView());
   ipcMain.handle("guild-share", (_e, on) => guildShare(on));
   ipcMain.handle("guild-rename", (_e, trainer) => guildRename(trainer));
+  ipcMain.handle("guild-list", () => guildList());
+  ipcMain.handle("guild-listing", (_e, a) => guildListing(a));
   ipcMain.handle("hall-donate", (_e, a) => hallDonate(a));
   ipcMain.handle("hall-theme", (_e, theme) => hallTheme(theme));
   // 코인 지갑 · 상점에 팔기 · 길드 몰

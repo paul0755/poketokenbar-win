@@ -51,6 +51,8 @@ contextBridge.exposeInMainWorld("ptb", {
   guildBattle: (id) => ipcRenderer.invoke("guild-battle", id),
   guildShare: (on) => ipcRenderer.invoke("guild-share", on),
   guildRename: (trainer) => ipcRenderer.invoke("guild-rename", trainer),
+  guildList: () => ipcRenderer.invoke("guild-list"),
+  guildListing: (a) => ipcRenderer.invoke("guild-listing", a),
   hallDonate: (a) => ipcRenderer.invoke("hall-donate", a),
   hallTheme: (theme) => ipcRenderer.invoke("hall-theme", theme),
   // 코인 지갑 · 상점에 팔기 · 길드 몰
