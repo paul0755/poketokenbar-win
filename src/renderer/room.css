@@ -139,6 +139,7 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .gd-foot { display: flex; align-items: center; gap: 6px; margin: 8px 0 4px; }
 .gd-foot .sp { flex: 1; }
 .gd-foot .del:hover { color: var(--red); border-color: var(--red); }
+.gd-rename { margin: 0 0 8px; }
 @media (min-width: 620px) {
   #gdMembers { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); column-gap: 8px; }
   #gdRoom { max-width: calc((100vh - 230px) * 1.6); margin: 0 auto; }

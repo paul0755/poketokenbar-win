@@ -623,6 +623,7 @@ async function guildPush(force = false) {
     if (r.status === 429) guildPushed.body = guildPushed.room = ""; // 너무 잦았다 — 다음 갱신 때 다시
     guildGone(r);
   }
+  return r;
 }
 
 function setTrainer(trainer) {
@@ -675,6 +676,23 @@ async function guildLeave() {
   writeSave();
   refresh(true);
   return { ok: true, message: "길드에서 나왔습니다" };
+}
+
+/**
+ * 트레이너 이름 바꾸기 — 길드에 들어간 뒤에도. 바로 길드에 올린다(방 사진의 trainer).
+ * 이미 지난 주간 기록 · 몰에 올려 둔 매물 · 이미 만든 친선 코드에는 옛 이름이 남는다
+ */
+async function guildRename(trainer) {
+  const before = save.trainerName;
+  if (!setTrainer(trainer)) return { ok: false, reason: "트레이너 이름을 넣어 주세요" };
+  if (save.trainerName === before) return { ok: true, message: "이름이 그대로입니다" };
+  writeSave();
+  refresh(true);
+  if (!save.guild || save.guild.gone) return { ok: true, message: `이름을 "${save.trainerName}"(으)로 바꿨습니다` };
+  const r = await guildPush(true).catch(() => null);
+  if (r && r.status === 429) return { ok: true, message: `이름을 "${save.trainerName}"(으)로 바꿨습니다. 길드에는 잠시 뒤에 올라갑니다` };
+  if (r && !r.ok) return { ok: false, reason: `이름은 바꿨지만 길드에 올리지 못했습니다 — ${r.reason || "다음 갱신 때 다시 올립니다"}` };
+  return { ok: true, message: `이름을 "${save.trainerName}"(으)로 바꿨습니다` };
 }
 
 async function guildShare(on) {
@@ -3465,6 +3483,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("guild-kick", (_e, id) => guildKick(String(id || "")));
   ipcMain.handle("guild-view", () => guildView());
   ipcMain.handle("guild-share", (_e, on) => guildShare(on));
+  ipcMain.handle("guild-rename", (_e, trainer) => guildRename(trainer));
   // 코인 지갑 · 상점에 팔기 · 길드 몰
   ipcMain.handle("wallet-info", () => walletInfo());
   ipcMain.handle("wallet-checkin", () => walletCheckin());

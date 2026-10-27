@@ -317,6 +317,26 @@
     visiting = null;
   };
   $("gdRefresh").onclick = () => load();
+  // 내 이름 바꾸기 — 길드원 목록 · 순위 · 홀 이름표에 바로 바뀐 이름이 뜬다
+  const renameRow = (on) => {
+    $("gdRenameRow").hidden = !on;
+    if (!on) return;
+    $("gdRenameIn").value = (last && last.friend && last.friend.trainer) || "";
+    $("gdRenameIn").focus();
+    $("gdRenameIn").select();
+  };
+  $("gdRename").onclick = () => renameRow($("gdRenameRow").hidden);
+  $("gdRenameNo").onclick = () => renameRow(false);
+  $("gdRenameOk").onclick = async () => {
+    $("gdRenameOk").disabled = true;
+    const r = await window.ptb.guildRename($("gdRenameIn").value);
+    $("gdRenameOk").disabled = false;
+    if (done(r)) { renameRow(false); load(); }
+  };
+  $("gdRenameIn").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("gdRenameOk").click();
+    if (e.key === "Escape") renameRow(false);
+  });
   $("gdHof").addEventListener("click", (e) => {
     if (!e.target.closest("#gdHofMore") || !guild) return;
     hofAll = !hofAll;
