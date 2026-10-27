@@ -15,7 +15,7 @@
  *   POST /guild                    만들기   { name, member }        → { code, memberId, key }
  *   GET  /guild/ABCD2345           보기                              → { name, leader, members[] }
  *   POST /guild/ABCD2345/join      들어가기 { member }              → { memberId, key }
- *   POST /guild/ABCD2345/update    내 방 올리기 { memberId, key, member, walletKey? }
+ *   POST /guild/ABCD2345/update    내 방 올리기 { memberId, key, member, walletKey? } → { walletOk }
  *   POST /guild/ABCD2345/leave     나가기   { memberId, key }        — 내 칸은 바로 지운다
  *   POST /guild/ABCD2345/kick      내보내기 { memberId, key, target } (길드장)
  *   POST /guild/ABCD2345/disband   길드 없애기 { memberId, key }    (길드장)
@@ -31,7 +31,26 @@
  *
  * ── 주간 코인 보상 ──
  * 지난주가 확정되면(다음 주가 시작하고 36시간 뒤 — 늦게 켠 사람의 마무리를 기다린다) 1위에게
- * 🪙REWARD_TOP, 칭호마다 🪙REWARD_TITLE 을 그 사람 지갑(snap.walletId)에 한 번 넣는다.
+ * 🪙REWARD_TOP, 칭호마다 🪙REWARD_TITLE 을 그 사람 지갑에 한 번 넣는다.
+ *
+ * 보상은 "확인된 지갑"(m.wallet)에만 넣는다 — 방 사진의 지갑 번호(snap.walletId)는 남의 것을
+ * 적어 낼 수 있어서, 부계정이 받을 보상을 본계정 지갑으로 몰 수 있었다. 앱이 지갑 열쇠를 같이
+ * 보내면 그 지갑이 정말 이 사람 것인지 보고 묶는다. 한 길드에서 지갑 하나는 한 사람에게만.
+ * 아직 지갑이 확인되지 않은 사람의 보상은 버리지 않고 PENDING_DAYS 동안 기다린다.
+ *
+ * ── 공동 목표 ──
+ * 주마다 길드 합계 목표가 셋(🥉 🥈 🥇) — 최근 GOAL_WEEKS 주 합계 평균의 GOAL_TIERS 배. 기록이
+ * 없으면 공개한 길드원 수 × GOAL_BASE. 목표는 그 주가 시작된 뒤 처음 셀 때 정해 두고("goal:주")
+ * 그 주 안에는 바꾸지 않는다. 합계는 공개한 사람(주간 기록에 줄이 있는 사람)만 센다.
+ * 주가 확정되면 이룬 만큼 GOAL_COINS 를, 그 주에 토큰을 쓴 길드원(그 주가 시작하기 전부터
+ * 길드원이었던 사람) 모두에게 넣는다.
+ *
+ * ── 홀 꾸미기 (모금) ──
+ * 장식(src/main/hall.json — 앱과 같은 파일)마다 모금함이 있다. 길드원 누구나 코인을 넣고,
+ * 다 차면 홀에 놓인다. 넣은 코인은 돌려받지 않는다(길드를 나가도 길드에 남는다).
+ * 홀 배경(theme)이 다 모이면 처음 것은 바로 바르고, 그다음부터는 길드장이 고른다.
+ *   POST /guild/ABCD2345/hall/donate  { memberId, key, walletId, walletKey, item, amount }
+ *   POST /guild/ABCD2345/hall/theme   { memberId, key, theme }   (길드장, "stone" 은 기본 돌 홀)
  *
  * ── 코인 꾸미기 ──
  * 코인으로 산 배경·가구(wallet.js buy)는 산 사람 방에만 보여야 한다. 방 사진을 받을 때 지갑의
@@ -44,6 +63,9 @@
 import { marketView, marketAction, returnListingsOf, listings } from "./market.js";
 import { WALLET_ID, walletCall, DECO_ITEMS, DECO_THEMES } from "./wallet.js";
 import LINES from "../../src/main/lines.json" with { type: "json" };
+import HALL from "../../src/main/hall.json" with { type: "json" };
+
+const HALL_ITEMS = new Map(HALL.items.map((it) => [it.id, it]));
 
 // 전설 석상에 깎을 수 있는 도감 번호 — 전설 · 환상만
 const LEGEND_DEX = new Set(LINES.filter((l) => l.single && l.legendary).map((l) => l.ids[1]));
@@ -53,6 +75,11 @@ const UPDATE_GAP_MS = 15_000; // 내 방 올리기는 15초에 한 번까지
 const KEEP_WEEKS = 26; // 반년치 주간 기록
 export const REWARD_TOP = 50;
 export const REWARD_TITLE = 10;
+const PENDING_DAYS = 14; // 지갑이 아직 확인되지 않은 사람의 보상을 기다리는 날
+export const GOAL_TIERS = [0.8, 1.0, 1.25]; // 🥉 🥈 🥇 — 평소(최근 평균)의 배
+export const GOAL_COINS = [10, 20, 35];
+const GOAL_WEEKS = 4;
+const GOAL_BASE = 200_000_000; // 기록이 없을 때 공개한 길드원 한 명당
 // 칭호 — 앱(guild.js TITLES)과 같아야 한다
 const TITLE_KEYS = ["week", "burn", "core", "night", "dawn", "morning"];
 const DAY_MS = 86_400_000;
@@ -144,18 +171,25 @@ export function cleanSnap(m) {
   };
 }
 
-/** 코인 꾸미기 중 산 것만 남긴다. 코인 꾸미기가 없으면 지갑을 부르지 않는다 */
-async function checkDeco(env, snap, walletKey) {
-  const coin = snap.furni.filter((id) => DECO_ITEMS.has(id));
-  if (!coin.length && !DECO_THEMES.has(snap.theme)) return;
-  let owned = [];
-  if (snap.walletId && typeof walletKey === "string") {
-    const r = await walletCall(env, snap.walletId, "view", { key: walletKey });
-    if (r.ok) owned = r.deco || [];
-  }
+/** 지갑 열쇠가 맞으면 그 지갑의 정보, 아니면 null */
+async function walletOf(env, snap, walletKey) {
+  if (!snap.walletId || typeof walletKey !== "string") return null;
+  const r = await walletCall(env, snap.walletId, "view", { key: walletKey });
+  return r.ok ? r : null;
+}
+
+/** 코인 꾸미기 중 산 것만 남긴다(wv: walletOf 결과) */
+function checkDeco(snap, wv) {
+  const owned = (wv && wv.deco) || [];
   snap.furni = snap.furni.filter((id) => !DECO_ITEMS.has(id) || owned.includes(id));
   if (DECO_THEMES.has(snap.theme) && !owned.includes(snap.theme)) snap.theme = "cabin";
 }
+
+/** 그 주가 가장 이른 시간대(UTC+14)에서 시작한 때 — "그 주가 시작하기 전부터 길드원"을 엄격하게 본다 */
+const weekBegin = (key) => Date.parse(key + "T00:00:00Z") - 14 * 3_600_000;
+/** 시각 t 의 (UTC 날짜로 본) 월요일 */
+const mondayOf = (t) => { const d = new Date(t); return new Date(t - ((d.getUTCDay() + 6) % 7) * DAY_MS).toISOString().slice(0, 10); };
+const sumWeek = (wk) => Object.values((wk && wk.rows) || {}).reduce((n, r) => n + (r.week || 0), 0);
 
 export class Guild {
   constructor(state, env) {
@@ -177,12 +211,68 @@ export class Guild {
     return m && m.keyHash === (await sha256(body.key)) ? m : null;
   }
 
-  async add(snap) {
+  async add(snap, wv) {
     const id = "m" + randomHex(6);
     const key = randomHex(16);
     const now = Date.now();
-    await this.store.put("m:" + id, { id, keyHash: await sha256(key), snap, joined: now, updated: now });
-    return { memberId: id, key };
+    const wallet = await this.bindable(snap, wv, id);
+    await this.store.put("m:" + id, { id, keyHash: await sha256(key), snap, wallet, joined: now, updated: now });
+    return { memberId: id, key, walletOk: Boolean(wallet) };
+  }
+
+  /** 열쇠로 확인된 지갑을 이 사람에게 묶을 수 있나 — 다른 길드원에게 이미 묶였으면 안 된다 */
+  async bindable(snap, wv, selfId) {
+    if (!wv) return null;
+    const taken = (await this.members()).some((m) => m.id !== selfId && m.wallet === snap.walletId);
+    return taken ? null : snap.walletId;
+  }
+
+  /**
+   * 그 주의 공동 목표 — 처음 셀 때 정해 두고 그 주 안에는 그대로 둔다. 아직 시작하지 않은 주는 null.
+   * 최근 GOAL_WEEKS 주(그 주 앞) 합계 평균, 없으면 공개한 길드원 수 × GOAL_BASE
+   */
+  async goalFor(key) {
+    const saved = await this.store.get("goal:" + key);
+    if (saved) return saved;
+    if (Date.now() < weekBegin(key)) return null;
+    const past = [...(await this.store.list({ prefix: "wk:" })).values()]
+      .filter((w) => w.key < key).sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, GOAL_WEEKS)
+      .map(sumWeek).filter((n) => n > 0);
+    const sharing = (await this.members()).filter((m) => m.snap && m.snap.usage).length;
+    const base = past.length ? past.reduce((a, b) => a + b, 0) / past.length : Math.max(1, sharing) * GOAL_BASE;
+    const goal = { key, base: Math.round(base), tiers: GOAL_TIERS.map((t) => Math.round(base * t)), at: Date.now() };
+    await this.store.put("goal:" + key, goal);
+    const keys = [...(await this.store.list({ prefix: "goal:" })).keys()].sort();
+    if (keys.length > KEEP_WEEKS) await this.store.delete(keys.slice(0, keys.length - KEEP_WEEKS));
+    return goal;
+  }
+
+  /** 화면에 보일 목표 — 지금 진행 중일 수 있는 주들(시간대마다 다르다)과 최근 기록이 있는 주 */
+  async goals() {
+    const now = Date.now();
+    const recent = [...(await this.store.list({ prefix: "wk:" })).values()].map((w) => w.key).sort().slice(-2);
+    const keys = [...new Set([mondayOf(now + 14 * 3_600_000), mondayOf(now - 12 * 3_600_000), ...recent])];
+    const out = {};
+    for (const key of keys) {
+      const g = await this.goalFor(key);
+      if (!g) continue;
+      const total = sumWeek(await this.store.get("wk:" + key));
+      out[key] = { tiers: g.tiers, total, reached: g.tiers.filter((t) => total >= t).length };
+    }
+    return out;
+  }
+
+  async hall() {
+    return (await this.store.get("hall")) || { funds: {}, owned: [], donors: {}, theme: null };
+  }
+
+  /** 화면에 보일 홀 — 모금함마다 넣은 사람(많이 넣은 순) */
+  publicHall(h) {
+    const donors = {};
+    for (const [item, byMember] of Object.entries(h.donors || {})) {
+      donors[item] = Object.values(byMember).sort((a, b) => b.coins - a.coins).map(({ trainer, coins }) => ({ trainer, coins }));
+    }
+    return { funds: h.funds, owned: h.owned, theme: h.theme, donors };
   }
 
   /** 그 주 칸에 한 사람의 합계를 적는다. 같은 값이면 쓰지 않는다 */
@@ -240,15 +330,29 @@ export class Guild {
           const best = rows.reduce((a, r) => ((r[k] || 0) > (a ? a[k] || 0 : 0) ? r : a), null);
           if (best) wk.rewards.push({ id: best.id, title: k, coins: k === "week" ? REWARD_TOP : REWARD_TITLE, done: false });
         }
+        // 공동 목표 — 이룬 만큼, 그 주에 쓴 사람 모두(그 주가 시작하기 전부터 길드원이었던 사람)
+        const goal = await this.goalFor(wk.key);
+        const total = sumWeek(wk);
+        const tier = goal ? goal.tiers.filter((t) => total >= t).length : 0;
+        wk.goal = { tiers: goal ? goal.tiers : [], total, reached: tier };
+        if (tier) {
+          for (const r of rows) {
+            const m = members.get(r.id);
+            if (r.week > 0 && m && m.joined <= weekBegin(wk.key)) wk.rewards.push({ id: r.id, title: "goal", coins: GOAL_COINS[tier - 1], done: false });
+          }
+        }
         wk.paid = true;
         await this.store.put(key, wk);
       }
       let dirty = false;
       for (const rw of wk.rewards || []) {
         if (rw.done) continue;
-        const wallet = members.get(rw.id) && members.get(rw.id).snap.walletId;
-        if (!wallet) { rw.done = true; rw.skipped = true; dirty = true; continue; } // 지갑이 없거나 나갔다
-        const r = await walletCall(this.env, wallet, "credit", { amount: rw.coins, memo: `길드 주간 ${rw.title === "week" ? "1위" : "칭호"} (${wk.key})` });
+        const m = members.get(rw.id);
+        const wallet = m && m.wallet; // 열쇠로 확인된 지갑에만
+        if (!m || (!wallet && Date.now() > closedAt + PENDING_DAYS * DAY_MS)) { rw.done = true; rw.skipped = true; dirty = true; continue; } // 나갔거나 끝내 지갑을 확인하지 못했다
+        if (!wallet) continue; // 앱이 지갑 열쇠를 보내 확인될 때까지 기다린다
+        const what = rw.title === "week" ? "1위" : rw.title === "goal" ? `목표 ${["🥉", "🥈", "🥇"][GOAL_COINS.indexOf(rw.coins)] || ""}` : "칭호";
+        const r = await walletCall(this.env, wallet, "credit", { amount: rw.coins, memo: `길드 주간 ${what} (${wk.key})` });
         if (r.ok || r.status === 404) { rw.done = true; dirty = true; }
       }
       if (dirty) await this.store.put(key, wk);
@@ -259,7 +363,7 @@ export class Guild {
     const all = await this.store.list({ prefix: "wk:" });
     return [...all.values()]
       .sort((a, b) => (a.key < b.key ? 1 : -1))
-      .map((wk) => ({ key: wk.key, rows: Object.entries(wk.rows || {}).map(([id, r]) => ({ id, ...r })), rewards: (wk.rewards || []).filter((x) => x.done && !x.skipped).map(({ id, title, coins }) => ({ id, title, coins })) }));
+      .map((wk) => ({ key: wk.key, rows: Object.entries(wk.rows || {}).map(([id, r]) => ({ id, ...r })), rewards: (wk.rewards || []).filter((x) => x.done && !x.skipped).map(({ id, title, coins }) => ({ id, title, coins })), goal: wk.goal || null }));
   }
 
   async view(meta) {
@@ -271,8 +375,11 @@ export class Guild {
       name: meta.name,
       leader: meta.leader,
       max: MAX_MEMBERS,
-      members: list.map((m) => ({ id: m.id, snap: m.snap, joined: m.joined, updated: m.updated })),
+      members: list.map((m) => ({ id: m.id, snap: m.snap, joined: m.joined, updated: m.updated, walletOk: Boolean(m.wallet) })),
       weeks: await this.weeks(),
+      goals: await this.goals(), // { 주: { tiers, total, reached } }
+      goalCoins: GOAL_COINS,
+      hall: this.publicHall(await this.hall()),
       now: Date.now(),
     });
   }
@@ -300,8 +407,9 @@ export class Guild {
       const snap = cleanSnap(body.member);
       if (!name) return fail("길드 이름을 넣어 주세요");
       if (!snap) return fail("트레이너 이름이 없습니다");
-      await checkDeco(this.env, snap, body.walletKey);
-      const me = await this.add(snap);
+      const wv = await walletOf(this.env, snap, body.walletKey);
+      checkDeco(snap, wv);
+      const me = await this.add(snap, wv);
       await this.store.put("meta", { code: str(body.code, 8), name, leader: me.memberId, created: Date.now() });
       await this.record(me.memberId, snap, Date.now());
       return json({ ok: true, code: body.code, name, ...me, leader: true });
@@ -315,8 +423,9 @@ export class Guild {
       const snap = cleanSnap(body.member);
       if (!snap) return fail("트레이너 이름이 없습니다");
       if ((await this.members()).length >= MAX_MEMBERS) return fail(`길드가 꽉 찼습니다 (${MAX_MEMBERS}명)`, 403);
-      await checkDeco(this.env, snap, body.walletKey);
-      const me = await this.add(snap);
+      const wv = await walletOf(this.env, snap, body.walletKey);
+      checkDeco(snap, wv);
+      const me = await this.add(snap, wv);
       await this.record(me.memberId, snap, Date.now());
       return json({ ok: true, code: meta.code, name: meta.name, ...me, leader: false });
     }
@@ -324,14 +433,62 @@ export class Guild {
     const me = await this.who(body);
     if (!me) return fail("길드원 열쇠가 맞지 않습니다. 이미 나갔거나 내보내졌을 수 있습니다", 403);
 
+    if (action === "hall/donate") {
+      const it = HALL_ITEMS.get(str(body.item, 24));
+      const amount = Number(body.amount);
+      if (!it) return fail("없는 장식입니다");
+      if (!Number.isInteger(amount) || amount < 1 || amount > 100_000) return fail("🪙1 이상 넣어 주세요");
+      if (!WALLET_ID.test(body.walletId || "") || typeof body.walletKey !== "string") return fail("지갑이 필요합니다");
+      let h = await this.hall();
+      if (h.owned.includes(it.id)) return fail("이미 다 모였습니다");
+      const pay = Math.min(amount, it.coins - (h.funds[it.id] || 0)); // 남은 만큼만
+      const paid = await walletCall(this.env, body.walletId, "debit", { key: body.walletKey, amount: pay, memo: `길드 홀 · ${it.name}` });
+      if (!paid.ok) return fail(paid.reason || "코인을 내지 못했습니다", paid.status === 402 ? 402 : paid.status === 403 ? 403 : 400);
+      // 지갑을 부르는 사이 다른 길드원이 넣었을 수 있다 — 다시 읽고, 넘친 만큼은 돌려준다
+      h = await this.hall();
+      const used = h.owned.includes(it.id) ? 0 : Math.min(pay, it.coins - (h.funds[it.id] || 0));
+      let balance = paid.balance;
+      if (used < pay) {
+        const back = await walletCall(this.env, body.walletId, "credit", { amount: pay - used, memo: `길드 홀 · ${it.name} 남은 코인` });
+        if (back.ok) balance = back.balance;
+      }
+      let done = false;
+      if (used > 0) {
+        h.funds[it.id] = (h.funds[it.id] || 0) + used;
+        h.donors[it.id] = h.donors[it.id] || {};
+        const prev = h.donors[it.id][me.id] || { coins: 0 };
+        h.donors[it.id][me.id] = { trainer: me.snap.trainer, coins: prev.coins + used };
+        if (h.funds[it.id] >= it.coins) {
+          h.owned.push(it.id);
+          done = true;
+          if (it.theme && !h.theme) h.theme = it.id; // 처음 다 모인 홀 배경은 바로 바른다
+        }
+        await this.store.put("hall", h);
+      }
+      return json({ ok: true, item: it.id, used, refunded: pay - used, done, balance, hall: this.publicHall(h) });
+    }
+
+    if (action === "hall/theme") {
+      if (meta.leader !== me.id) return fail("길드장만 홀 배경을 바꿀 수 있습니다", 403);
+      const h = await this.hall();
+      const theme = str(body.theme, 24);
+      if (theme !== "stone" && !(HALL_ITEMS.get(theme) || {}).theme) return fail("없는 홀 배경입니다");
+      if (theme !== "stone" && !h.owned.includes(theme)) return fail("아직 모금이 다 되지 않은 배경입니다");
+      h.theme = theme === "stone" ? null : theme;
+      await this.store.put("hall", h);
+      return json({ ok: true, hall: this.publicHall(h) });
+    }
+
     if (action === "update") {
       const snap = cleanSnap(body.member);
       if (!snap) return fail("트레이너 이름이 없습니다");
       if (Date.now() - me.updated < UPDATE_GAP_MS) return fail("잠시 뒤에 다시 올려 주세요", 429);
-      await checkDeco(this.env, snap, body.walletKey);
-      await this.store.put("m:" + me.id, { ...me, snap, updated: Date.now() });
+      const wv = await walletOf(this.env, snap, body.walletKey);
+      checkDeco(snap, wv);
+      const wallet = (wv && (await this.bindable(snap, wv, me.id))) || me.wallet || null; // 확인된 지갑은 열쇠 없이 올려도 그대로
+      await this.store.put("m:" + me.id, { ...me, snap, wallet, updated: Date.now() });
       await this.record(me.id, snap, me.joined);
-      return json({ ok: true, leader: meta.leader === me.id });
+      return json({ ok: true, leader: meta.leader === me.id, walletOk: Boolean(wallet) && wallet === snap.walletId });
     }
 
     if (action === "leave") {

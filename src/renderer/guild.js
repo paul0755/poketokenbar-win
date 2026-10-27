@@ -182,6 +182,7 @@
       guild = r;
       if (visiting && !r.members.some((m) => m.id === visiting)) visiting = null; // 그 사이 나갔다
       if (r.medal) toast("🏅 지난주 길드 1위! 내 방에 메달 액자가 걸렸습니다", "shiny");
+      else if (r.goalNew) toast(`🎉 지난주 길드 목표 ${MEDAL[r.goalNew.reached - 1]} 달성! 그 주에 쓴 길드원에게 🪙${r.goalNew.coins}씩`, "shiny");
       renderGuild();
     } finally {
       loading = false;
@@ -201,6 +202,8 @@
     rk.icons = iconsOf;
     renderRank(g, rk);
     renderHof(g, closed);
+    renderGoal(g, rk);
+    renderHall(g);
     $("gdShare").checked = Boolean(last && last.guild && last.guild.share);
     const sel = visiting && g.members.find((m) => m.id === visiting);
     if (!room) room = window.ptbRoom.create($("gdRoom"));
@@ -215,6 +218,19 @@
       room.render({
         kind: "hall",
         code: g.code,
+        hall: {
+          owned: g.hall.owned,
+          theme: g.hall.theme,
+          // 트로피 진열장 — 목표 🥇를 이룬 주의 수
+          golds: (g.weeks || []).filter((w) => w.goal && w.goal.reached >= 3).length,
+          // 마스코트 석상 — 지난주 1위의 대표 포켓몬(그 사람 방의 첫 아이)
+          mascot: (() => {
+            const t = lastTitles.find((x) => x.k === "week");
+            const m = t && g.members.find((x) => x.id === t.id);
+            return (m && m.room.mons[0] && m.room.mons[0].dexId) || null;
+          })(),
+        },
+        goal: g.goal,
         guildName: g.name,
         count: g.members.length,
         // 게시판 — 지난주 1위가 있으면 그 사람, 없으면 이번 주 지금 1위
@@ -247,6 +263,74 @@
       })
       .join("");
   }
+
+  /* ---------------- 공동 목표 ---------------- */
+
+  const MEDAL = ["🥉", "🥈", "🥇"];
+  /** 이번 주 길드 합계와 목표 셋 — 공개한 사람만 센다(서버도 그렇게 센다) */
+  function renderGoal(g, rk) {
+    const el = $("gdGoal");
+    const goal = g.goal;
+    el.hidden = !goal;
+    if (!goal) return;
+    const [t1, , t3] = goal.tiers;
+    const total = goal.total;
+    const at = (v) => Math.min(100, (v / t3) * 100);
+    const next = goal.tiers.findIndex((t) => total < t);
+    const shared = g.members.filter((m) => m.usage).length;
+    const coins = g.goalCoins || [10, 20, 35];
+    const foot = next < 0
+      ? `<b>🥇 달성!</b> — 일요일 밤까지 쓴 길드원 모두 🪙${coins[2]}`
+      : `${goal.reached ? `${MEDAL[goal.reached - 1]} 달성 · ` : ""}<b>${MEDAL[next]}까지 ${fmt(goal.tiers[next] - total)} 남음</b> — 이루면 이번 주에 쓴 길드원 모두 🪙${coins[next]}`;
+    el.innerHTML = `<div class="top"><b>🎯 이번 주 길드 목표</b><span>공개한 길드원 ${shared}명 · 합계 ${fmt(total)}${next >= 0 ? ` / ${MEDAL[next]} ${fmt(goal.tiers[next])}` : ""}</span></div>
+      <div class="bar"><div class="fill" style="width:${at(total)}%"></div>${goal.tiers.map((t) => `<i class="tick" style="left:${at(t)}%"></i>`).join("")}</div>
+      <div class="labs">${goal.tiers.map((t, i) => `<span class="${total >= t ? "done" : ""}" style="left:${at(t)}%">${MEDAL[i]} 🪙${coins[i]}</span>`).join("")}</div>
+      <div class="foot">${foot}${g.walletOk ? "" : ` · <span class="warn">코인 보상은 내 지갑이 확인되면 들어갑니다</span>`}</div>`;
+    el.title = `목표는 이 길드의 최근 4주 평균으로 정해집니다(🥉 ${fmt(t1)} · 🥈 ${fmt(goal.tiers[1])} · 🥇 ${fmt(t3)}). 합계는 순위를 공개한 사람만 셉니다`;
+  }
+
+  /* ---------------- 홀 꾸미기 (모금) ---------------- */
+
+  function renderHall(g) {
+    const h = g.hall;
+    const items = g.hallItems || [];
+    const themes = items.filter((it) => it.theme && h.owned.includes(it.id));
+    const pick = (id, name) => `<button data-theme="${id}" class="${(h.theme || "stone") === id ? "on" : ""}" ${g.leader ? "" : "disabled"}>${name}</button>`;
+    $("gdHall").innerHTML = `<div class="hd"><b>🏗️ 홀 꾸미기</b><span>길드원이 함께 모금 · 다 모이면 홀에 놓인다 · 내 코인 <b>🪙${g.coins == null ? "–" : g.coins}</b></span></div>
+      ${themes.length ? `<div class="themes">${pick("stone", "🪨 돌 홀")}${themes.map((t) => pick(t.id, `${t.icon} ${t.name.replace("홀 배경: ", "")}`)).join("")}${g.leader ? "" : '<span class="sub">홀 배경은 길드장이 고릅니다</span>'}</div>` : ""}
+      <div class="fund">${items.map((it) => {
+        const have = h.funds[it.id] || 0;
+        const done = h.owned.includes(it.id);
+        const who = (h.donors[it.id] || []).map((d) => `${esc(d.trainer)} ${d.coins}`).join(" · ");
+        return `<div class="it${done ? " done" : ""}" data-item="${it.id}">
+          <div class="nm">${it.icon} ${esc(it.name)}<span>🪙${it.coins}</span></div>
+          <div class="ds">${esc(it.desc)}</div>
+          <div class="pb"><i style="width:${Math.min(100, (have / it.coins) * 100)}%"></i></div>
+          <div class="amt">${done ? '<span class="ok">✓ 완성 · 홀에 놓였다</span>' : `<span><b>🪙${have}</b> / 🪙${it.coins}</span><span>${Math.floor((have / it.coins) * 100)}%</span>`}</div>
+          ${done ? "" : `<div class="btns"><button data-give="10">+🪙10</button><button data-give="50">+🪙50</button><input type="number" min="1" placeholder="직접"><button data-give="in">넣기</button></div>`}
+          <div class="who">${who ? "보탠 사람 · " + who : "아직 아무도 안 보탰다"}</div>
+        </div>`;
+      }).join("")}</div>
+      <div class="ft dim">넣은 코인은 돌려받지 않습니다(길드를 나가도 길드에 남습니다). 남은 금액보다 많이 넣으면 남은 만큼만 빠집니다</div>`;
+  }
+
+  $("gdHall").addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (!b || b.disabled || !guild) return;
+    if (b.dataset.theme) {
+      if (done(await window.ptb.hallTheme(b.dataset.theme))) load();
+      return;
+    }
+    const card = b.closest("[data-item]");
+    if (!card || !b.dataset.give) return;
+    const amount = b.dataset.give === "in" ? Math.floor(Number(card.querySelector("input").value) || 0) : Number(b.dataset.give);
+    if (amount < 1) return toast("넣을 코인을 적어 주세요", "bad");
+    if (amount >= 50 && !sure(b, `🪙${amount} 정말?`)) return; // 큰 돈은 한 번 더
+    b.disabled = true;
+    const r = await window.ptb.hallDonate({ item: card.dataset.item, amount });
+    b.disabled = false;
+    if (done(r)) load();
+  });
 
   /* ---------------- 누르기 ---------------- */
 

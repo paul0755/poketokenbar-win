@@ -1,0 +1,14 @@
+{
+  "items": [
+    { "id": "flowers", "name": "꽃 화단", "icon": "🌷", "coins": 200, "desc": "입구 양옆 꽃밭" },
+    { "id": "banners", "name": "길드 깃발 추가", "icon": "🚩", "coins": 300, "desc": "벽 깃발 2개 → 4개" },
+    { "id": "chandelier", "name": "샹들리에", "icon": "🕯️", "coins": 500, "desc": "천장에서 반짝, 밤엔 홀이 밝아진다" },
+    { "id": "billboard", "name": "전광판 게시판", "icon": "📺", "coins": 600, "desc": "게시판이 목표 진행 화면으로" },
+    { "id": "goldFountain", "name": "황금 분수", "icon": "⛲", "coins": 800, "desc": "분수가 금빛, 물줄기가 더 높다" },
+    { "id": "trophies", "name": "우승 트로피 진열장", "icon": "🏆", "coins": 1000, "desc": "길드가 목표 🥇를 이룬 만큼 트로피" },
+    { "id": "goldCarpet", "name": "레드카펫 금테", "icon": "🟥", "coins": 1200, "desc": "융단 테두리가 금실로" },
+    { "id": "mascot", "name": "길드 마스코트 석상", "icon": "🗿", "coins": 1500, "desc": "지난주 1위의 대표 포켓몬을 돌로" },
+    { "id": "castle", "name": "홀 배경: 성", "icon": "🏰", "coins": 2000, "desc": "성벽 · 스테인드글라스 · 대리석", "theme": true },
+    { "id": "temple", "name": "홀 배경: 하늘 신전", "icon": "☁️", "coins": 3000, "desc": "구름 위 흰 기둥 · 금줄 대리석", "theme": true }
+  ]
+}

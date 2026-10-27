@@ -14,6 +14,7 @@ const battle = require("./battle");
 const wild = require("./wild");
 const friend = require("./friend");
 const room = require("./room");
+const HALL = require("./hall.json"); // 길드 홀 꾸미기 카탈로그 — 서버와 같은 파일
 const burning = require("./burning");
 const BERRIES = require("./berries.json");
 
@@ -596,11 +597,13 @@ function guildGone(r) {
 }
 
 /**
- * 방 사진에 코인 꾸미기가 있으면 지갑 열쇠를 같이 보낸다 — 서버가 그 지갑이 내 것인지, 정말
- * 샀는지 보고 안 산 것은 지운다(guild.js checkDeco). 열쇠는 저장되지 않는다. 없으면 안 보낸다
+ * 지갑 열쇠를 같이 보낼 때 — 서버가 그 지갑이 정말 내 것인지 본다(열쇠는 저장하지 않는다).
+ *   - 아직 길드에서 내 지갑이 확인되지 않았을 때: 확인되면 주간 보상 · 목표 보상이 그 지갑으로 간다
+ *   - 방에 코인 꾸미기가 있을 때: 정말 산 것인지 보고 안 산 것은 지운다(guild.js checkDeco)
+ * 둘 다 아니면 보내지 않는다
  */
 const walletKeyFor = (snap) =>
-  save.wallet && save.wallet.key && (room.isCoin(snap.theme) || snap.furni.some(room.isCoin)) ? { walletKey: save.wallet.key } : {};
+  save.wallet && save.wallet.key && (!(save.guild && save.guild.walletOk) || room.isCoin(snap.theme) || snap.furni.some(room.isCoin)) ? { walletKey: save.wallet.key } : {};
 
 let guildPushed = { body: "", room: "", at: 0 };
 /**
@@ -619,6 +622,7 @@ async function guildPush(force = false) {
   guildPushed = { body, room: roomPart, at: Date.now() };
   const r = await guildCall(`/${g.code}/update`, { memberId: g.memberId, key: g.key, member: snap, ...walletKeyFor(snap) });
   if (r.ok && Boolean(r.leader) !== Boolean(g.leader)) { g.leader = Boolean(r.leader); writeSave(); }
+  if (r.ok && r.walletOk != null && Boolean(r.walletOk) !== Boolean(g.walletOk)) { g.walletOk = Boolean(r.walletOk); writeSave(); }
   if (!r.ok) {
     if (r.status === 429) guildPushed.body = guildPushed.room = ""; // 너무 잦았다 — 다음 갱신 때 다시
     guildGone(r);
@@ -640,7 +644,7 @@ async function guildCreate({ name, trainer } = {}) {
   const snap = guildSnap();
   const r = await guildCall("", { name: String(name).trim().slice(0, 20), member: snap, ...walletKeyFor(snap) });
   if (!r.ok) return r;
-  save.guild = { code: r.code, name: r.name, memberId: r.memberId, key: r.key, leader: true };
+  save.guild = { code: r.code, name: r.name, memberId: r.memberId, key: r.key, leader: true, walletOk: Boolean(r.walletOk) };
   guildPushed = { body: "", room: "", at: Date.now() };
   writeSave();
   refresh(true);
@@ -655,7 +659,7 @@ async function guildJoin({ code, trainer } = {}) {
   const snap = guildSnap();
   const r = await guildCall(`/${c}/join`, { member: snap, ...walletKeyFor(snap) });
   if (!r.ok) return r;
-  save.guild = { code: c, name: r.name, memberId: r.memberId, key: r.key, leader: false };
+  save.guild = { code: c, name: r.name, memberId: r.memberId, key: r.key, leader: false, walletOk: Boolean(r.walletOk) };
   guildPushed = { body: "", room: "", at: Date.now() };
   writeSave();
   refresh(true);
@@ -719,7 +723,9 @@ async function guildView() {
   const g = save.guild;
   if (!g) return { ok: false, reason: "길드에 들어가 있지 않습니다" };
   if (g.gone) return { ok: false, gone: g.gone, reason: g.gone };
-  await guildPush().catch(() => {}); // 내 칸이 최신이어야 다른 사람이 보는 내 방도 맞다
+  // 길드 코인 보상을 받을 지갑 — 없으면 만든다(상점 탭을 한 번도 안 연 길드원도 받게)
+  if (!save.wallet) await walletEnsure().catch(() => {});
+  await guildPush(!g.walletOk && Boolean(save.wallet)).catch(() => {}); // 내 칸이 최신이어야 다른 사람이 보는 내 방도 맞다. 지갑이 아직 확인 전이면 바로 올린다
   const r = await guildCall(`/${g.code}`);
   if (!r.ok) {
     guildGone(r);
@@ -756,6 +762,7 @@ async function guildView() {
     guildCache.members.set(m.id, s.team || "");
     const mons = await Promise.all((s.mons || []).map(async (x, i) => ({
       id: m.id + ":" + i,
+      dexId: x.dexId, // 홀 마스코트 석상이 쓴다
       name: x.name,
       shiny: x.shiny,
       stageKey: x.stage,
@@ -774,8 +781,66 @@ async function guildView() {
       room: { theme: s.theme, furni: s.furni || [], statue: s.statue || null, pos: s.pos || {}, mons, dex: s.dex || { seen: 0, total: 0 }, wins: s.wins || 0, graduated: s.graduated || 0, lastGrad: s.lastGrad || "", weekTop: s.weekTop || 0 },
     };
   }));
+  // 공동 목표 — 이번 주(내 PC 의 월요일)와, 끝난 주 중 가장 최근 것. 이룬 주는 한 번 알린다
+  const week = thisWeek || localMonday();
+  const goalCoins = r.goalCoins || [10, 20, 35];
+  const lastWk = (r.weeks || []).find((wk) => wk.key < week && wk.goal);
+  const lastGoal = lastWk ? { key: lastWk.key, ...lastWk.goal, coins: lastWk.goal.reached ? goalCoins[lastWk.goal.reached - 1] : 0 } : null;
+  save.goalSeen = save.goalSeen || [];
+  let goalNew = null;
+  if (lastGoal && lastGoal.reached && !save.goalSeen.includes(g.code + ":" + lastGoal.key)) {
+    save.goalSeen = [...save.goalSeen, g.code + ":" + lastGoal.key].slice(-30);
+    goalNew = lastGoal;
+    writeSave();
+  }
+  const me = r.members.find((m) => m.id === g.memberId);
   // 주간 기록 — 그 주의 1위 포켓몬 그림은 지금 길드원 카드에서 가져온다(화면이 한다)
-  return { ok: true, code: r.code, name: r.name, max: r.max, leader, members, weeks: r.weeks || [], thisWeek, medal, now: r.now };
+  return {
+    ok: true, code: r.code, name: r.name, max: r.max, leader, members, weeks: r.weeks || [], thisWeek: week, medal, now: r.now,
+    goal: (r.goals || {})[week] || null, goalCoins, lastGoal, goalNew,
+    hall: r.hall || { funds: {}, owned: [], theme: null, donors: {} }, hallItems: HALL.items,
+    walletOk: Boolean(me && me.walletOk), hasWallet: Boolean(save.wallet), coins: coinCache ? coinCache.balance : null,
+  };
+}
+
+/** 내 PC 시간대의 이번 주 월요일 — weekUsage 와 같은 꼴 */
+function localMonday() {
+  const monday = new Date();
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  return dayKey(monday);
+}
+
+/** 홀 꾸미기 모금함에 코인을 넣는다. 남은 만큼만 빠진다(서버가 정한다) */
+async function hallDonate({ item, amount } = {}) {
+  const g = save.guild;
+  if (!g || g.gone) return { ok: false, reason: "길드에 들어가 있지 않습니다" };
+  const it = HALL.items.find((x) => x.id === item);
+  if (!it) return { ok: false, reason: "없는 장식입니다" };
+  amount = Math.floor(Number(amount) || 0);
+  if (amount < 1) return { ok: false, reason: "🪙1 이상 넣어 주세요" };
+  if (coinCache && amount > coinCache.balance) {
+    if (coinCache.balance < 1) return { ok: false, reason: "넣을 코인이 없습니다" };
+    amount = coinCache.balance; // "직접"에 크게 적었으면 가진 만큼만
+  }
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await guildCall(`/${g.code}/hall/donate`, { memberId: g.memberId, key: g.key, walletId: save.wallet.id, walletKey: save.wallet.key, item, amount });
+  if (!r.ok) { guildGone(r); return r; }
+  coinCache = { balance: r.balance, at: Date.now() };
+  refresh(true);
+  const back = r.refunded ? ` (먼저 다 모여서 🪙${r.refunded}은 돌려받았습니다)` : "";
+  if (r.done) return { ok: true, done: true, hall: r.hall, message: `🎉 ${it.name} 모금이 다 모였습니다! 홀에 놓였습니다${back}` };
+  return { ok: true, hall: r.hall, message: r.used ? `${it.name}에 🪙${r.used}을 보탰습니다 (🪙${r.balance} 남음)${back}` : `이미 다 모였습니다${back}` };
+}
+
+/** 홀 배경 고르기 — 길드장만. "stone" 은 기본 돌 홀 */
+async function hallTheme(theme) {
+  const g = save.guild;
+  if (!g || g.gone) return { ok: false, reason: "길드에 들어가 있지 않습니다" };
+  const r = await guildCall(`/${g.code}/hall/theme`, { memberId: g.memberId, key: g.key, theme });
+  if (!r.ok) return r;
+  return { ok: true, hall: r.hall, message: "홀 배경을 바꿨습니다" };
 }
 
 /** 길드원과 결투 — 내 대표 팀 코드 vs 그 사람이 올려 둔 코드. Lv.50, 보상 없음 */
@@ -3484,6 +3549,8 @@ app.whenReady().then(async () => {
   ipcMain.handle("guild-view", () => guildView());
   ipcMain.handle("guild-share", (_e, on) => guildShare(on));
   ipcMain.handle("guild-rename", (_e, trainer) => guildRename(trainer));
+  ipcMain.handle("hall-donate", (_e, a) => hallDonate(a));
+  ipcMain.handle("hall-theme", (_e, theme) => hallTheme(theme));
   // 코인 지갑 · 상점에 팔기 · 길드 몰
   ipcMain.handle("wallet-info", () => walletInfo());
   ipcMain.handle("wallet-checkin", () => walletCheckin());

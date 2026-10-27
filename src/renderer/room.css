@@ -33,6 +33,7 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 /* 캔버스 위에 얹는 글자 */
 .rm-txt { position: absolute; transform: translate(-50%, -50%); font: 800 1.9cqw/1 Consolas, "Malgun Gothic", monospace; color: #3b2a12; white-space: nowrap; text-align: center; pointer-events: none; }
 .rm-txt.lt { color: #ffffffcc; font-size: 1.5cqw; }
+.rm-txt.board { line-height: 1.25; text-align: center; font-size: 1.35cqw; } /* 홀 전광판 */
 .rm-txt.sm { color: #455a64; font-size: 1.35cqw; line-height: 1.25; }
 .rm-txt.sign { color: #ffe9b0; font-size: 2.6cqw; letter-spacing: .1em; text-shadow: 0 .25cqw 0 #3e2412; }
 
@@ -140,6 +141,43 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .gd-foot .sp { flex: 1; }
 .gd-foot .del:hover { color: var(--red); border-color: var(--red); }
 .gd-rename { margin: 0 0 8px; }
+/* 길드 공동 목표 — 홀 위 막대. 눈금은 🥉 🥈 🥇 */
+.gd-goal { background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 9px 12px 8px; margin-bottom: 8px; }
+.gd-goal .top { display: flex; align-items: baseline; gap: 8px; font-size: 12px; margin-bottom: 7px; }
+.gd-goal .top b { white-space: nowrap; }
+.gd-goal .top span { margin-left: auto; font-size: 10.5px; color: var(--muted); text-align: right; }
+.gd-goal .bar { position: relative; height: 10px; background: #2b2e37; border-radius: 99px; margin: 0 4px; }
+.gd-goal .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: linear-gradient(90deg, #4ee39a, #2bb673); }
+.gd-goal .bar .tick { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: #ffffff66; }
+.gd-goal .labs { position: relative; height: 15px; margin: 3px 4px 0; font-size: 10px; color: var(--muted); }
+.gd-goal .labs span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.gd-goal .labs span:last-child { transform: translateX(-90%); }
+.gd-goal .labs span.done { color: #4ee39a; font-weight: 700; }
+.gd-goal .foot { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+.gd-goal .foot b { color: var(--text); }
+.gd-goal .warn { color: #ffb347; }
+/* 홀 꾸미기 — 모금함 */
+.gd-hall .fund { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.gd-hall .it { background: var(--card2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 8px; font-size: 11px; }
+.gd-hall .it.done { border-color: #4ee39a66; }
+.gd-hall .it .nm { display: flex; gap: 6px; align-items: baseline; font-weight: 700; font-size: 11.5px; }
+.gd-hall .it .nm span { margin-left: auto; font-weight: 400; color: var(--muted); font-size: 10px; }
+.gd-hall .it .ds { color: var(--dim); font-size: 9.5px; margin: 1px 0 5px; }
+.gd-hall .it .pb { height: 6px; background: #2b2e37; border-radius: 99px; overflow: hidden; }
+.gd-hall .it .pb i { display: block; height: 100%; background: #f5c542; border-radius: 99px; }
+.gd-hall .it.done .pb i { background: #4ee39a; }
+.gd-hall .it .amt { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin: 3px 0 5px; }
+.gd-hall .it .amt b { color: #f5c542; }
+.gd-hall .it .btns { display: flex; gap: 4px; }
+.gd-hall .it .btns button { font: inherit; font-size: 10.5px; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: #f5c542; cursor: pointer; }
+.gd-hall .it .btns button:disabled { opacity: .45; cursor: default; }
+.gd-hall .it .btns input { width: 52px; min-width: 0; font: inherit; font-size: 10.5px; padding: 2px 5px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+.gd-hall .it .who { margin-top: 5px; font-size: 9.5px; color: var(--dim); line-height: 1.45; }
+.gd-hall .it .ok { color: #4ee39a; font-weight: 700; }
+.gd-hall .themes { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 8px; }
+.gd-hall .themes button { font: inherit; font-size: 11px; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--card2); color: var(--text); cursor: pointer; }
+.gd-hall .themes button.on { background: var(--accent); color: #14151a; border-color: var(--accent); font-weight: 700; }
+.gd-hall .themes button:disabled { cursor: default; }
 @media (min-width: 620px) {
   #gdMembers { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); column-gap: 8px; }
   #gdRoom { max-width: calc((100vh - 230px) * 1.6); margin: 0 auto; }

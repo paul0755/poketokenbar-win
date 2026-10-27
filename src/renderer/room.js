@@ -798,7 +798,7 @@
 
   function render(Rm, d) {
     Rm.data = d;
-    const key = JSON.stringify([d.kind, d.code, d.guildName, d.count, d.notice, d.weekTop, d.theme, d.furni, d.statue, d.pos, d.dex && d.dex.seen, d.dex && d.dex.total, d.wins, d.graduated, d.lastGrad, d.trainer, period(d.theme)]);
+    const key = JSON.stringify([d.kind, d.code, d.guildName, d.count, d.notice, d.hall, d.goal && [d.goal.total, d.goal.tiers], d.weekTop, d.theme, d.furni, d.statue, d.pos, d.dex && d.dex.seen, d.dex && d.dex.total, d.wins, d.graduated, d.lastGrad, d.trainer, period(d.theme)]);
     if (key !== Rm.key) {
       Rm.key = key;
       if (d.kind === "hall") paintHall(Rm, d);
@@ -908,31 +908,182 @@
     oval(g, 13, 16, 12, 12, "#2e6b3a"); oval(g, 11, 14, 9, 9, "#3f8a4a"); oval(g, 9, 11, 4, 4, "#5aa864");
   }
 
+
+  /* ---- 홀 꾸미기 (hall.json — 길드원이 모금으로 산다) ---- */
+
+  /** 융단 — 입구에서 분수까지. 금테면 테두리가 굵은 금실에 무늬 */
+  function carpet(g, col, gold) {
+    for (let y = FLOOR; y < AH; y++) { const w = 24 + Math.round((y - FLOOR) * 0.5); R(g, 160 - w, y, w * 2, 1, (y - FLOOR) % 6 ? col[0] : col[2]); }
+    for (let y = FLOOR; y < AH; y++) {
+      const w = 24 + Math.round((y - FLOOR) * 0.5);
+      if (!gold) { R(g, 160 - w, y, 2, 1, "#c9a227"); R(g, 160 + w - 2, y, 2, 1, "#c9a227"); continue; }
+      R(g, 160 - w, y, 4, 1, "#c9a227"); R(g, 160 + w - 4, y, 4, 1, "#c9a227"); R(g, 160 - w + 1, y, 1, 1, "#ffe28a"); R(g, 160 + w - 2, y, 1, 1, "#ffe28a");
+      if ((y - FLOOR) % 12 === 6) { R(g, 160 - w + 8, y, 2, 2, "#ffe28a"); R(g, 160 + w - 10, y, 2, 2, "#ffe28a"); }
+    }
+  }
+
+  /** 꽃 화단 하나(58×16) — 융단 양옆 앞쪽에 둘 */
+  function flowerBed(g, seed) {
+    const r = seeded(seed);
+    box(g, 0, 4, 58, 16, "#6d4c41", "#3e2723", "#8d6e63");
+    R(g, 2, 6, 54, 4, "#4e342e");
+    for (let i = 0; i < 13; i++) {
+      const fx = 4 + Math.floor(r() * 50), fy = 2 + Math.floor(r() * 6);
+      R(g, fx, fy + 2, 1, 5, "#3f8a4a"); R(g, fx + 1, fy + 4, 2, 1, "#5aa864");
+      R(g, fx - 1, fy, 3, 3, ["#ff6b8a", "#ffd54f", "#b388ff", "#ffffff", "#ff8a65"][Math.floor(r() * 5)]); R(g, fx, fy + 1, 1, 1, "#ffe082");
+    }
+  }
+
+  /** 샹들리에 — 간판 양옆 천장. 밤이면 둘레가 밝다 */
+  function chandelier(g, x, night) {
+    R(g, x, 0, 1, 9, "#c9a227");
+    if (night) for (let r = 22; r > 4; r -= 6) { g.fillStyle = "rgba(255, 220, 140, .1)"; g.beginPath(); g.ellipse(x, 18, r, r * 0.8, 0, 0, Math.PI * 2); g.fill(); }
+    oval(g, x, 16, 9, 3, "#8a6a12"); oval(g, x, 15, 8, 2, "#c9a227"); R(g, x - 8, 15, 17, 1, "#ffe28a");
+    for (const dx of [-8, -3, 3, 8]) { R(g, x + dx, 10, 1, 5, "#fff8e1"); oval(g, x + dx, 8, 1, 2, "#ffb74d"); R(g, x + dx, 8, 1, 1, "#fff3c4"); }
+    for (const dx of [-6, -2, 2, 6]) { R(g, x + dx, 19, 1, 3, "#d6f2ff"); R(g, x + dx, 22, 1, 1, "#ffffff"); }
+    R(g, x, 18, 1, 6, "#c9a227"); oval(g, x, 25, 2, 2, "#d6f2ff");
+  }
+
+  /** 전광판 — 게시판 자리. 이번 주 목표 진행(🥇 기준)을 막대로, 글자는 HTML 로 */
+  function billboard(g, pct, ticks) {
+    box(g, 224, 60, 44, 36, "#263238", "#0d1317", "#37474f", "#1c262b");
+    R(g, 227, 63, 38, 30, "#0b1a3a"); dither(g, 227, 63, 38, 30, "#ffffff08");
+    R(g, 230, 82, 32, 5, "#1e2a44");
+    const w = Math.round(32 * Math.min(1, pct));
+    R(g, 230, 82, w, 5, "#4ee39a"); R(g, 230, 82, w, 1, "#b8ffd9");
+    for (const t of ticks) R(g, 230 + Math.round(32 * t), 80, 1, 9, "#ffffffaa");
+    R(g, 236, 96, 3, 6, "#455a64"); R(g, 253, 96, 3, 6, "#455a64");
+  }
+
+  /** 우승 트로피 진열장 — 목표 🥇를 이룬 주만큼(6개까지) */
+  function trophyCase(g, n) {
+    const x = 36, y = 78;
+    box(g, x, y, 42, 46, "#6d4c41", "#3e2723", "#8d6e63", "#4e342e");
+    R(g, x + 3, y + 3, 36, 38, "#bfe8f744"); R(g, x + 3, y + 21, 36, 2, "#8d6e63");
+    for (let i = 0; i < Math.min(6, n); i++) {
+      const tx = x + 6 + (i % 3) * 11, ty = y + 6 + Math.floor(i / 3) * 18;
+      R(g, tx + 1, ty, 6, 5, "#ffd54f"); R(g, tx + 1, ty, 6, 1, "#fff3b0"); R(g, tx, ty + 1, 1, 2, "#c49000"); R(g, tx + 7, ty + 1, 1, 2, "#c49000");
+      R(g, tx + 3, ty + 5, 2, 4, "#c49000"); R(g, tx + 1, ty + 9, 6, 3, "#8d6e63");
+    }
+    for (let i = 0; i < 6; i++) R(g, x + 6 + i, y + 6 + i * 3, 1, 2, "#ffffff66");
+  }
+
+  /** 황금 분수 — 기존 분수의 금색판, 물줄기가 더 높다 */
+  function goldFountain(g) {
+    oval(g, 34, 38, 33, 9, "#5f5a52");
+    oval(g, 34, 35, 32, 9, "#e0b84a"); oval(g, 34, 35, 30, 7, "#b8902a");
+    oval(g, 34, 34, 27, 6, "#4fa3d9"); oval(g, 34, 33, 22, 4, "#6ec3f4");
+    for (let i = 0; i < 6; i++) R(g, 16 + i * 7, 32 + (i % 2), 3, 1, "#fff3c4");
+    R(g, 30, 14, 8, 20, "#d4a838"); R(g, 30, 14, 2, 20, "#ffe28a"); R(g, 36, 14, 2, 20, "#a07a1e");
+    oval(g, 34, 14, 12, 3, "#e0b84a"); oval(g, 34, 13, 10, 2, "#6ec3f4");
+    for (const [x, y] of [[24, 16], [22, 20], [21, 25], [44, 16], [46, 20], [47, 25], [20, 30], [48, 30]]) R(g, x, y, 1, 3, "#bfeaff");
+    R(g, 33, 0, 2, 13, "#bfeaff"); R(g, 32, 0, 4, 2, "#e3f6ff"); R(g, 30, 2, 1, 2, "#e3f6ff"); R(g, 37, 2, 1, 2, "#e3f6ff");
+  }
+
+  /** 마스코트 석상(40×70) — 지난주 1위의 대표 포켓몬을 돌로(방의 전설 석상과 같은 stoneOf) */
+  const MASCOT = { w: 40, h: 70, draw(g, t, k) {
+    box(g, 2, 54, 36, 16, "#9e9e9e", "#5f5f5f", "#c4c4c4", "#7d7d7d"); R(g, 0, 52, 40, 3, "#b5b5b5"); R(g, 0, 52, 40, 1, "#d6d6d6");
+    R(g, 11, 59, 18, 5, "#c49000"); R(g, 11, 59, 18, 1, "#ffd54f");
+    const st = k && k.dexId ? stoneOf(k.dexId) : null;
+    if (st) g.drawImage(st, 20 - Math.floor(st.width / 2), 53 - st.height);
+    else { box(g, 12, 28, 16, 25, "#8a8a8a", "#5f5f5f", "#a0a0a0", "#767676"); R(g, 15, 34, 4, 3, "#767676"); }
+  } };
+
+  /* ---- 홀 배경 (모금으로 산다) ---- */
+  const HALL_THEMES = {
+    // 성 — 큰 돌벽, 간판 아래 스테인드글라스 둘, 대리석 체크 바닥
+    castle: {
+      wall(g) {
+        R(g, 0, 0, AW, FLOOR, "#4f566b");
+        const r = seeded(5);
+        for (let y = 8, row = 0; y < FLOOR - 6; y += 14, row++) for (let x = (row % 2) * -12; x < AW; x += 24) {
+          R(g, x, y, 24, 14, "#3d4354"); R(g, x + 1, y + 1, 22, 12, r() < 0.5 ? "#5c6378" : "#565d71"); R(g, x + 1, y + 1, 22, 1, "#6e7690");
+        }
+        R(g, 0, 0, AW, 8, "#3a2f2a"); R(g, 0, 7, AW, 1, "#241c18");
+        const cols = ["#d84343", "#3d73d9", "#f2c94c", "#4caf50", "#b388ff"];
+        for (const x of [112, 184]) {
+          const w = 24, top = 50, h = 60;
+          oval(g, x + w / 2, top + 10, 13, 11, "#2a2230", -11, 0); R(g, x - 1, top + 10, w + 2, h - 10, "#2a2230");
+          for (let yy = top + 1; yy < top + h - 1; yy++) for (let xx = x; xx < x + w; xx++) {
+            const dy = yy - (top + 10), dx = xx - (x + w / 2);
+            if (dy < 0 && (dx * dx) / 144 + (dy * dy) / 100 > 1) continue;
+            R(g, xx, yy, 1, 1, cols[(Math.floor((xx - x) / 6) + Math.floor((yy - top) / 8)) % cols.length]);
+          }
+          for (let yy = top + 8; yy < top + h; yy += 8) R(g, x, yy, w, 1, "#2a2230");
+          for (let xx = x + 6; xx < x + w; xx += 6) R(g, xx, top + 2, 1, h - 2, "#2a2230");
+          dither(g, x, top, w, h, "#ffffff18");
+          R(g, x - 3, top + h - 1, w + 6, 3, "#8a8fa3");
+        }
+      },
+      floor(g) {
+        for (let y = FLOOR, r = 0; y < AH; y += 10, r++) for (let x = 0, c = r % 2; x < AW; x += 20, c ^= 1) {
+          R(g, x, y, 20, 10, c ? "#d9d4cc" : "#b8b2a8"); R(g, x, y, 20, 1, "#e9e5de");
+        }
+      },
+    },
+    // 하늘 신전 — 하늘과 구름, 흰 기둥, 금줄 대리석
+    temple: {
+      wall(g) {
+        ["#7ec8f7", "#9ad6fa", "#b7e3fb", "#d4effd"].forEach((c, i) => R(g, 0, i * 31, AW, 31, c));
+        const r = seeded(12);
+        for (let i = 0; i < 9; i++) { const x = Math.floor(r() * AW), y = 20 + Math.floor(r() * 80); oval(g, x, y, 14, 4, "#ffffff"); oval(g, x + 9, y - 3, 9, 4, "#ffffff"); oval(g, x - 4, y + 1, 10, 3, "#eef8ff"); }
+        for (const x of [4, 98, 210, 304]) {
+          R(g, x, 10, 12, FLOOR - 10, "#f5f3ee"); R(g, x + 2, 10, 2, FLOOR - 10, "#ffffff"); R(g, x + 9, 10, 2, FLOOR - 10, "#d8d3c6");
+          for (let xx = x + 3; xx < x + 10; xx += 3) R(g, xx, 12, 1, FLOOR - 14, "#e6e1d6");
+          R(g, x - 2, 6, 16, 5, "#e0c068"); R(g, x - 2, 6, 16, 1, "#fff0b8");
+        }
+        R(g, 0, 0, AW, 6, "#f5f3ee"); R(g, 0, 5, AW, 1, "#e0c068");
+      },
+      floor(g) {
+        for (let y = FLOOR, r = 0; y < AH; y += 12, r++) {
+          for (let x = (r % 2) * 12; x < AW; x += 24) { R(g, x, y, 24, 12, r % 2 ? "#f5f3ee" : "#ebe7dd"); R(g, x, y, 1, 12, "#d8d3c6"); }
+          R(g, 0, y, AW, 1, "#e0c068");
+        }
+        const r2 = seeded(3);
+        for (let i = 0; i < 6; i++) oval(g, Math.floor(r2() * AW), AH - 4, 16, 4, "#ffffffcc");
+      },
+    },
+  };
+
   function paintHall(Rm, d) {
     const per = period("hall");
     const night = per === "night";
     const col = guildColor(d.code);
+    const hall = d.hall || {};
+    const has = (id) => (hall.owned || []).includes(id); // 모금으로 다 모인 장식
+    const T = HALL_THEMES[hall.theme];
     const [base, g] = canvas(AW, AH);
-    hallWall(g);
+    (T ? T.wall : hallWall)(g);
     R(g, 0, FLOOR - 6, AW, 6, "#5f574e"); R(g, 0, FLOOR - 6, AW, 1, "#7a7268"); R(g, 0, FLOOR - 1, AW, 1, "#4a433b");
-    hallFloor(g);
+    (T ? T.floor : hallFloor)(g);
     dither(g, 0, FLOOR, AW, 3, "#0000002e");
-    // 길 — 입구에서 분수까지 깐 길드 색 융단
-    for (let y = FLOOR; y < AH; y++) { const w = 24 + Math.round((y - FLOOR) * 0.5); R(g, 160 - w, y, w * 2, 1, (y - FLOOR) % 6 ? col[0] : col[2]); }
-    for (let y = FLOOR; y < AH; y++) { const w = 24 + Math.round((y - FLOOR) * 0.5); R(g, 160 - w, y, 2, 1, "#c9a227"); R(g, 160 + w - 2, y, 2, 1, "#c9a227"); }
+    carpet(g, col, has("goldCarpet")); // 길 — 입구에서 분수까지 깐 길드 색 융단
     banner(g, 30, col); banner(g, 264, col);
+    if (has("banners")) { banner(g, 3, col); banner(g, 291, col); }
     sign(g);
-    noticeBoard(g);
+    // 전광판 — 이번 주 목표 진행(🥇 를 끝으로)
+    const goal = d.goal;
+    const board = has("billboard");
+    if (board) billboard(g, goal ? goal.total / goal.tiers[2] : 0, goal ? goal.tiers.slice(0, 2).map((t) => t / goal.tiers[2]) : []);
+    else noticeBoard(g);
     torch(g, 84, night); torch(g, 232, night);
+    if (has("chandelier")) { chandelier(g, 98, night); chandelier(g, 222, night); }
+    if (has("trophies")) trophyCase(g, hall.golds || 0);
     if (per !== "day") { g.fillStyle = night ? "rgba(10, 14, 40, .3)" : "rgba(60, 20, 40, .1)"; g.fillRect(0, 0, AW, AH); }
 
     const html = [];
-    for (const [id, f] of Object.entries(HALL)) {
-      html.push(`<canvas class="rm-f" data-h="${id}" width="${f.w}" height="${f.h}" style="left:${X(f.x)}%; top:${Y(f.y)}%; width:${X(f.w)}%; height:${Y(f.h)}%; z-index:${(f.y + f.h) * 10};"></canvas>`);
-    }
+    const item = (id, x, y, w, h) => html.push(`<canvas class="rm-f" data-h="${id}" width="${w}" height="${h}" style="left:${X(x)}%; top:${Y(y)}%; width:${X(w)}%; height:${Y(h)}%; z-index:${(y + h) * 10};"></canvas>`);
+    for (const [id, f] of Object.entries(HALL)) item(id, f.x, f.y, f.w, f.h);
+    if (has("mascot")) item("mascot", 210, 98, MASCOT.w, MASCOT.h);
+    if (has("flowers")) { item("bedL", 44, 174, 58, 20); item("bedR", 218, 174, 58, 20); }
     html.push(`<i class="rm-spark" style="left:${X(158)}%; top:${Y(122)}%; z-index:1700"></i><i class="rm-spark b" style="left:${X(168)}%; top:${Y(130)}%; right:auto; z-index:1700"></i>`);
     html.push(`<span class="rm-txt sign" style="left:${X(160)}%; top:${Y(30)}%;">${esc(d.guildName || "길드")}</span>`);
-    html.push(`<span class="rm-txt lt" style="left:${X(246)}%; top:${Y(99)}%;">${d.notice ? esc(d.notice) : "길드 게시판"}</span>`);
+    if (board) {
+      const MED = ["🥉", "🥈", "🥇"];
+      const next = goal ? goal.tiers.findIndex((t) => goal.total < t) : -1;
+      const line = !goal ? "이번 주 목표<br>집계 전" : next < 0 ? "이번 주 목표<br>🥇 달성!" : `이번 주 목표<br>${MED[next]} ${Math.floor((goal.total / goal.tiers[next]) * 100)}%`;
+      html.push(`<span class="rm-txt lt board" style="left:${X(246)}%; top:${Y(72)}%;">${line}</span>`);
+    } else html.push(`<span class="rm-txt lt" style="left:${X(246)}%; top:${Y(99)}%;">${d.notice ? esc(d.notice) : "길드 게시판"}</span>`);
     html.push(`<div class="rm-plate"><b>${esc(d.guildName || "길드")}</b> 길드 홀<br>길드원 ${d.count || 0}명</div>`);
 
     Rm.el.dataset.theme = "hall";
@@ -942,12 +1093,20 @@
     base.className = "rm-base";
     layer.appendChild(base);
     layer.insertAdjacentHTML("beforeend", html.join(""));
+    Rm.coin = [];
     for (const c of layer.querySelectorAll("canvas.rm-f")) {
       const g2 = c.getContext("2d");
       g2.imageSmoothingEnabled = false;
-      HALL[c.dataset.h].draw(g2);
+      const id = c.dataset.h;
+      if (id === "fountain" && has("goldFountain")) goldFountain(g2);
+      else if (id === "bedL" || id === "bedR") flowerBed(g2, id === "bedL" ? 9 : 10);
+      else if (id === "mascot") {
+        // 석상 그림이 늦게 오면 다시 그린다 — 방의 전설 석상과 같은 줄(id "statue")에 넣는다
+        const k = { id: "statue", f: MASCOT, g: g2, dexId: hall.mascot || null };
+        Rm.coin.push(k);
+        drawCoin(k, frame);
+      } else HALL[id].draw(g2);
     }
-    Rm.coin = [];
     Rm.scene = { on: new Set(["fountain"]), per, theme: "hall", hall: true };
   }
 
