@@ -24,6 +24,12 @@
  * 있어서 고치면 생기지만, 코인 꾸미기는 길드 객체가 지갑의 산 목록과 맞춰 보고 안 산 것은
  * 길드 방에서 지운다(guild.js). 되팔기 · 선물은 없다 — 쓴 코인은 그대로 사라진다.
  *
+ * ── 전설의 조각 (레이드 · raid.js) ──
+ * 길드 레이드에서 보스를 쓰러뜨리면 그 전설의 조각이 들어온다(shard — 길드 객체만 부른다). 같은 전설의
+ * 조각 SHARD_NEED 개면 그 전설을 받는다(redeem — 앱이 박스에 넣는다). 보스가 매주 바뀌어서 같은 조각은
+ * 잘 모이지 않는다 — 다른 전설의 조각 SWAP_RATE 개를 원하는 전설의 조각 1개로 바꾼다(swap).
+ * 조각도 한 주에 한 길드에서만 받는다(raidWeeks, 주간 코인 보상과 같다). rid 로 같은 보상을 두 번 받지 않는다.
+ *
  * ── 계정 없이 ──
  * 만들 때 지갑 번호와 열쇠를 한 번 준다. 서버에는 열쇠의 해시만 둔다. 열쇠를 잃으면 지갑도
  * 잃는다(앱은 세이브에 두고, 세이브 백업에 같이 들어간다).
@@ -53,6 +59,8 @@
  *   POST /wallet/w0123456789ab/sell       상점에 팔기 { key, day, mon: { line, grown, shiny } }
  *   POST /wallet/w0123456789ab/buy        코인 꾸미기 사기 { key, item }  → { ...보기, item }
  *   POST /wallet/w0123456789ab/candy      코인 → 사탕 { key, day, n }    → { ...보기, got, paid }
+ *   POST /wallet/w0123456789ab/redeem     조각으로 전설 받기 { key, line } → { ...보기, line }
+ *   POST /wallet/w0123456789ab/swap       조각 바꾸기 { key, from, to }   → { ...보기 }
  *
  * debit · credit 은 밖에서 부를 수 없다 — walletRoute 가 넘기지 않고, 길드 객체(몰·주간 보상)만
  * 지갑 객체를 직접 부른다. debit 은 그래도 열쇠를 본다(사는 사람이 열쇠를 넘겨야 빠진다).
@@ -64,9 +72,13 @@ import DECO from "../../src/main/deco.json" with { type: "json" };
 /** 코인 꾸미기 카탈로그 — id → { name, coins } (배경·가구 id 는 겹치지 않는다) */
 export const DECO_ITEMS = new Map([...DECO.themes, ...DECO.furni].map((d) => [d.id, d]));
 export const DECO_THEMES = new Set(DECO.themes.map((d) => d.id));
+/** 조각이 될 수 있는 라인 — 전설 · 환상 */
+const LEGEND_LINES = new Set(LINES.map((l, i) => (l.single && l.legendary ? i : -1)).filter((i) => i >= 0));
+export const SHARD_NEED = 5;
+export const SWAP_RATE = 2;
 
 export const GATE_PER_DAY = 5;
-export const BUY_WAIT_MS = 2 * 86_400_000;
+export const BUY_WAIT_MS = 86_400_000; // 하루
 const GATE_SALT = "poketokenbar-wallet-gate"; // 주소를 그대로 두지 않으려는 것 — 비밀은 아니다
 export const SELL_MAX = 10;
 export const SELL_COINS = 100;
@@ -129,6 +141,9 @@ export class Wallet {
       cbDay: (w.cb || {}).day || "",
       cbLeft: CANDY_MAX - ((w.cb || {}).n || 0), // 코인 → 사탕 오늘 남은 개수
       candyCoins: CANDY_COINS,
+      shards: w.shards || {}, // 전설의 조각 { 라인: 개수 }
+      shardNeed: SHARD_NEED,
+      swapRate: SWAP_RATE,
       log: w.log.slice(-LOG_KEEP).reverse(),
     };
   }
@@ -184,7 +199,54 @@ export class Wallet {
       return json({ ok: true, balance: w.balance });
     }
 
+    // 길드 객체만 부른다 — 레이드 조각. 한 주에 한 길드, 같은 보상(rid)은 한 번만
+    if (action === "shard") {
+      const line = Number(body.line);
+      const n = Number(body.n);
+      if (!LEGEND_LINES.has(line) || !Number.isInteger(n) || n < 1 || n > 10) return fail("조각이 맞지 않습니다");
+      const guild = String(body.guild || "").slice(0, 8);
+      const week = String(body.week || "").slice(0, 10);
+      const rid = String(body.rid || "").slice(0, 40);
+      w.shardGot = w.shardGot || [];
+      if (rid && w.shardGot.includes(rid)) return json({ ok: true, dup: true });
+      w.raidWeeks = w.raidWeeks || {};
+      if (w.raidWeeks[week] && w.raidWeeks[week] !== guild) return fail("이 지갑은 그 주 레이드 조각을 이미 다른 길드에서 받았습니다", 409);
+      w.raidWeeks[week] = guild;
+      const weeks = Object.keys(w.raidWeeks).sort();
+      for (const k of weeks.slice(0, Math.max(0, weeks.length - GUILD_WEEKS_KEEP))) delete w.raidWeeks[k];
+      if (rid) w.shardGot = [...w.shardGot, rid].slice(-60);
+      w.shards = w.shards || {};
+      w.shards[line] = (w.shards[line] || 0) + n;
+      await this.save(w, 0, `레이드 조각 ${n}개 (${LINES[line].names[1]})`);
+      return json({ ok: true, shards: w.shards });
+    }
+
     if (typeof body.key !== "string" || w.keyHash !== (await sha256(body.key))) return fail("지갑 열쇠가 맞지 않습니다", 403);
+
+    if (action === "redeem") {
+      const line = Number(body.line);
+      if (!LEGEND_LINES.has(line)) return fail("전설의 조각이 아닙니다");
+      w.shards = w.shards || {};
+      const have = w.shards[line] || 0;
+      if (have < SHARD_NEED) return fail(`조각이 모자랍니다 (${have} / ${SHARD_NEED})`, 402);
+      w.shards[line] = have - SHARD_NEED;
+      if (!w.shards[line]) delete w.shards[line];
+      await this.save(w, 0, `조각으로 전설 받기 (${LINES[line].names[1]})`);
+      return json({ ...this.view(w), line });
+    }
+
+    if (action === "swap") {
+      const from = Number(body.from);
+      const to = Number(body.to);
+      if (!LEGEND_LINES.has(from) || !LEGEND_LINES.has(to) || from === to) return fail("바꿀 조각을 골라 주세요");
+      w.shards = w.shards || {};
+      if ((w.shards[from] || 0) < SWAP_RATE) return fail(`조각이 모자랍니다 (${SWAP_RATE}개가 1개가 됩니다)`, 402);
+      w.shards[from] -= SWAP_RATE;
+      if (!w.shards[from]) delete w.shards[from];
+      w.shards[to] = (w.shards[to] || 0) + 1;
+      await this.save(w, 0, `조각 바꾸기 (${LINES[from].names[1]} ${SWAP_RATE} → ${LINES[to].names[1]} 1)`);
+      return json(this.view(w));
+    }
 
     if (action === "view") return json(this.view(w));
 
@@ -273,7 +335,7 @@ export async function walletCall(env, id, action, body) {
   return { status: res.status, ...(await res.json().catch(() => ({ ok: false, reason: "지갑 응답을 읽지 못했습니다" }))) };
 }
 
-/** Worker 쪽 — 밖에서 부를 수 있는 건 만들기 · 보기 · 출석 · 환전 · 상점에 팔기 · 꾸미기 사기 · 사탕 사기뿐이다 */
+/** Worker 쪽 — 밖에서 부를 수 있는 건 만들기 · 보기 · 출석 · 환전 · 상점에 팔기 · 꾸미기 사기 · 사탕 사기 · 조각 쓰기뿐이다 */
 export async function walletRoute(request, env, id, action) {
   if (request.method !== "POST") return fail("POST 로 보내 주세요", 405);
   const len = Number(request.headers.get("content-length") || 0);
@@ -292,6 +354,6 @@ export async function walletRoute(request, env, id, action) {
     }
     return fail("지갑을 만들지 못했습니다. 다시 시도해 주세요", 503);
   }
-  if (!["checkin", "exchange", "sell", "buy", "candy"].includes(action || "") && action) return fail("모르는 요청입니다", 404);
+  if (!["checkin", "exchange", "sell", "buy", "candy", "redeem", "swap"].includes(action || "") && action) return fail("모르는 요청입니다", 404);
   return walletStub(env, id).fetch("https://wallet/" + (action || "view"), { method: "POST", body: await request.text() });
 }

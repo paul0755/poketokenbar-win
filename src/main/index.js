@@ -13,6 +13,7 @@ const backup = require("./backup");
 const battle = require("./battle");
 const wild = require("./wild");
 const friend = require("./friend");
+const raidbattle = require("./raidbattle");
 const room = require("./room");
 const HALL = require("./hall.json"); // 길드 홀 꾸미기 카탈로그 — 서버와 같은 파일
 const burning = require("./burning");
@@ -494,8 +495,19 @@ async function serverCall(path, body) {
  * 안 그러면 갱신할 때마다 코드가 바뀌어 매번 올리게 된다.
  */
 let guildTeam = { key: "", code: "" };
+
+/**
+ * 길드 대표 포켓몬 — 길드 홀에 서고, 길드원 결투 · 레이드에서 남의 도전에 함께 나가는 아이.
+ * 길드 탭에서 고른 아이(save.guildRep). 안 골랐거나 그 아이가 없어졌으면(팔았거나 맡겼으면) 방의 첫 아이
+ */
+const guildRepPicked = () => {
+  const m = save.guildRep && box.find(save.box, save.guildRep);
+  return m && !isEggMon(m) ? m : null;
+};
+const guildRepMon = () => guildRepPicked() || box.find(save.box, room.monsIn(save, isEggMon)[0]) || box.active(save);
+
 function guildTeamCode() {
-  const m = box.find(save.box, room.monsIn(save, isEggMon)[0]) || box.active(save);
+  const m = guildRepMon();
   if (!m || isEggMon(m)) return "";
   const grown = box.effOf(m, growthSpeed());
   const p = profile.build(box.withLv(m, growthSpeed()), grown);
@@ -512,7 +524,10 @@ const dexCount = () => ({
 /** 내 방 사진. 서버가 꼴을 다시 본다(guild.js cleanSnap) */
 function guildSnap() {
   const st = roomState();
-  const mons = st.mons
+  // 고른 대표 포켓몬을 맨 앞에 — 홀에는 첫 아이가 선다(방에 두지 않은 아이면 방 사진에도 같이 나온다)
+  const rep = guildRepPicked();
+  const ids = rep ? [rep.id, ...st.mons.filter((id) => id !== rep.id)].slice(0, 5) : st.mons;
+  const mons = ids
     .map((id) => box.find(save.box, id))
     .filter(Boolean)
     .map((m) => {
@@ -729,6 +744,19 @@ async function guildRename(trainer) {
   return { ok: true, message: `이름을 "${save.trainerName}"(으)로 바꿨습니다` };
 }
 
+/** 길드 대표 포켓몬 고르기 — id 가 없으면 방의 첫 아이로 */
+async function guildRep(id) {
+  const m = id ? box.find(save.box, String(id)) : null;
+  if (id && (!m || isEggMon(m))) return { ok: false, reason: "고를 수 없는 아이입니다(알은 대표가 될 수 없습니다)" };
+  save.guildRep = m ? m.id : null;
+  writeSave();
+  refresh(true);
+  const r = await guildPush(true).catch(() => null);
+  const name = (() => { const x = guildRepMon(); return x ? poke.describe(box.effOf(x, growthSpeed()), x.line, { shiny: x.shiny }).name : ""; })();
+  const later = r && r.status === 429 ? " — 조금 뒤에 길드에 올라갑니다" : "";
+  return { ok: true, message: m ? `길드 대표 포켓몬을 ${name}(으)로 정했습니다${later}` : `길드 대표 포켓몬은 방의 첫 아이(${name})입니다${later}` };
+}
+
 async function guildShare(on) {
   save.guildShare = Boolean(on);
   writeSave();
@@ -831,6 +859,8 @@ async function guildView() {
     goal: (r.goals || {})[week] || null, goalCoins, lastGoal, goalNew,
     hall: r.hall || { funds: {}, owned: [], theme: null, donors: {} }, hallItems: HALL.items,
     walletOk: Boolean(me && me.walletOk), hasWallet: Boolean(save.wallet), coins: coinCache ? coinCache.balance : null,
+    raid: r.raid ? await raidOut(r.raid) : null,
+    rep: (guildRepMon() || {}).id || null, repPicked: Boolean(guildRepPicked()), // 길드 대표 포켓몬
   };
 }
 
@@ -883,6 +913,193 @@ async function guildBattle(memberId) {
   return friendBattle(theirs, { team: mine });
 }
 
+/* ---------------- 길드 레이드 (server/src/raid.js) ----------------
+   매주 전설 보스를 길드원이 함께 깎는다. 서버가 씨앗과 "지금 칸의 남은 체력"을 주면 여기서 결투를
+   끝까지 돌리고 깎은 만큼(천분율)을 알린다. 보스를 쓰러뜨리면 그 전설의 조각이 지갑에 들어가고,
+   같은 전설의 조각 5개로 그 전설을 받는다(wallet.js redeem). */
+
+/** 보스는 Lv.70 만큼 자란 모습 — 기술은 Lv.70 까지 배운 것. 싸울 때는 Lv.50 으로 맞춘다 */
+const RAID_BOSS_GROWN = 69 * profile.PER_LEVEL;
+
+/** 보스 — 개체값은 모두 31, 성격 · 특성 · 패시브스킬은 고정. 같은 씨앗이면 같은 결투가 나와야 한다 */
+const raidBoss = (line) => ({ id: "raid-boss", line, nature: 0, shiny: false, ivs: [31, 31, 31, 31, 31, 31], gender: "무성", ability: 0, eggMoves: [], tmMoves: [] });
+
+const raidName = (line) => poke.describe(poke.STAGES[1].at, line).name;
+async function raidUrl(line, kind = "anim") {
+  const p = await poke.spriteWithFallback(poke.describe(poke.STAGES[1].at, line), CACHE, kind).catch(() => null);
+  return p ? pathToFileURL(p).href : null;
+}
+
+/** 화면에 보일 레이드 — 보스 이름 · 그림, 내 줄 */
+async function raidOut(rd) {
+  const g = save.guild;
+  const mine = rd.rows.find((x) => x.id === (g && g.memberId));
+  return { ...rd, name: raidName(rd.line), url: await raidUrl(rd.line), mine: mine || null, triesLeft: rd.tries - ((mine && mine.n) || 0) };
+}
+
+const RAID_LINEUP = 6; // 한 도전에 내보낼 수 있는 내 아이 — 한 번에 한 마리씩. 서버 raid.js LINEUP 과 같다
+const RAID_IDLE_MS = 5 * 60_000; // 다음 아이를 고르지 않고 이만큼 지나면 그대로 끝낸다(서버는 10분 기다린다)
+
+/**
+ * 지금 싸우는 레이드 — 내 아이가 쓰러지면 판이 멈추고 다음 아이를 기다린다(raidNext).
+ * { b: raidbattle 판, g, s: start 응답, used: 내보낸 아이 번호들, urls: 아이 번호 → 그림, timer }
+ */
+let raidLive = null;
+
+const raidSprite = async (dexId, shiny) => {
+  const p = await poke.spriteWithFallback({ dexId, isShiny: shiny }, CACHE, "anim").catch(() => null);
+  return p ? pathToFileURL(p).href : null;
+};
+const raidAlly = (m) => ({ mon: box.withLv(m, growthSpeed()), grown: box.effOf(m, growthSpeed()), owner: save.trainerName || "나", member: save.guild.memberId, me: true });
+const raidFighter = (id) => {
+  const m = box.find(save.box, id);
+  return m && !isEggMon(m) && poke.stageFor(box.effOf(m, growthSpeed())) ? m : null;
+};
+
+/** 끝낸다 — 주인마다 깎은 양을 서버에 알린다 */
+async function raidFinish(L) {
+  clearTimeout(L.timer);
+  if (raidLive === L) raidLive = null;
+  const r = L.b.result();
+  // 주인마다 합친다. 보스를 쓰러뜨렸으면 남은 체력을 다 깎은 것이다 — 반올림이나 보스의 반동으로
+  // 모자란 몫은 도전한 나에게(한 점이 남아 보스가 안 쓰러지지 않게)
+  const credit = {};
+  for (const f of r.allies) credit[f.member] = (credit[f.member] || 0) + f.dealt;
+  const sum = Object.values(credit).reduce((x, y) => x + y, 0);
+  if (r.defeated && sum < L.s.start) credit[L.g.memberId] = (credit[L.g.memberId] || 0) + (L.s.start - sum);
+  const h = await guildCall(`/${L.g.code}/raid/hit`, { memberId: L.g.memberId, key: L.g.key, credit });
+  refresh(true);
+  if (!h.ok) return h;
+  return { ok: true, dealt: h.dealt, mine: credit[L.g.memberId] || 0, cleared: h.cleared, again: Boolean(L.s.again), triesLeft: L.s.triesLeft, stage: L.s.stage, raid: await raidOut(h.raid) };
+}
+
+/** 한 토막을 화면에 넘길 꼴로. 더 내보낼 아이가 없으면 그대로 끝까지 */
+async function raidPack(L, seg) {
+  const log = [...seg.log];
+  let { need, over } = seg;
+  if (need && (L.used.length >= RAID_LINEUP || !save.box.some((m) => !L.used.includes(m.id) && raidFighter(m.id)))) {
+    L.b.stop();
+    const end = L.b.step();
+    log.push(...end.log);
+    need = false;
+    over = true;
+  }
+  const r = L.b.result();
+  const allies = await Promise.all(r.allies.map(async (f, i) => {
+    if (!L.urls.has(i)) L.urls.set(i, await raidSprite(f.dexId, f.shiny));
+    return { ...f, url: L.urls.get(i) };
+  }));
+  const out = { ok: true, log, allies, need, over, used: [...L.used], limit: RAID_LINEUP, boss: { ...r.boss, url: L.bossUrl, label: `레이드 보스 ${r.boss.name}` } };
+  if (over) {
+    const fin = await raidFinish(L);
+    if (!fin.ok) return fin;
+    out.raid = fin;
+  } else {
+    clearTimeout(L.timer);
+    L.timer = setTimeout(() => { if (raidLive === L) { L.b.stop(); L.b.step(); raidFinish(L).catch(() => {}); } }, RAID_IDLE_MS);
+  }
+  return out;
+}
+
+/**
+ * 보스에게 도전한다 — 내 아이 한 마리와 다른 길드원 모두의 대표 포켓몬이 한꺼번에 싸운다(raidbattle.js).
+ * 내 아이가 쓰러지면 멈추고(need) 화면이 다음 아이를 고른다(raidNext). 깎은 칸은 포켓몬 주인마다 따로
+ * 알린다. 화면은 보스 탭이 재생한다(boss.js).
+ */
+async function raidAttack(monId) {
+  const g = save.guild;
+  if (!g || g.gone) return { ok: false, reason: "길드에 들어가 있지 않습니다" };
+  if (raidLive) { raidLive.b.stop(); raidLive.b.step(); await raidFinish(raidLive).catch(() => {}); } // 고르다 만 도전은 그대로 끝낸다
+  const m = raidFighter(String(monId || ""));
+  if (!m) return { ok: false, reason: "싸울 포켓몬을 골라 주세요(알은 싸울 수 없습니다)" };
+  const s = await guildCall(`/${g.code}/raid/start`, { memberId: g.memberId, key: g.key });
+  if (!s.ok) { guildGone(s); return s; }
+  const allies = [raidAlly(m)];
+  // 길드원의 코드가 말이 안 되면(고친 세이브 등) 그 아이만 빠진다
+  for (const x of s.party || []) {
+    const t = raidbattle.parseTeam(x.team);
+    if (t) allies.push({ mon: { id: "raid-" + x.id, ...t.mon }, grown: t.grown, owner: x.trainer || "", member: x.id });
+  }
+  const b = raidbattle.start(allies, { mon: raidBoss(s.line), grown: RAID_BOSS_GROWN }, friend.rng(s.seed), { level: 50, bars: s.start / 1000 });
+  if (!b) return { ok: false, reason: "결투를 시작하지 못했습니다" };
+  raidLive = { b, g, s, used: [m.id], urls: new Map(), bossUrl: await raidUrl(s.line), timer: null };
+  return raidPack(raidLive, b.step());
+}
+
+/** 내 아이가 쓰러진 뒤 — 다음 아이를 내보낸다. monId 가 없으면 그만한다 */
+async function raidNext(monId) {
+  const L = raidLive;
+  if (!L) return { ok: false, reason: "싸우고 있는 레이드가 없습니다" };
+  if (!monId) {
+    L.b.stop();
+    return raidPack(L, L.b.step());
+  }
+  const m = raidFighter(String(monId));
+  if (!m) return { ok: false, reason: "싸울 포켓몬을 골라 주세요(알은 싸울 수 없습니다)" };
+  if (L.used.includes(m.id)) return { ok: false, reason: "이번 도전에 이미 나갔던 아이입니다" };
+  if (L.used.length >= RAID_LINEUP) return { ok: false, reason: `한 번 도전에 ${RAID_LINEUP}마리까지 내보낼 수 있습니다` };
+  L.b.swap(raidAlly(m));
+  L.used.push(m.id);
+  return raidPack(L, L.b.step());
+}
+
+/** 보스 탭 — 레이드만 받아 온다(길드 보기와 같은 요청). 다른 길드원의 대표 포켓몬 그림도 같이 */
+async function raidView() {
+  const v = await guildView();
+  if (!v.ok) return v;
+  const others = v.members.filter((m) => !m.me && m.canBattle).map((m) => {
+    const x = m.room.mons[0];
+    return { id: m.id, trainer: m.trainer, name: x ? x.name : "", url: x ? x.animUrl || x.url : null };
+  });
+  return { ok: true, raid: v.raid, members: others, walletOk: v.walletOk, lineup: RAID_LINEUP, name: v.name };
+}
+
+/** 내 전설의 조각 — 지갑에 있다. 바꿀 곳(모든 전설) 목록도 같이 */
+async function raidShards() {
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await walletCall("/" + save.wallet.id, { key: save.wallet.key });
+  if (!r.ok) return r;
+  const legends = poke.LINES.map((L, i) => (L.single && L.legendary ? i : -1)).filter((i) => i >= 0);
+  const shards = await Promise.all(Object.entries(r.shards || {}).filter(([, n]) => n > 0).map(async ([line, n]) => ({
+    line: Number(line), n, name: raidName(Number(line)), url: await raidUrl(Number(line), "still"),
+  })));
+  return { ok: true, shards: shards.sort((a, b) => b.n - a.n), need: r.shardNeed || 5, swapRate: r.swapRate || 2, legends: legends.map((line) => ({ line, name: raidName(line) })) };
+}
+
+/** 조각 5개로 그 전설을 받는다 — 지갑이 조각을 뺀 뒤 박스에 넣는다. 야생에서 잡은 것처럼 부화한 모습이다 */
+async function raidRedeem(line) {
+  line = Number(line);
+  const L = poke.LINES[line];
+  if (!L || !L.single || !L.legendary) return { ok: false, reason: "전설의 조각이 아닙니다" };
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await walletCall(`/${save.wallet.id}/redeem`, { key: save.wallet.key, line });
+  if (!r.ok) return r;
+  const shiny = poke.rollShiny(Boolean(save.charm));
+  const m = box.make(line, poke.rollNature(), shiny);
+  m.fed = poke.STAGES[1].at;
+  m.maxStage = 1;
+  m.raid = true; // 레이드 조각으로 받은 아이
+  save.box.push(m);
+  if (!save.seen.includes(line)) save.seen.push(line);
+  save.maxStage[line] = Math.max(save.maxStage[line] ?? -1, 1);
+  writeSave();
+  refresh(true);
+  pushDex();
+  const name = raidName(line);
+  return { ok: true, name, shiny, message: `${shiny ? "★ " : ""}${battle.josa(name, "을를")} 받았습니다! 박스에 들어갔습니다` };
+}
+
+/** 다른 전설의 조각 2개 → 원하는 전설의 조각 1개 */
+async function raidSwap({ from, to } = {}) {
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await walletCall(`/${save.wallet.id}/swap`, { key: save.wallet.key, from: Number(from), to: Number(to) });
+  if (!r.ok) return r;
+  return { ok: true, message: `${raidName(Number(from))} 조각 ${r.swapRate || 2}개를 ${raidName(Number(to))} 조각 1개로 바꿨습니다` };
+}
+
 /* ---------------- 코인 지갑 · 상점에 팔기 · 길드 몰 (server/src/wallet.js · market.js) ----------------
    코인(🪙)은 서버가 잔액을 들고 있다 — 여기서는 지갑 번호와 열쇠만 세이브에 둔다(save.wallet).
    길드 몰은 포켓몬을 서버에 맡겨서 판다. 맡기면 박스에서 빠지고, 팔리면 산 사람에게 간다.
@@ -912,7 +1129,7 @@ async function walletInfo() {
     id: save.wallet.id,
     created: Boolean(e.created),
     balance: r.balance,
-    canBuyAt: r.canBuyAt || 0, // 새 지갑은 이틀 뒤부터 몰에서 산다
+    canBuyAt: r.canBuyAt || 0, // 새 지갑은 하루 뒤부터 몰에서 산다
     checkedIn: r.checkin === today,
     exLeft: r.exDay === today ? r.exLeft : 5,
     sellLeft: r.sellDay === today ? r.sellLeft : 10,
@@ -2317,6 +2534,7 @@ function pathReport() {
 
 function settingsPayload() {
   return {
+    version: app.getVersion(),
     limits: save.limits || {},
     growthPct: save.growthPct ?? 100,
     pricePct: save.pricePct ?? 100,
@@ -3617,6 +3835,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("guild-kick", (_e, id) => guildKick(String(id || "")));
   ipcMain.handle("guild-view", () => guildView());
   ipcMain.handle("guild-share", (_e, on) => guildShare(on));
+  ipcMain.handle("guild-rep", (_e, id) => guildRep(id));
   ipcMain.handle("guild-rename", (_e, trainer) => guildRename(trainer));
   ipcMain.handle("guild-list", () => guildList());
   ipcMain.handle("guild-rank", () => guildRank());
@@ -3634,6 +3853,12 @@ app.whenReady().then(async () => {
   ipcMain.handle("market-buy", (_e, id) => marketBuy(String(id || "")));
   ipcMain.handle("market-cancel", (_e, id) => marketCancel(String(id || "")));
   ipcMain.handle("guild-battle", (_e, id) => guildBattle(String(id || "")));
+  ipcMain.handle("raid-attack", (_e, id) => raidAttack(id));
+  ipcMain.handle("raid-next", (_e, id) => raidNext(id));
+  ipcMain.handle("raid-view", () => raidView());
+  ipcMain.handle("raid-shards", () => raidShards());
+  ipcMain.handle("raid-redeem", (_e, line) => raidRedeem(line));
+  ipcMain.handle("raid-swap", (_e, a) => raidSwap(a || {}));
   ipcMain.handle("room-buy", (_e, { kind, id } = {}) => roomBuy(kind, id));
   ipcMain.handle("room-coins", () => roomCoins());
   ipcMain.handle("statue-image", (_e, dexId) => statueImage(dexId));

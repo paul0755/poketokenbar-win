@@ -212,6 +212,7 @@
     renderHall(g);
     renderListing(g);
     $("gdShare").checked = Boolean(last && last.guild && last.guild.share);
+    renderRep(g);
     const sel = visiting && g.members.find((m) => m.id === visiting);
     if (!room) room = window.ptbRoom.create($("gdRoom"));
     if (sel) {
@@ -339,6 +340,27 @@
     if (done(r)) load();
   });
 
+  /* ---------------- 길드 대표 포켓몬 ---------------- */
+
+  /** 고르기 — 맨 위는 "방의 첫 아이(자동)". 지금 대표가 누구인지 그 칸에 적는다 */
+  function renderRep(g) {
+    const sel = $("gdRep");
+    if (document.activeElement === sel) return; // 고르는 중에는 다시 그리지 않는다
+    const mons = ((last && last.box) || []).filter((m) => m.stageKey !== "egg" && m.profile).sort((a, b) => b.profile.level - a.profile.level);
+    const auto = !g.repPicked && mons.find((m) => m.id === g.rep);
+    sel.innerHTML = `<option value="">방의 첫 아이${auto ? ` (${esc(auto.name)})` : ""}</option>` +
+      mons.map((m) => `<option value="${esc(m.id)}"${g.repPicked && m.id === g.rep ? " selected" : ""}>${esc(m.name)} Lv.${m.profile.level}</option>`).join("");
+  }
+  $("gdRep").addEventListener("change", async (e) => {
+    e.target.disabled = true;
+    try {
+      done(await window.ptb.guildRep(e.target.value || null));
+    } finally {
+      e.target.disabled = false;
+    }
+    load();
+  });
+
   /* ---------------- 길드 목록 (📋 길드 목록 탭) ---------------- */
 
   let found = null; // 마지막으로 받은 목록 { guilds, at }
@@ -379,7 +401,7 @@
     syncView();
     const mine = myCode();
     $("gdListNote").innerHTML = mine ? "한 번에 한 길드에만 있을 수 있어서, 다른 길드에는 <b>지금 길드를 나간 뒤</b> 들어갈 수 있습니다." : "";
-    if (look.mode === "rank") return renderRank();
+    if (look.mode === "rank") return renderGuildRank();
     if (!found) return;
     $("gdList").innerHTML = listHtml($("gdFindQ").value, mine);
     // 내 길드가 목록에 없으면 그것도 알린다
@@ -441,7 +463,8 @@
     return rows;
   }
 
-  function renderRank() {
+  /** 길드 랭킹(📋 길드 목록 탭). 길드 안의 토큰 순위(renderRank)와 이름이 같으면 뒤의 것이 앞의 것을 덮는다 */
+  function renderGuildRank() {
     if (!ranked) return;
     const mine = myCode();
     $("gdList").innerHTML = rankHtml($("gdFindQ").value, mine);

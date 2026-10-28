@@ -171,6 +171,8 @@
     $("mlList").innerHTML = open.length
       ? open.map((l) => {
         const canBuy = !l.mine && l.valid && wallet && wallet.balance >= l.price && !waitH();
+        // 못 살 때는 왜 못 사는지 단추 옆에 — 말없이 흐린 단추만 있으면 고장 난 줄 안다
+        const why = l.mine || !l.valid || canBuy ? "" : !wallet ? "지갑 불러오는 중" : waitH() ? `새 지갑 — ${waitH()}시간 뒤부터` : `코인 부족 (🪙${wallet.balance})`;
         const left = Math.max(0, Math.ceil((l.expires - Date.now()) / 86_400_000));
         return `<div class="ml-card${l.mine ? " mine" : ""}${l.legendary ? " legend" : ""}">
           <div class="pic">${l.animUrl || l.url ? `<img src="${esc(l.animUrl || l.url)}" alt="">` : ""}</div>
@@ -183,7 +185,7 @@
           ${!l.valid ? `<div class="bad">읽을 수 없는 매물 — ${esc(l.invalidWhy || "")}</div>` : ""}
           <div class="ft"><span>${esc(l.seller)} · ${left}일 남음</span>
             ${l.mine ? `<button class="mini2" data-cancel="${esc(l.id)}">돌려받기</button>`
-              : `<button class="mini2 buy" data-buy="${esc(l.id)}" ${canBuy ? "" : "disabled"}>🪙${l.price} 사기</button>`}
+              : `${why ? `<span class="why">${esc(why)}</span>` : ""}<button class="mini2 buy" data-buy="${esc(l.id)}" ${canBuy ? "" : "disabled"}>🪙${l.price} 사기</button>`}
           </div>
         </div>`;
       }).join("")

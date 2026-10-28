@@ -421,12 +421,14 @@
 <link rel="stylesheet" href="moves.css" />
 <link rel="stylesheet" href="room.css" />
 <link rel="stylesheet" href="mall.css" />
+<link rel="stylesheet" href="boss.css" />
 
 <nav>
   <button data-tab="home" class="on">홈</button>
   <button data-tab="shop">상점</button>
   <button data-tab="box">박스</button>
   <button data-tab="room">방</button>
+  <button data-tab="boss">보스</button>
   <button data-tab="battle">결투</button>
   <button data-tab="dex">도감</button>
   <span class="sp"></span>
@@ -632,6 +634,7 @@
           <span class="c" id="gdCount"></span>
         </div>
         <div class="gd-goal" id="gdGoal" hidden></div>
+        
         <div class="rm-room" id="gdRoom" data-theme="cabin"></div>
         <div class="gd-visit" id="gdVisit"></div>
         <div class="gd-rank" id="gdRank"></div>
@@ -641,6 +644,7 @@
         <div class="gd-foot">
           <button class="mini2" id="gdRefresh">↻ 새로고침</button>
           <label class="gd-share" title="이번 주·오늘 토큰 합계와 그중 버닝타임 몫만 올라갑니다. 기록(로그)은 보내지 않습니다"><input type="checkbox" id="gdShare" /> 내 토큰 합계 공개</label>
+          <label class="gd-share gd-rep" title="길드 홀에 서고, 길드원 결투 · 레이드에서 다른 길드원의 도전에 함께 나가는 아이">대표 포켓몬 <select id="gdRep"></select></label>
           <span class="sp"></span>
           <button class="mini2" id="gdRename">✏️ 내 이름</button>
           <button class="mini2 del" id="gdLeave">길드 나가기</button>
@@ -661,6 +665,48 @@
   </section>
 
   <!-- ---------------- 결투 ---------------- -->
+  <!-- ---------------- 보스 (길드 레이드, boss.js) ---------------- -->
+  <section id="tab-boss" hidden>
+    <div class="dexhead"><span class="t">🐉 길드 레이드</span><span class="c" id="bsHead"></span><button class="mini2" id="bsRefresh" title="다시 불러오기">↻</button></div>
+    <div class="note" id="bsOff"></div>
+    <div id="bsIn" hidden>
+      <div class="bs-wrap">
+        <div class="bs-main">
+          <div class="bs-room">
+            <canvas id="bsCanvas" width="320" height="180"></canvas>
+            <div class="bs-bar">
+              <div class="nm"><b id="bsBossName"></b><span>Lv.50</span></div>
+              <div class="hpbar"><i id="bsHp"></i></div>
+              <div class="hpn" id="bsHpn"></div>
+            </div>
+            <div class="bs-boss" id="bsBoss"><img id="bsBossImg" alt="" draggable="false" /><div class="bs-wave" id="bsWave"></div><span class="drophint">여기에 놓으면 도전!</span></div>
+            <div class="bs-actors" id="bsActors"></div>
+          </div>
+          <div class="bs-go">
+            <span class="sub">내보낼 포켓몬<br />길드원마다 한 마리</span>
+            <div class="bs-pick" id="bsPick"></div>
+            <span class="sp"></span>
+            <span class="sub" id="bsTries"></span>
+            <button id="bsGo">⚔️ 도전</button>
+            <button id="bsSkip" hidden>건너뛰기</button>
+          </div>
+          <div class="bs-choose" id="bsChoose" hidden>
+            <span><b>내 포켓몬이 쓰러졌습니다!</b> 다음 포켓몬을 아래에서 누르거나 보스 위로 끌어 놓으세요 <span class="sub" id="bsChooseN"></span></span>
+            <button id="bsStop">그만하기</button>
+          </div>
+          <div class="bs-shelf-hd sub">내 박스 — 눌러서 고르거나, 보스 위로 끌어 놓으면 바로 도전합니다</div>
+          <div class="bs-shelf" id="bsShelf"></div>
+          <div class="bs-log" id="bsLog"></div>
+        </div>
+        <div class="bs-side">
+          <div class="bs-card" id="bsRank"></div>
+          <div class="bs-card" id="bsShards"></div>
+          <div class="bs-card ft dim" id="bsFoot"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="tab-battle" hidden>
     <div class="dexhead"><span class="t">결투</span><span class="c" id="btlLeft"></span></div>
     <div class="note">
@@ -792,4 +838,5 @@
 <script src="battle.js"></script>
 <script src="room.js"></script>
 <script src="guild.js"></script>
+<script src="boss.js"></script>
 <script src="mall.js"></script>

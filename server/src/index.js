@@ -11,10 +11,10 @@
  * ── 주소 ──
  *   GET /                     살아 있는지 확인
  *   GET /room/123456?role=host|guest   (웹소켓)  방 만들기 / 참가
- *   /guild/…                  길드 (guild.js) · 길드 몰 (market.js) — 이쪽은 저장한다
+ *   /guild/…                  길드 (guild.js) · 길드 몰 (market.js) · 길드 레이드 (raid.js) — 이쪽은 저장한다
  *   GET /guilds               목록에 올린 길드 (directory.js)
  *   GET /guilds/rank?week=…   길드 랭킹 — 그 주와 지난주 (directory.js)
- *   /wallet/…                 코인 지갑 (wallet.js)
+ *   /wallet/…                 코인 지갑 · 전설의 조각 (wallet.js)
  */
 import { guildRoute } from "./guild.js";
 import { walletRoute } from "./wallet.js";
@@ -43,9 +43,9 @@ export default {
       const r = ok ? await directoryCall(env, "rank?week=" + week) : { ok: false, reason: "주가 맞지 않습니다. PC 시계를 확인해 주세요" };
       return new Response(JSON.stringify(r), { status: r.ok ? 200 : ok ? 503 : 400, headers: { "content-type": "application/json; charset=utf-8" } });
     }
-    const g = /^\/guild(?:\/([A-HJ-NP-Z2-9]{8}))?(?:\/(join|update|leave|kick|disband|listing|market(?:\/(?:list|buy|cancel))?|hall\/(?:donate|theme)))?$/.exec(url.pathname);
+    const g = /^\/guild(?:\/([A-HJ-NP-Z2-9]{8}))?(?:\/(join|update|leave|kick|disband|listing|market(?:\/(?:list|buy|cancel))?|hall\/(?:donate|theme)|raid\/(?:start|hit)))?$/.exec(url.pathname);
     if (g) return guildRoute(request, env, g[1], g[2]);
-    const w = /^\/wallet(?:\/(w[0-9a-f]{12}))?(?:\/(checkin|exchange|sell|buy|candy))?$/.exec(url.pathname);
+    const w = /^\/wallet(?:\/(w[0-9a-f]{12}))?(?:\/(checkin|exchange|sell|buy|candy|redeem|swap))?$/.exec(url.pathname);
     if (w) return walletRoute(request, env, w[1], w[2]);
     const m = /^\/room\/(\d{6})$/.exec(url.pathname);
     if (!m) return new Response(`PokeTokenBar relay (protocol ${PROTOCOL})`, { headers: { "content-type": "text/plain; charset=utf-8" } });

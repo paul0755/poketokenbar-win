@@ -44,6 +44,8 @@
 .ml-card .bad { color: var(--red); }
 .ml-card .ft { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--dim); font-size: 9.5px; }
 .ml-card .ft button { margin-left: auto; }
+.ml-card .ft .why { margin-left: auto; color: #ffb347; white-space: nowrap; }
+.ml-card .ft .why + button { margin-left: 0; }
 .ml-card .ft .buy:not(:disabled) { color: #14151a; background: var(--accent); border-color: var(--accent); }
 /* 타입 색은 index.html 의 .ty.t-* 와 같다 */
 .ml-card .t.t-normal{background:#9099a1}.ml-card .t.t-fire{background:#e8703a}.ml-card .t.t-water{background:#4a90d9}

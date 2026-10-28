@@ -1,0 +1,98 @@
+/* 보스 탭 — 길드 레이드 (boss.js) */
+#tab-boss .dexhead { display: flex; align-items: baseline; gap: 8px; }
+#tab-boss .dexhead .c { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tab-boss .sub { font-size: 10.5px; color: var(--muted); }
+#tab-boss .sub b { color: var(--text); }
+.bs-wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+@media (min-width: 900px) { .bs-wrap { grid-template-columns: minmax(0, 1fr) 250px; } }
+
+/* 방 — 그림(320×180)을 그대로 늘린다. 아이들 · 보스는 % 자리 */
+.bs-room { position: relative; aspect-ratio: 16 / 9; border-radius: 11px; overflow: hidden; border: 1px solid var(--line); background: #3b3631; user-select: none; }
+.bs-room canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+.bs-bar { position: absolute; right: 3%; top: 4%; width: 46%; z-index: 2000; }
+.bs-bar .nm { display: flex; gap: 6px; align-items: baseline; font-size: 12px; color: #f1efe8; text-shadow: 0 1px 0 #000; }
+.bs-bar .nm span { font-size: 10px; color: #d3d1c7; }
+.bs-bar .hpbar { height: 9px; margin-top: 4px; background: #1e1c1a; border-radius: 99px; overflow: hidden; border: 1px solid #000; }
+.bs-bar .hpbar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff5d5d, #ff9a3d); transition: width .3s ease; }
+.bs-bar .hpn { font-size: 10px; color: #d3d1c7; margin-top: 2px; text-shadow: 0 1px 0 #000; }
+/* 보스 — 아이들보다 훨씬 크게, 제단 위에 */
+.bs-boss { position: absolute; right: 2%; top: 21%; width: 40%; height: 66%; display: flex; align-items: flex-end; justify-content: center; z-index: 900; border-radius: 12px; transition: background .15s; }
+.bs-boss img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; image-rendering: pixelated; transform: scaleX(-1); filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .55)); }
+.bs-boss.hit img { animation: hitblink .45s steps(2, end); }
+.bs-boss .drophint { position: absolute; top: -2px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; color: #ffd24a; white-space: nowrap; opacity: 0; transition: opacity .15s; text-shadow: 0 1px 0 #000; }
+.bs-boss.drop { background: rgba(255, 210, 74, .16); outline: 2px dashed #ffd24a; }
+.bs-boss.drop .drophint { opacity: 1; }
+.bs-wave { position: absolute; inset: 20% 20%; border-radius: 50%; border: 3px solid #f09595; opacity: 0; pointer-events: none; }
+.bs-wave.go { animation: bswave .6s ease-out; }
+@keyframes bswave { from { transform: scale(1); opacity: .9; } to { transform: scale(3.4); opacity: 0; } }
+
+.bs-actors { position: absolute; inset: 0; pointer-events: none; --s: 40px; }
+.bs-a { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 1px; transform: translate(-50%, -100%); transition: left .45s ease, top .45s ease, opacity .5s; }
+.bs-a img { width: var(--s); height: var(--s); object-fit: contain; image-rendering: pixelated; transform: scaleX(-1); }
+.bs-a .tg { font-size: 10px; color: #f1efe8; background: rgba(0, 0, 0, .45); padding: 0 4px; border-radius: 4px; white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.bs-a.me .tg { color: #ffd24a; }
+.bs-a .hp { width: calc(var(--s) * .8); height: 4px; background: #1e1c1a; border-radius: 99px; overflow: hidden; }
+.bs-a .hp i { display: block; height: 100%; width: 100%; background: var(--green); transition: width .3s; }
+.bs-a .hp i.yellow { background: #f5c542; }
+.bs-a .hp i.red { background: var(--red); }
+.bs-a .st { font-size: 9.5px; font-weight: 800; color: var(--orange); min-height: 10px; }
+.bs-a.act { transition-duration: .3s; }
+.bs-a.act img { filter: drop-shadow(0 0 4px #ffd24a); }
+.bs-a.hit img { animation: hitblink .45s steps(2, end); }
+.bs-a.down { opacity: .3; }
+.bs-a.gone { display: none; }
+.bs-pop { position: absolute; transform: translate(-50%, 0); font-size: 12px; font-weight: 800; color: #ffd24a; text-shadow: 0 1px 0 #000; pointer-events: none; animation: bspop .9s ease-out forwards; z-index: 3000; white-space: nowrap; }
+.bs-pop.mvn { color: #f7c1c1; font-size: 11px; }
+@keyframes bspop { from { transform: translate(-50%, 0); opacity: 1; } to { transform: translate(-50%, -22px); opacity: 0; } }
+
+/* 내보낼 아이 · 선반 */
+.bs-go { display: flex; gap: 8px; align-items: center; margin: 8px 0 5px; flex-wrap: wrap; }
+.bs-go .sp { flex: 1; }
+.bs-pick { width: 84px; }
+.bs-slot { height: 64px; display: grid; place-items: center; text-align: center; border-radius: 8px; border: 1px dashed var(--line); font-size: 10px; color: var(--dim); padding: 0 4px; }
+.bs-choose { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 7px 10px; margin-bottom: 6px; border-radius: 10px; background: #3a1d1d; border: 1px solid #a33; font-size: 11.5px; animation: bschoose 1.2s ease-in-out infinite alternate; }
+.bs-choose b { color: #ffb4b4; }
+@keyframes bschoose { from { border-color: #a33; } to { border-color: #ff7a7a; } }
+.bs-shelf.choose { outline: 2px dashed #ff7a7a; outline-offset: 2px; border-radius: 8px; }
+.bs-mon { height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); cursor: grab; touch-action: none; min-width: 0; padding: 0 3px; }
+.bs-mon img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
+.bs-mon span { font-size: 10px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bs-mon i { font-style: normal; font-size: 9px; color: var(--muted); }
+.bs-mon.on { border-color: #f5c542; background: #26220f; }
+.bs-mon.used { opacity: .3; cursor: not-allowed; }
+.bs-mon.lift { opacity: .35; }
+.bs-ghost { position: fixed; z-index: 99999; width: 70px; transform: translate(-50%, -50%); pointer-events: none; opacity: .9; box-shadow: 0 4px 14px rgba(0, 0, 0, .5); }
+.bs-shelf-hd { margin: 8px 0 4px; }
+.bs-shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 5px; max-height: 210px; overflow-y: auto; padding: 2px; }
+
+.bs-log { margin-top: 8px; max-height: 150px; overflow-y: auto; font-size: 11px; line-height: 1.5; background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px; }
+.bs-log:empty { display: none; }
+.bs-log .mv { font-weight: 700; }
+.bs-log .good { color: var(--orange); }
+.bs-log .bad { color: var(--dim); }
+.bs-log .ft { color: var(--red); font-weight: 700; }
+.bs-log .sys { color: var(--accent); }
+.bs-log .rw { color: var(--green); font-weight: 700; }
+.bs-log .turn { color: var(--dim); font-size: 10px; margin-top: 3px; }
+
+/* 옆 칸 — 순위 · 조각 */
+.bs-side { display: flex; flex-direction: column; gap: 8px; }
+.bs-card { background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 8px 9px; }
+.bs-card .hd { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; font-size: 12px; margin-bottom: 5px; }
+.bs-card .hd span { font-size: 10px; color: var(--muted); }
+#bsRank .r { display: grid; grid-template-columns: 16px minmax(40px, 1fr) auto; gap: 6px; padding: 2px 4px; border-radius: 6px; font-size: 11.5px; }
+#bsRank .r.me { background: #26220f; }
+#bsRank .no { font-weight: 800; color: var(--muted); text-align: center; }
+#bsRank .nm { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#bsRank .v { color: var(--muted); }
+#bsRank .v i { font-style: normal; color: var(--dim); font-size: 10px; }
+#bsShards .sh-list { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+#bsShards .sh { display: flex; gap: 5px; align-items: center; background: var(--card2); border: 1px solid var(--line); border-radius: 8px; padding: 3px 7px 3px 3px; font-size: 11px; }
+#bsShards .sh.ready { border-color: #f5c542; }
+#bsShards .sh img { width: 26px; height: 26px; image-rendering: pixelated; }
+#bsShards .sh b { color: #f5c542; }
+#bsShards button { font: inherit; font-size: 10.5px; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: #f5c542; cursor: pointer; }
+#bsShards .sh-swap { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; font-size: 11px; }
+#bsShards select { font: inherit; font-size: 11px; padding: 3px 5px; border-radius: 6px; border: 1px solid var(--line); background: var(--card2); color: var(--text); max-width: 150px; }
+#bsFoot { font-size: 10px; line-height: 1.55; }
+#bsFoot .warn { color: #ffb347; }

@@ -130,10 +130,10 @@ export async function marketAction(g, action, body, meta) {
     if (l.state === "buying") return fail("다른 길드원이 사는 중입니다", 409);
     if (l.state !== "open" || Date.now() > l.expires) return fail("지금은 살 수 없는 매물입니다");
     if (l.seller === me.id || l.wallet === body.walletId) return fail("내 매물은 살 수 없습니다");
-    // 새 지갑은 이틀 뒤부터 산다 — 부계정을 만들어 바로 코인을 몰아주지 못하게(wallet.js)
+    // 새 지갑은 하루 뒤부터 산다 — 부계정을 만들어 바로 코인을 몰아주지 못하게(wallet.js)
     if (wv.canBuyAt && Date.now() < wv.canBuyAt) {
       const h = Math.ceil((wv.canBuyAt - Date.now()) / 3_600_000);
-      return fail(`새 지갑은 만든 지 이틀이 지나야 몰에서 살 수 있습니다 (${h}시간 남음). 파는 건 바로 됩니다`, 403);
+      return fail(`새 지갑은 만든 지 하루가 지나야 몰에서 살 수 있습니다 (${h}시간 남음). 파는 건 바로 됩니다`, 403);
     }
     await g.store.put(key, { ...l, state: "buying" }); // 동시에 두 사람이 사지 못하게
     const paid = await walletCall(g.env, body.walletId, "debit", { key: body.walletKey, amount: l.price, memo: "길드 몰 구매" });

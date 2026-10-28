@@ -12,6 +12,7 @@ let anchorSet = false;
 
 window.ptb.onSettings((s) => {
   ready = false;
+  $("appVer").textContent = s.version ? "v" + s.version : "";
   $("growthPct").value = s.growthPct;
   $("pricePct").value = s.pricePct;
   showGrowth(s.growthPct);

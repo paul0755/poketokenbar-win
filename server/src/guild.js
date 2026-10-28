@@ -68,12 +68,17 @@
  *   POST /guild/ABCD2345/listing   { memberId, key, listed, intro }   (길드장)
  *
  * ── 길드 몰 ── market.js
+ *
+ * ── 길드 레이드 ── raid.js
+ * 매주 전설 보스를 길드원이 함께 깎는다. 쓰러뜨리면 그 전설의 조각이 지갑에 들어간다.
+ *   POST /guild/ABCD2345/raid/start · /raid/hit
  */
 import { marketView, marketAction, returnListingsOf, listings } from "./market.js";
 import { WALLET_ID, walletCall, DECO_ITEMS, DECO_THEMES } from "./wallet.js";
 import LINES from "../../src/main/lines.json" with { type: "json" };
 import HALL from "../../src/main/hall.json" with { type: "json" };
 import { directoryCall } from "./directory.js";
+import { raidView, raidAction } from "./raid.js";
 
 const HALL_ITEMS = new Map(HALL.items.map((it) => [it.id, it]));
 
@@ -439,6 +444,7 @@ export class Guild {
       goals: await this.goals(), // { 주: { tiers, total, reached } }
       goalCoins: GOAL_COINS,
       hall: this.publicHall(await this.hall()),
+      raid: await raidView(this).catch(() => null),
       now: Date.now(),
     });
   }
@@ -447,6 +453,12 @@ export class Guild {
     const url = new URL(request.url);
     const action = url.pathname.slice(1);
     const meta = await this.store.get("meta");
+    // 목록에 올리기가 생기기 전에 만든 길드(listed 칸이 없다) — 지금 앱처럼 올린 것으로 친다. 길드장이 끌 수 있다.
+    // 다음에 누가 방을 올리면(update) 목록에 나온다
+    if (meta && meta.listed === undefined) {
+      meta.listed = true;
+      await this.store.put("meta", meta);
+    }
 
     if (request.method === "GET") {
       if (!meta) return fail("없는 길드입니다. 코드를 확인해 주세요", 404);
@@ -469,7 +481,7 @@ export class Guild {
       const wv = await walletOf(this.env, snap, body.walletKey);
       checkDeco(snap, wv);
       const me = await this.add(snap, wv);
-      const fresh = { code: str(body.code, 8), name, leader: me.memberId, created: Date.now(), listed: Boolean(body.listed), intro: str(body.intro, 60) };
+      const fresh = { code: str(body.code, 8), name, leader: me.memberId, created: Date.now(), listed: body.listed === undefined ? true : Boolean(body.listed), intro: str(body.intro, 60) }; // 옛 앱은 listed 를 안 보낸다 — 지금 앱의 기본(올리기)처럼
       await this.store.put("meta", fresh);
       await this.record(me.memberId, snap, Date.now());
       await this.publish(fresh, true);
@@ -494,6 +506,8 @@ export class Guild {
 
     const me = await this.who(body);
     if (!me) return fail("길드원 열쇠가 맞지 않습니다. 이미 나갔거나 내보내졌을 수 있습니다", 403);
+
+    if (action.startsWith("raid/")) return raidAction(this, action.slice(5), me, body);
 
     if (action === "hall/donate") {
       const it = HALL_ITEMS.get(str(body.item, 24));

@@ -245,6 +245,7 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .gd-rank .ft.dim { font-size: 9.5px; color: var(--dim); }
 .gd-share { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .gd-share input { accent-color: var(--accent); margin: 0; }
+.gd-rep select { font: inherit; font-size: 10.5px; padding: 2px 4px; border-radius: 6px; border: 1px solid var(--line); background: var(--card2); color: var(--text); max-width: 150px; }
 .gd-m .t .ld { display: inline; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 5px; background: #3a2f16; color: var(--accent); }
 
 /* 명예의 전당 */
