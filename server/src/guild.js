@@ -298,6 +298,20 @@ export class Guild {
     if (!list.length) return;
     const lead = list.find((m) => m.id === meta.leader);
     const h = await this.hall();
+    // 길드 랭킹 — 최근 두 주의 합계 · 쓴 사람 수 · 목표 진행(🥇 목표 대비 천분율)
+    const weeks = {};
+    const wks = [...(await this.store.list({ prefix: "wk:" })).values()].sort((a, b) => (a.key < b.key ? 1 : -1)).slice(0, 2);
+    for (const wk of wks) {
+      const total = sumWeek(wk);
+      const g = await this.goalFor(wk.key);
+      const gold = g ? g.tiers[g.tiers.length - 1] : 0;
+      weeks[wk.key] = {
+        total,
+        people: Object.values(wk.rows || {}).filter((r) => r.week > 0).length,
+        reached: g ? g.tiers.filter((t) => total >= t).length : 0,
+        gp: gold ? Math.min(9999, Math.round((total / gold) * 1000)) : 0,
+      };
+    }
     await directoryCall(this.env, "put", {
       code: meta.code,
       name: meta.name,
@@ -308,6 +322,7 @@ export class Guild {
       active: list.filter((m) => now - m.updated < 7 * DAY_MS).length, // 이번 주(7일) 안에 방을 올린 사람
       hall: h.owned.length,
       at: Math.max(...list.map((m) => m.updated)),
+      weeks,
     });
     const cur = await this.store.get("meta");
     if (!cur) return;

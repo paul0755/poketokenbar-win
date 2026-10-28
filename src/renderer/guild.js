@@ -140,14 +140,20 @@
 
   /* ---------------- 내 방 · 길드 바꾸기 ---------------- */
 
+  /** 내 방 · 길드 · 길드 목록 */
+  function setView(v) {
+    view = v;
+    for (const x of $("rmSwitch").querySelectorAll("button")) x.classList.toggle("on", x.dataset.view === v);
+    $("rmMineView").hidden = v !== "mine";
+    $("gdView").hidden = v !== "guild";
+    $("gdListView").hidden = v !== "list";
+    $("rmSwitch").querySelector(".c").hidden = v !== "mine"; // "포켓몬을 누르면 깡충"은 내 방 이야기
+    if (v === "guild") show(true);
+    if (v === "list") loadList();
+  }
   $("rmSwitch").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-view]");
-    if (!b) return;
-    view = b.dataset.view;
-    for (const x of $("rmSwitch").querySelectorAll("button")) x.classList.toggle("on", x === b);
-    $("rmMineView").hidden = view !== "mine";
-    $("gdView").hidden = view !== "guild";
-    if (view === "guild") show(true);
+    if (b) setView(b.dataset.view);
   });
 
   /** 지금 상태에 맞는 칸만 보인다. fetch 면 길드를 다시 받아 온다 */
@@ -162,7 +168,6 @@
     $("gdIn").hidden = !(online && g && !g.gone);
     if (g && g.gone) $("gdGoneMsg").textContent = g.gone;
     if (online && !g && !$("gdTrainer").value) $("gdTrainer").value = (s.friend && s.friend.trainer) || "";
-    if (online && !g && fetch) loadList(); // 길드가 없으면 목록부터 보여 준다
     if (online && g && !g.gone) {
       $("gdTitle").textContent = g.name;
       $("gdCopy").textContent = "GLD-" + g.code;
@@ -334,53 +339,59 @@
     if (done(r)) load();
   });
 
-  /* ---------------- 길드 목록 ---------------- */
+  /* ---------------- 길드 목록 (📋 길드 목록 탭) ---------------- */
 
   let found = null; // 마지막으로 받은 목록 { guilds, at }
+  let ranked = null; // 마지막으로 받은 길드 랭킹 { week, prev, guilds, at }
   let finding = false;
+  // 목록 · 랭킹, 랭킹은 어느 주 · 무슨 기준
+  const look = { mode: "list", week: "cur", by: "total" };
 
   /** 지금 들어가 있는 길드 코드 — 없으면 null */
   const myCode = () => (last && last.guild && !last.guild.gone ? last.guild.code : null);
-  /** 목록 칸 둘 — 길드가 없을 때(gdList)와 길드 안에서 둘러볼 때(gdBrowseList) */
-  const listBoxes = () => [$("gdList"), $("gdBrowseList")];
 
-  /** 목록을 받아 온다. 1분 안에 받은 게 있으면 그대로 쓴다(force 면 다시) */
+  /** 목록이나 랭킹을 받아 온다. 1분 안에 받은 게 있으면 그대로 쓴다(force 면 다시) */
   async function loadList(force = false) {
     if (finding) return;
-    if (!force && found && Date.now() - found.at < 60_000) return renderList();
+    const rank = look.mode === "rank";
+    if (!force && (rank ? ranked : found) && Date.now() - (rank ? ranked : found).at < 60_000) return renderList();
     finding = true;
-    $("gdFindRe").disabled = $("gdBrowseRe").disabled = true;
-    if (!found) for (const el of listBoxes()) el.innerHTML = '<div class="empty">길드 목록을 불러오는 중…</div>';
+    $("gdFindRe").disabled = true;
+    if (!(rank ? ranked : found)) $("gdList").innerHTML = `<div class="empty">${rank ? "길드 랭킹" : "길드 목록"}을 불러오는 중…</div>`;
     try {
-      const r = await window.ptb.guildList();
+      const r = await (rank ? window.ptb.guildRank() : window.ptb.guildList());
       if (!r || !r.ok) {
-        found = null;
-        for (const el of listBoxes()) el.innerHTML = `<div class="empty">${esc((r && r.reason) || "길드 목록을 불러오지 못했습니다")}</div>`;
+        if (rank) ranked = null; else found = null;
+        $("gdList").innerHTML = `<div class="empty">${esc((r && r.reason) || (rank ? "길드 랭킹을 불러오지 못했습니다" : "길드 목록을 불러오지 못했습니다"))}</div>`;
         return;
       }
-      found = { guilds: r.guilds, at: Date.now() };
-      renderList();
+      if (rank) ranked = { ...r, at: Date.now() };
+      else found = { guilds: r.guilds, at: Date.now() };
+      if (look.mode === (rank ? "rank" : "list")) renderList(); // 받는 사이 바꿨으면 그쪽이 그린다
     } finally {
       finding = false;
-      $("gdFindRe").disabled = $("gdBrowseRe").disabled = false;
+      $("gdFindRe").disabled = false;
+      if (look.mode !== (rank ? "rank" : "list")) loadList();
     }
   }
 
   function renderList() {
-    if (!found) return;
+    syncView();
     const mine = myCode();
-    $("gdList").innerHTML = listHtml($("gdFindQ").value, null, '아직 목록에 올라온 길드가 없습니다.<br>아래에서 길드를 만들어 첫 길드가 되어 보세요');
-    $("gdBrowseList").innerHTML = listHtml($("gdBrowseQ").value, mine, "아직 목록에 올라온 길드가 없습니다");
-    // 길드 안에서 — 다른 길드는 나간 뒤에 들어간다. 내 길드가 목록에 없으면 그것도 알린다
-    const listed = mine && found.guilds.some((x) => x.code === mine);
-    $("gdBrowseNote").innerHTML = `한 번에 한 길드에만 있을 수 있어서, 다른 길드에는 <b>지금 길드를 나간 뒤</b> 들어갈 수 있습니다.${
-      mine && !listed ? ` 내 길드는 목록에 없습니다${guild && guild.leader ? " — 아래 📋 길드 목록에 올리기로 올릴 수 있습니다" : "(코드를 아는 사람만 들어옵니다)"}.` : ""}`;
+    $("gdListNote").innerHTML = mine ? "한 번에 한 길드에만 있을 수 있어서, 다른 길드에는 <b>지금 길드를 나간 뒤</b> 들어갈 수 있습니다." : "";
+    if (look.mode === "rank") return renderRank();
+    if (!found) return;
+    $("gdList").innerHTML = listHtml($("gdFindQ").value, mine);
+    // 내 길드가 목록에 없으면 그것도 알린다
+    if (mine && !found.guilds.some((x) => x.code === mine)) {
+      $("gdListNote").innerHTML += ` 내 길드는 목록에 없습니다${last.guild.leader ? " — 🏰 길드 탭 아래 📋 길드 목록에 올리기로 올릴 수 있습니다" : "(코드를 아는 사람만 들어옵니다)"}.`;
+    }
   }
 
   /** 목록 줄들. mine 이 있으면(길드 안) 그 길드에 "내 길드"를 달고, 다른 길드는 들어가기 대신 "나간 뒤" 안내 */
-  function listHtml(query, mine, emptyMsg) {
+  function listHtml(query, mine) {
     const q = query.trim().toLowerCase();
-    if (!found.guilds.length) return `<div class="empty">${emptyMsg}</div>`;
+    if (!found.guilds.length) return `<div class="empty">아직 목록에 올라온 길드가 없습니다${mine ? "" : ".<br>🏰 길드 탭에서 길드를 만들어 첫 길드가 되어 보세요"}</div>`;
     const list = found.guilds.filter((x) => !q || (x.name + " " + (x.intro || "") + " " + (x.leader || "")).toLowerCase().includes(q));
     if (!list.length) return `<div class="empty">"${esc(q)}"(이)가 들어간 길드가 없습니다</div>`;
     return list.map((x) => {
@@ -400,42 +411,115 @@
     }).join("");
   }
 
-  // 길드 안에서 둘러보기 — 열고 닫기
-  const browse = (on) => {
-    $("gdBrowse").hidden = !on;
-    $("gdBrowseBtn").classList.toggle("on", on);
-    if (!on) return;
-    loadList();
-    $("gdBrowse").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  /* ---------------- 길드 랭킹 ---------------- */
+
+  const RANK_SHOW = 30; // 찾지 않을 때 보여 주는 순위 — 내 길드가 그 밖이면 맨 아래에 따로
+  const RANK_NOTE = {
+    total: "순위를 공개한 길드원의 토큰 합계입니다",
+    per: "합계 ÷ 그 주에 쓴 사람 수 — 쓴 사람이 3명 이상인 길드만 겨룹니다",
+    goal: "길드마다 자기 최근 4주 평균으로 정한 🥇 목표에 얼마나 다가갔나 — 작은 길드도 겨룰 수 있습니다",
   };
-  $("gdBrowseBtn").onclick = () => browse($("gdBrowse").hidden);
-  $("gdBrowseNo").onclick = () => browse(false);
-  $("gdBrowseRe").onclick = () => loadList(true);
-  $("gdBrowseQ").addEventListener("input", () => renderList());
-  $("gdBrowseList").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-later]");
+
+  /** 단추들을 보기에 맞춘다 */
+  function syncView() {
+    const box = $("gdListView");
+    for (const b of box.querySelectorAll("[data-mode]")) b.classList.toggle("on", b.dataset.mode === look.mode);
+    for (const seg of box.querySelectorAll(".gd-rkbar .gd-seg")) for (const b of seg.children) b.classList.toggle("on", b.dataset.v === look[seg.dataset.k]);
+    box.querySelector(".gd-rkbar").hidden = look.mode !== "rank";
+    box.querySelector(".gd-rknote").textContent = "";
+  }
+
+  /** 그 주 · 그 기준으로 줄 세운 길드. 같은 값이면 같은 순위 */
+  function rankRows() {
+    const per = look.by === "per";
+    const rows = ranked.guilds
+      .map((g) => ({ g, w: g[look.week] }))
+      .filter(({ w }) => w && (!per || w.people >= 3))
+      .map((x) => ({ ...x, v: look.by === "total" ? x.w.total : per ? x.w.total / x.w.people : x.w.reached * 10000 + x.w.gp }))
+      .sort((a, b) => b.v - a.v || b.w.total - a.w.total); // 목표가 같으면 합계가 큰 쪽
+    rows.forEach((x, i) => { const p = rows[i - 1]; x.no = p && x.v === p.v && x.w.total === p.w.total ? p.no : i + 1; });
+    return rows;
+  }
+
+  function renderRank() {
+    if (!ranked) return;
+    const mine = myCode();
+    $("gdList").innerHTML = rankHtml($("gdFindQ").value, mine);
+    // 내 길드가 랭킹에 없으면 왜 없는지
+    const where = mine && ranked.guilds.find((x) => x.code === mine);
+    const w = where && where[look.week];
+    const label = look.week === "prev" ? "지난주" : "이번 주";
+    const why = !mine ? ""
+      : !where ? " 내 길드는 랭킹에 없습니다 — 📋 길드 목록에 올리고, 토큰을 쓴 기록이 있어야 나옵니다(방을 올리면 10분쯤 뒤)."
+      : !w ? ` 내 길드는 ${label} 기록이 없습니다.`
+      : look.by === "per" && w.people < 3 ? " 내 길드는 쓴 사람이 3명이 안 돼 1인당 순위에 없습니다." : "";
+    $("gdListView").querySelector(".gd-rknote").textContent = `${RANK_NOTE[look.by]}. 목록에 올린 길드끼리 겨루고, 10분쯤 늦게 바뀝니다.${look.week === "prev" ? " 👑 지난주 1위." : ""}${why}`;
+  }
+
+  function rankHtml(query, mine) {
+    const q = query.trim().toLowerCase();
+    const all = rankRows();
+    const label = look.week === "prev" ? "지난주" : "이번 주";
+    if (!all.length) return `<div class="empty">${label} 기록이 있는 길드가 아직 없습니다${look.by === "per" ? "<br>1인당은 쓴 사람이 3명 이상인 길드만 겨룹니다" : ""}</div>`;
+    const list = q ? all.filter((x) => x.g.name.toLowerCase().includes(q)) : all.slice(0, RANK_SHOW);
+    if (!list.length) return `<div class="empty">"${esc(q)}"(이)가 들어간 길드가 ${label} 순위에 없습니다</div>`;
+    const at = mine ? all.findIndex((x) => x.g.code === mine) : -1;
+    const tail = !q && at >= RANK_SHOW ? all[at] : null;
+    const row = ({ g, w, no }) => {
+      const me = mine && g.code === mine;
+      const badge = no === 1 && look.week === "prev" ? "👑" : no;
+      const val = look.by === "total" ? `${fmt(w.total)}<small>쓴 사람 ${w.people}명</small>`
+        : look.by === "per" ? `${fmt(Math.round(w.total / w.people))}<small>1인당 · ${w.people}명</small>`
+        : `${w.reached ? MEDAL[w.reached - 1] + " " : ""}${w.gp >= 9999 ? "999%+" : (w.gp / 10).toFixed(w.gp < 1000 ? 1 : 0) + "%"}<small>🥇 목표의</small>`;
+      return `<div class="g${me ? " mine" : ""}">
+        <span class="no${no <= 3 ? " top" : ""}">${badge}</span>
+        <div class="tx"><div class="nm">${esc(g.name)}${me ? '<i class="tag">내 길드</i>' : ""}<span>👥 ${g.members}/${g.max}</span></div></div>
+        <span class="val">${val}</span>
+      </div>`;
+    };
+    return list.map(row).join("") + (tail ? '<div class="gap">⋮</div>' + row(tail) : "");
+  }
+
+  // [목록 | 🏆 랭킹] · 이번 주/지난주 · 기준
+  $("gdListView").addEventListener("click", (e) => {
+    const b = e.target.closest(".gd-seg button");
     if (!b) return;
-    const name = b.closest("[data-name]").dataset.name;
-    toast(`"${name}"에 들어가려면 먼저 지금 길드를 나가 주세요 — 한 번에 한 길드에만 있을 수 있습니다`, "bad");
+    if (b.dataset.mode) {
+      if (look.mode === b.dataset.mode) return;
+      look.mode = b.dataset.mode;
+      syncView();
+      return loadList();
+    }
+    look[b.parentElement.dataset.k] = b.dataset.v;
+    renderList();
   });
 
   $("gdList").addEventListener("click", async (e) => {
+    const later = e.target.closest("button[data-later]");
+    if (later) {
+      const name = later.closest("[data-name]").dataset.name;
+      return toast(`"${name}"에 들어가려면 먼저 지금 길드를 나가 주세요 — 한 번에 한 길드에만 있을 수 있습니다`, "bad");
+    }
     const b = e.target.closest("button[data-join]");
     if (!b || b.disabled) return;
     const row = b.closest("[data-code]");
-    if (!$("gdTrainer").value.trim()) {
-      toast("먼저 위에 트레이너 이름을 넣어 주세요", "bad");
+    // 트레이너 이름은 🏰 길드 탭의 칸 — 비었으면 친선 배틀에 쓰는 이름
+    const trainer = $("gdTrainer").value.trim() || (last && last.friend && last.friend.trainer) || "";
+    if (!trainer) {
+      toast("먼저 🏰 길드 탭에서 트레이너 이름을 넣어 주세요", "bad");
+      setView("guild");
       $("gdTrainer").focus();
       return;
     }
     b.disabled = true;
-    const r = await window.ptb.guildJoin({ code: row.dataset.code, trainer: $("gdTrainer").value });
+    const r = await window.ptb.guildJoin({ code: row.dataset.code, trainer });
     b.disabled = false;
-    if (done(r)) { guild = null; visiting = null; found = null; }
+    if (done(r)) { guild = null; visiting = null; found = null; ranked = null; setView("guild"); }
     else loadList(true); // 그 사이 꽉 찼거나 없어졌을 수 있다
   });
   $("gdFindQ").addEventListener("input", () => renderList());
   $("gdFindRe").onclick = () => loadList(true);
+  $("gdGoList").onclick = () => setView("list");
 
   /** 들어간 길드 — 길드장만 목록에 올리기 · 소개를 바꾼다 */
   function renderListing(g) {
@@ -444,7 +528,7 @@
     $("gdListed").checked = g.listed;
     if (document.activeElement !== $("gdIntro")) $("gdIntro").value = g.intro || "";
     $("gdListingNote").textContent = g.listed
-      ? "목록에 올라 있습니다 — 코드를 몰라도 누구나 목록에서 찾아 들어옵니다. 낯선 길드원은 내보낼 수 있습니다"
+      ? "목록에 올라 있습니다 — 코드를 몰라도 누구나 목록에서 찾아 들어오고, 🏆 길드 랭킹에 길드 합계가 나옵니다. 낯선 길드원은 내보낼 수 있습니다"
       : "목록에 없습니다 — 길드 코드를 아는 사람만 들어옵니다";
   }
   const saveListing = async () => {
@@ -455,7 +539,7 @@
       guild.listed = r.listed;
       guild.intro = r.intro;
       renderListing(guild);
-      if (!$("gdBrowse").hidden) loadList(true); // 둘러보는 중이면 내 길드 줄도 바로 바뀐다
+      found = ranked = null; // 목록 탭의 내 길드 줄도 다음에 볼 때 바뀐다
     }
     else if (guild) renderListing(guild);
   };
@@ -582,7 +666,8 @@
     last = s;
     const now = s.guild ? s.guild.code + (s.guild.gone || "") : "";
     const moved = before !== now; // 들어가거나 나갔다 — 나갔으면 길드 목록을 다시 받는다
-    if (moved) { guild = null; visiting = null; found = null; $("gdBrowse").hidden = true; $("gdBrowseBtn").classList.remove("on"); }
+    if (moved) { guild = null; visiting = null; found = null; ranked = null; }
     if (view === "guild") show(moved);
+    if (view === "list" && moved) loadList(true);
   });
 })();

@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld("ptb", {
   guildShare: (on) => ipcRenderer.invoke("guild-share", on),
   guildRename: (trainer) => ipcRenderer.invoke("guild-rename", trainer),
   guildList: () => ipcRenderer.invoke("guild-list"),
+  guildRank: () => ipcRenderer.invoke("guild-rank"),
   guildListing: (a) => ipcRenderer.invoke("guild-listing", a),
   hallDonate: (a) => ipcRenderer.invoke("hall-donate", a),
   hallTheme: (theme) => ipcRenderer.invoke("hall-theme", theme),

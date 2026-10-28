@@ -13,6 +13,7 @@
  *   GET /room/123456?role=host|guest   (웹소켓)  방 만들기 / 참가
  *   /guild/…                  길드 (guild.js) · 길드 몰 (market.js) — 이쪽은 저장한다
  *   GET /guilds               목록에 올린 길드 (directory.js)
+ *   GET /guilds/rank?week=…   길드 랭킹 — 그 주와 지난주 (directory.js)
  *   /wallet/…                 코인 지갑 (wallet.js)
  */
 import { guildRoute } from "./guild.js";
@@ -32,6 +33,15 @@ export default {
       if (request.method !== "GET") return new Response("GET only", { status: 405 });
       const r = await directoryCall(env, "list");
       return new Response(JSON.stringify(r), { status: r.ok ? 200 : 503, headers: { "content-type": "application/json; charset=utf-8" } });
+    }
+    if (url.pathname === "/guilds/rank") {
+      if (request.method !== "GET") return new Response("GET only", { status: 405 });
+      // 앱 PC 의 이번 주 월요일 — 서버 시각과 8일 넘게 다르면 받지 않는다
+      const week = url.searchParams.get("week") || "";
+      const t = Date.parse(week + "T00:00:00Z");
+      const ok = /^\d{4}-\d{2}-\d{2}$/.test(week) && new Date(t).getUTCDay() === 1 && Math.abs(Date.now() - t) < 8 * 86_400_000;
+      const r = ok ? await directoryCall(env, "rank?week=" + week) : { ok: false, reason: "주가 맞지 않습니다. PC 시계를 확인해 주세요" };
+      return new Response(JSON.stringify(r), { status: r.ok ? 200 : ok ? 503 : 400, headers: { "content-type": "application/json; charset=utf-8" } });
     }
     const g = /^\/guild(?:\/([A-HJ-NP-Z2-9]{8}))?(?:\/(join|update|leave|kick|disband|listing|market(?:\/(?:list|buy|cancel))?|hall\/(?:donate|theme)))?$/.exec(url.pathname);
     if (g) return guildRoute(request, env, g[1], g[2]);

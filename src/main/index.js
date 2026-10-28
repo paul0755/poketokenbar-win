@@ -676,6 +676,16 @@ async function guildList() {
   return { ok: true, guilds: r.guilds || [], now: r.now || Date.now() };
 }
 
+/**
+ * 길드 랭킹 — 목록에 올린 길드끼리, 내 PC 의 이번 주와 지난주(server/src/directory.js).
+ * 길드마다 합계 · 쓴 사람 수 · 목표 진행만 온다. 줄 세우는 기준은 화면이 고른다
+ */
+async function guildRank() {
+  const r = await serverCall("/guilds/rank?week=" + localMonday());
+  if (!r.ok) return { ok: false, reason: r.offline || r.status === 400 ? r.reason : "길드 랭킹을 불러오지 못했습니다" };
+  return { ok: true, week: r.week, prev: r.prev, guilds: r.guilds || [] };
+}
+
 /** 내 길드를 목록에 올리기 · 내리기, 소개 글 — 길드장만 */
 async function guildListing({ listed, intro } = {}) {
   const g = save.guild;
@@ -3609,6 +3619,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("guild-share", (_e, on) => guildShare(on));
   ipcMain.handle("guild-rename", (_e, trainer) => guildRename(trainer));
   ipcMain.handle("guild-list", () => guildList());
+  ipcMain.handle("guild-rank", () => guildRank());
   ipcMain.handle("guild-listing", (_e, a) => guildListing(a));
   ipcMain.handle("hall-donate", (_e, a) => hallDonate(a));
   ipcMain.handle("hall-theme", (_e, theme) => hallTheme(theme));

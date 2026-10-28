@@ -550,6 +550,7 @@
     <div class="rm-switch" id="rmSwitch">
       <button data-view="mine" class="on">🏠 내 방</button>
       <button data-view="guild">🏰 길드</button>
+      <button data-view="list">📋 길드 목록</button>
       <span class="c">포켓몬을 누르면 깡충 · 이름표</span>
     </div>
     <div id="rmMineView">
@@ -579,6 +580,17 @@
     </div>
     </div>
 
+    <!-- 길드 목록 (guild.js) — 목록에 올린 길드 · 길드 랭킹 -->
+    <div id="gdListView" hidden>
+      <div class="gd-box gd-find">
+        <div class="hd"><b>📋 길드 목록</b><span class="gd-seg"><button data-mode="list" class="on">목록</button><button data-mode="rank">🏆 랭킹</button></span><span class="sp"></span><input class="gd-in" id="gdFindQ" maxlength="20" placeholder="이름 · 소개로 찾기" /><button class="mini2" id="gdFindRe" title="다시 불러오기">↻</button></div>
+        <div class="sub" id="gdListNote"></div>
+        <div class="gd-rkbar" hidden><span class="gd-seg" data-k="week"><button data-v="cur" class="on">이번 주</button><button data-v="prev">지난주</button></span><span class="gd-seg" data-k="by"><button data-v="total" class="on">합계</button><button data-v="per">1인당</button><button data-v="goal">🎯 목표</button></span></div>
+        <div class="sub gd-rknote"></div>
+        <div class="gd-list" id="gdList"></div>
+      </div>
+    </div>
+
     <!-- 길드 (guild.js) — 길드원의 방 구경 · 길드원과 결투 -->
     <div id="gdView" hidden>
       <div class="gd-box" id="gdOff" hidden>
@@ -598,14 +610,14 @@
           <b>트레이너 이름</b>
           <input class="gd-in" id="gdTrainer" maxlength="16" placeholder="길드원에게 보일 이름" />
         </div>
-        <div class="gd-box gd-find">
-          <div class="hd"><b>🔎 길드 찾기</b><span class="sp"></span><input class="gd-in" id="gdFindQ" maxlength="20" placeholder="이름 · 소개로 찾기" /><button class="mini2" id="gdFindRe" title="다시 불러오기">↻</button></div>
-          <div class="gd-list" id="gdList"></div>
+        <div class="gd-box">
+          <b>🔎 길드 찾기</b>
+          <div class="gd-row"><span class="gd-go">목록에 올라온 길드를 골라 코드 없이 들어갑니다</span><button class="mini2" id="gdGoList">📋 길드 목록 보기</button></div>
         </div>
         <div class="gd-box">
           <b>길드 만들기</b>
           <div class="gd-row"><input class="gd-in" id="gdName" maxlength="20" placeholder="길드 이름" /><button class="mini2" id="gdCreate">만들기</button></div>
-          <label class="gd-share gd-pub"><input type="checkbox" id="gdPublic" checked /> 길드 목록에 올리기 — 누구나 목록에서 찾아 들어올 수 있습니다(나중에 바꿀 수 있음)</label>
+          <label class="gd-share gd-pub"><input type="checkbox" id="gdPublic" checked /> 길드 목록에 올리기 — 누구나 목록에서 찾아 들어오고, 🏆 랭킹에 길드 합계가 나옵니다(나중에 바꿀 수 있음)</label>
         </div>
         <div class="gd-box">
           <b>코드로 들어가기</b>
@@ -630,14 +642,8 @@
           <button class="mini2" id="gdRefresh">↻ 새로고침</button>
           <label class="gd-share" title="이번 주·오늘 토큰 합계와 그중 버닝타임 몫만 올라갑니다. 기록(로그)은 보내지 않습니다"><input type="checkbox" id="gdShare" /> 내 토큰 합계 공개</label>
           <span class="sp"></span>
-          <button class="mini2" id="gdBrowseBtn">🔎 다른 길드 보기</button>
           <button class="mini2" id="gdRename">✏️ 내 이름</button>
           <button class="mini2 del" id="gdLeave">길드 나가기</button>
-        </div>
-        <div class="gd-box gd-find" id="gdBrowse" hidden>
-          <div class="hd"><b>🔎 길드 목록</b><span class="sp"></span><input class="gd-in" id="gdBrowseQ" maxlength="20" placeholder="이름 · 소개로 찾기" /><button class="mini2" id="gdBrowseRe" title="다시 불러오기">↻</button><button class="mini2" id="gdBrowseNo" title="닫기">✕</button></div>
-          <div class="sub" id="gdBrowseNote"></div>
-          <div class="gd-list" id="gdBrowseList"></div>
         </div>
         <div class="gd-box gd-listing" id="gdListing" hidden>
           <label class="gd-share"><input type="checkbox" id="gdListed" /> <b>📋 길드 목록에 올리기</b></label>

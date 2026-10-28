@@ -164,6 +164,19 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .gd-find > .sub:empty { display: none; }
 .gd-find > .sub b { display: inline; margin: 0; font-size: inherit; color: var(--text); }
 .gd-share.gd-pub { white-space: normal; }
+/* 길드 랭킹 — [목록 | 🏆 랭킹], 이번 주 · 지난주, 합계 · 1인당 · 목표 */
+.gd-seg { display: inline-flex; flex: none; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.gd-seg button { background: none; border: 0; color: var(--muted); font: inherit; font-size: 10px; padding: 3px 9px; cursor: pointer; white-space: nowrap; }
+.gd-seg button.on { background: var(--accent); color: #14151a; font-weight: 700; }
+.gd-rkbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 7px; }
+.gd-rkbar[hidden] { display: none; }
+#gdListView .gd-list { max-height: none; } /* 목록 탭은 칸 하나라 길게 둔다 */
+.gd-go { flex: 1; font-size: 10.5px; color: var(--muted); }
+.gd-list .g .no { flex: none; width: 24px; text-align: center; font-weight: 800; font-size: 12px; color: var(--muted); }
+.gd-list .g .no.top { color: var(--text); font-size: 15px; }
+.gd-list .g .val { flex: none; text-align: right; font-weight: 700; font-size: 12px; }
+.gd-list .g .val small { display: block; font-weight: 400; color: var(--muted); font-size: 9.5px; }
+.gd-list .gap { color: var(--dim); text-align: center; font-size: 10px; line-height: 1; }
 .gd-list .empty { color: var(--muted); font-size: 10.5px; padding: 10px 2px; text-align: center; line-height: 1.6; }
 .gd-pub { margin-top: 7px; }
 .gd-listing .gd-share { margin-bottom: 6px; color: var(--text); }

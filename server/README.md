@@ -57,6 +57,7 @@ npm run deploy       # https://poketokenbar-relay.<계정>.workers.dev
 | `POST /guild/ABCD2345/disband` | `{ memberId, key }` | 길드장만 — 길드를 통째로 지운다 |
 | `POST /guild/ABCD2345/listing` | `{ memberId, key, listed, intro }` | 길드장만 — 길드 목록에 올리기 · 내리기, 한 줄 소개(60자) |
 | `GET /guilds` | | 길드 목록 `{ guilds: [{ code, name, intro, members, max, leader, active, hall, at }] }` — 아래 |
+| `GET /guilds/rank?week=2026-10-26` | | 길드 랭킹 — 그 주(앱 PC 의 월요일)와 지난주 `{ week, prev, guilds: [{ code, name, members, max, cur, prev }] }` — 아래 |
 
 - `member`(방 사진) — `{ trainer, theme, furni[], statue, pos, mons[{ line, dexId, name, shiny, stage, level }], dex{seen,total}, graduated, lastGrad, wins, team, usage }`.
   `statue` 는 전설 석상의 모델(도감 번호) — 전설 · 환상이 아니면 버립니다. `pos` 는 끌어 옮긴 가구 자리 `{ id: [x, y] }`(그림 좌표 320×200).
@@ -76,7 +77,8 @@ npm run deploy       # https://poketokenbar-relay.<계정>.workers.dev
 
 길드장이 목록에 올린 길드의 요약만 모아 두는 Durable Object 하나(`DIRECTORY`, 이름 `all`). 길드 객체만 부르고
 밖에서는 `GET /guilds` 로 보기만 됩니다. 요약은 이름 · 소개 · 코드 · 인원 · 길드장 트레이너 이름 · 이번 주(7일)
-방을 올린 인원(`active`) · 홀 장식 수 · 마지막으로 움직인 때(`at`) — 길드원의 방 사진이나 토큰 합계는 오지 않습니다.
+방을 올린 인원(`active`) · 홀 장식 수 · 마지막으로 움직인 때(`at`), 그리고 길드 랭킹용 최근 두 주의 `weeks` —
+길드원 한 사람 한 사람의 방 사진이나 토큰 합계는 오지 않습니다.
 
 - 길드원이 들고 나거나 길드장이 설정을 바꾸면 바로, 방을 올릴 때는 10분에 한 번 요약을 고칩니다
 - 끄거나, 마지막 사람이 나가거나, 길드를 없애면 내립니다
@@ -84,6 +86,11 @@ npm run deploy       # https://poketokenbar-relay.<계정>.workers.dev
   500개를 넘으면 가장 오래 조용한 길드부터 내립니다
 - 이 기능이 생긴 뒤 처음 배포할 때 마이그레이션 `v4`(Directory)가 같이 적용됩니다. 기존 길드는 길드장이 켤 때까지
   목록에 오르지 않습니다
+- **길드 랭킹** — 길드가 요약과 함께 최근 두 주의 `weeks: { 주: { total, people, reached, gp } }` 를 보냅니다.
+  `total` 은 그 주 길드 합계(공개한 길드원만), `people` 은 그 주에 쓴 사람 수, `reached` 는 이룬 목표 수(0~3),
+  `gp` 는 🥇 목표 대비 천분율(9999 까지). `GET /guilds/rank?week=` 는 그 주와 7일 앞 주를 `cur` · `prev` 로 돌려주고,
+  둘 다 없는 길드는 뺍니다. `week` 는 월요일이고 서버 시각과 8일 안이어야 합니다(아니면 400).
+  어떤 기준으로 줄 세울지(합계 · 1인당 · 목표)는 앱이 고릅니다. 코인 보상은 없습니다
 
 ## 코인 지갑 (HTTP, JSON) — `src/wallet.js`
 
