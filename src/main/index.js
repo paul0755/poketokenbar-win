@@ -1029,7 +1029,8 @@ async function raidAttack(monId) {
 /** 내 아이가 쓰러진 뒤 — 다음 아이를 내보낸다. monId 가 없으면 그만한다 */
 async function raidNext(monId) {
   const L = raidLive;
-  if (!L) return { ok: false, reason: "싸우고 있는 레이드가 없습니다" };
+  // 고르지 않은 채 RAID_IDLE_MS 가 지나면 메인이 그대로 끝내 둔다(깎은 만큼은 이미 서버에 알렸다)
+  if (!L) return { ok: false, over: true, reason: "다음 포켓몬을 고르지 않은 채 5분이 지나 이 도전은 끝났습니다. 깎은 만큼은 기록됐습니다" };
   if (!monId) {
     L.b.stop();
     return raidPack(L, L.b.step());

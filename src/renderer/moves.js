@@ -826,5 +826,6 @@
 
   // 펫 창은 창 전체가 무대다. 결투 화면은 create(칸) 으로 따로 만든다
   const main = create(document.body);
-  window.ptbMoves = { play: main.play, create, sigOf, SIGS, DURATION };
+  // fxOf — 타입의 입자 색(레이드 방 연출 raidfx.js 가 같은 색을 쓴다)
+  window.ptbMoves = { play: main.play, create, sigOf, SIGS, DURATION, fxOf: (k) => FX[k] || DEFAULT_FX };
 })();

@@ -5,7 +5,8 @@
  * 길드원마다 한 마리씩 나간다. 선반(내 박스)에서 아이를 끌어 보스 위에 놓으면(또는 골라 두고 ⚔️ 도전)
  * 모두가 한꺼번에 보스와 싸운다. 내 아이가 쓰러지면 판이 멈추고, 선반에서 다음 아이를 골라 내보내면
  * 이어서 싸운다(한 도전에 limit 마리까지). 결과는 메인이 토막마다 계산해 둔다(main/raidbattle.js) — 여기서는
- * 그 사건 목록을 아이들이 돌아다니며 달려드는 모습으로 재생만 한다. 건너뛰어도 결과는 같다.
+ * 그 사건 목록을 아이들이 돌아다니며 기술을 쓰는 모습으로 재생만 한다. 기술 연출은 펫 · 결투 탭과 같은
+ * moves.js — 아이마다 작은 무대를 하나씩 붙인다. 건너뛰어도 결과는 같다.
  *
  * 서버와 이야기하는 건 메인(index.js 길드 레이드 칸)이 한다.
  */
@@ -82,7 +83,8 @@
     const el = document.createElement("div");
     el.className = "bs-a" + (me ? " me" : "");
     el.dataset.key = key;
-    el.innerHTML = `<img alt="" draggable="false" /><span class="tg"></span><span class="hp"><i></i></span><span class="st"></span>`;
+    // fxs — 기술 연출 무대(moves.js). bd — 기술을 쓸 때 움직이는 몸(그림은 오른쪽을 보게 뒤집혀 있다)
+    el.innerHTML = `<div class="fxs"></div><span class="bd"><img alt="" draggable="false" /></span><span class="tg"></span><span class="hp"><i></i></span><span class="st"></span>`;
     el.querySelector("img").src = url || "";
     el.querySelector(".tg").textContent = tag;
     $("bsActors").appendChild(el);
@@ -347,6 +349,7 @@
         const n = await window.ptb.raidNext(id);
         if (!n || !n.ok) {
           toast((n && n.reason) || "내보내지 못했습니다", "bad");
+          if (n && n.over) return; // 이미 끝난 도전 — 다시 부를 것 없다
           if (n && /이미 나갔던|골라 주세요/.test(n.reason || "")) continue; // 다시 고른다
           r = await window.ptb.raidNext(null); // 그만한다
           if (!r || !r.ok) return;
@@ -394,6 +397,35 @@
     setTimeout(() => p.remove(), 900);
   }
   const blink = (el) => { el.classList.remove("hit"); void el.offsetWidth; el.classList.add("hit"); };
+
+  /**
+   * 기술 연출 — 아이는 오른쪽(보스 쪽), 보스는 왼쪽을 보고 쓴다. 몸 둘레는 moves.js 가,
+   * 보스까지 날아가 맞는 데는 방 전체 캔버스(raidfx.js)가 그린다. targets — 보스가 때리는 아이들의 자리
+   */
+  let bossFx = null;
+  let roomFx = null;
+  /** 요소의 한 점을 방 좌표로 — fx · fy 는 그 요소 안의 비율 */
+  function roomPt(el, fx = 0.5, fy = 0.5) {
+    const R = $("bsRoom").getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    return { x: r.left - R.left + r.width * fx, y: r.top - R.top + r.height * fy };
+  }
+  function skill(a, move, targets = []) {
+    if (fast || !window.ptbMoves) return;
+    const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduce && window.ptbRaidFx) roomFx = roomFx || window.ptbRaidFx.create($("bsFx"), $("bsRoom"));
+    const colors = window.ptbMoves.fxOf ? window.ptbMoves.fxOf(move.typeKey).c : ["#ffffff"];
+    if (!a) {
+      bossFx = bossFx || window.ptbMoves.create($("bsBossFx"));
+      bossFx.play(move, { body: $("bsBossBody"), dir: -1, force: true });
+      if (roomFx && !reduce) roomFx.blast(targets, move, colors);
+      return;
+    }
+    a.fx = a.fx || window.ptbMoves.create(a.el.querySelector(".fxs"));
+    a.fx.play(move, { body: a.el.querySelector(".bd"), dir: 1, force: true });
+    // 쏘는 자리는 몸 앞쪽, 맞는 자리는 보스 몸통(그림 상자의 왼쪽 가운데쯤)
+    if (roomFx && !reduce) roomFx.attack(roomPt(a.el.querySelector("img"), 0.7, 0.5), roomPt($("bsBossImg"), move.damageClass === "physical" ? 0.34 : 0.42, 0.6), move, colors);
+  }
   const AIL = { paralysis: "마비", burn: "화상", poison: "독", sleep: "잠듦", freeze: "얼음", confusion: "혼란" };
 
   /** 판을 차린다 — 아이들을 바닥에 고르게(앞줄부터). 뒤에 내보낸 내 아이는 내 자리(0번)에 선다 */
@@ -457,15 +489,19 @@
         logLine(ev.text, "mv");
         if (ev.who === "b") {
           bossTurn = true;
-          if (!fast) { blink($("bsBoss")); $("bsWave").classList.remove("go"); void $("bsWave").offsetWidth; $("bsWave").classList.add("go"); }
-          pop(78, 30, ev.move.name, "mvn");
-          await wait(700);
+          skill(null, ev.move, team.filter((x) => x && x.hp > 0 && !x.el.classList.contains("gone")).map((x) => roomPt(x.el.querySelector("img"))));
+          // 공격 기술이면 기를 모은 뒤 방 전체로 퍼진다 — 모두가 맞는다
+          if (!fast && ev.move.damageClass !== "status") setTimeout(() => { $("bsWave").classList.remove("go"); void $("bsWave").offsetWidth; $("bsWave").classList.add("go"); }, 450);
+          await wait(1000);
         } else if (a) {
           bossTurn = false;
           a.el.classList.add("act");
-          put(a, rand(57, 63), rand(82, 94)); // 보스에게 달려든다
-          await wait(420);
-          setTimeout(() => { a.el.classList.remove("act"); if (a.hp > 0) put(a, ...a.home); }, fast ? 0 : 500 * k);
+          // 물리 기술은 보스 앞까지 달려가 들이받고, 특수 · 변화 기술은 제자리에서 쓴다
+          const near = ev.move.damageClass === "physical";
+          if (near) put(a, rand(55, 60), rand(82, 94));
+          setTimeout(() => skill(a, ev.move), fast || !near ? 0 : 300);
+          await wait(near ? 750 : 600);
+          setTimeout(() => { a.el.classList.remove("act"); if (a.hp > 0) put(a, ...a.home); }, fast ? 0 : 1100 * k);
         }
       } else if (ev.t === "hp") {
         if (ev.who === "b") {

@@ -672,15 +672,16 @@
     <div id="bsIn" hidden>
       <div class="bs-wrap">
         <div class="bs-main">
-          <div class="bs-room">
+          <div class="bs-room" id="bsRoom">
             <canvas id="bsCanvas" width="320" height="180"></canvas>
             <div class="bs-bar">
               <div class="nm"><b id="bsBossName"></b><span>Lv.50</span></div>
               <div class="hpbar"><i id="bsHp"></i></div>
               <div class="hpn" id="bsHpn"></div>
             </div>
-            <div class="bs-boss" id="bsBoss"><img id="bsBossImg" alt="" draggable="false" /><div class="bs-wave" id="bsWave"></div><span class="drophint">여기에 놓으면 도전!</span></div>
+            <div class="bs-boss" id="bsBoss"><span class="bd" id="bsBossBody"><img id="bsBossImg" alt="" draggable="false" /></span><div class="fxs" id="bsBossFx"></div><div class="bs-wave" id="bsWave"></div><span class="drophint">여기에 놓으면 도전!</span></div>
             <div class="bs-actors" id="bsActors"></div>
+            <canvas class="bs-fx" id="bsFx"></canvas>
           </div>
           <div class="bs-go">
             <span class="sub">내보낼 포켓몬<br />길드원마다 한 마리</span>
@@ -835,6 +836,7 @@
 <script src="ballart.js"></script>
 <script src="app.js"></script>
 <script src="moves.js"></script>
+<script src="raidfx.js"></script>
 <script src="battle.js"></script>
 <script src="room.js"></script>
 <script src="guild.js"></script>
