@@ -14,6 +14,10 @@
  *                                 몰에서 사람에게 파는 게 이득이어야 몰이 돈다
  *   몰 판매 대금 · 길드 주간 보상  — 길드 객체가 credit 으로 넣는다(아래)
  *
+ * ── 코인 → 사탕 (candy) ──
+ * 사탕 환전의 반대. 🪙CANDY_COINS 에 🍬1, 하루 CANDY_MAX 개까지. 사탕 → 코인(🍬1 → 🪙5)보다
+ * 훨씬 비싸서 오가며 불릴 수 없다. 사탕은 앱이 세이브에 더한다 — 서버는 코인만 뺀다.
+ *
  * ── 코인 꾸미기 (buy) ──
  * 코인이 빠져나가는 곳. 코인으로만 사는 배경·가구(src/main/deco.json — 앱과 같은 파일)를 산다.
  * 값은 서버가 카탈로그에서 정하고, 산 것은 지갑에 적어 둔다(deco). 사탕 가구는 세이브에만
@@ -48,6 +52,7 @@
  *   POST /wallet/w0123456789ab/exchange   환전   { key, day, n }
  *   POST /wallet/w0123456789ab/sell       상점에 팔기 { key, day, mon: { line, grown, shiny } }
  *   POST /wallet/w0123456789ab/buy        코인 꾸미기 사기 { key, item }  → { ...보기, item }
+ *   POST /wallet/w0123456789ab/candy      코인 → 사탕 { key, day, n }    → { ...보기, got, paid }
  *
  * debit · credit 은 밖에서 부를 수 없다 — walletRoute 가 넘기지 않고, 길드 객체(몰·주간 보상)만
  * 지갑 객체를 직접 부른다. debit 은 그래도 열쇠를 본다(사는 사람이 열쇠를 넘겨야 빠진다).
@@ -82,6 +87,8 @@ export function shopPrice(mon) {
 export const CHECKIN = 10;
 export const EXCHANGE_RATE = 5;
 export const EXCHANGE_MAX = 5;
+export const CANDY_COINS = 20; // 코인 → 사탕 — 사탕 하나 값
+export const CANDY_MAX = 5; // 하루 사탕 몇 개까지
 const LOG_KEEP = 30;
 
 const json = (body, status = 200) =>
@@ -119,6 +126,9 @@ export class Wallet {
       sellLeft: SELL_MAX - ((w.sell || {}).n || 0),
       sellCoinsLeft: SELL_COINS - ((w.sell || {}).coins || 0),
       deco: w.deco || [], // 산 코인 꾸미기
+      cbDay: (w.cb || {}).day || "",
+      cbLeft: CANDY_MAX - ((w.cb || {}).n || 0), // 코인 → 사탕 오늘 남은 개수
+      candyCoins: CANDY_COINS,
       log: w.log.slice(-LOG_KEEP).reverse(),
     };
   }
@@ -200,6 +210,20 @@ export class Wallet {
       return json({ ...this.view(w), got: n * EXCHANGE_RATE });
     }
 
+    if (action === "candy") {
+      const n = Number(body.n);
+      if (!sane(body.day)) return fail("날짜가 맞지 않습니다. PC 시계를 확인해 주세요");
+      if (!Number.isInteger(n) || n < 1 || n > CANDY_MAX) return fail(`사탕은 한 번에 1~${CANDY_MAX}개까지 삽니다`);
+      if (!w.cb || w.cb.day !== body.day) w.cb = { day: body.day, n: 0 };
+      if (w.cb.n + n > CANDY_MAX) return fail(`오늘 코인으로 살 수 있는 사탕(${CANDY_MAX}개)을 넘습니다. 남은 한도 ${CANDY_MAX - w.cb.n}개`);
+      const paid = n * CANDY_COINS;
+      if (w.balance < paid) return fail(`코인이 모자랍니다 (🪙${w.balance} / 🪙${paid})`, 402);
+      w.cb.n += n;
+      w.balance -= paid;
+      await this.save(w, -paid, `사탕 ${n}개 사기`);
+      return json({ ...this.view(w), got: n, paid });
+    }
+
     if (action === "sell") {
       if (!sane(body.day)) return fail("날짜가 맞지 않습니다. PC 시계를 확인해 주세요");
       const mon = body.mon || {};
@@ -249,7 +273,7 @@ export async function walletCall(env, id, action, body) {
   return { status: res.status, ...(await res.json().catch(() => ({ ok: false, reason: "지갑 응답을 읽지 못했습니다" }))) };
 }
 
-/** Worker 쪽 — 밖에서 부를 수 있는 건 만들기 · 보기 · 출석 · 환전 · 상점에 팔기 · 꾸미기 사기뿐이다 */
+/** Worker 쪽 — 밖에서 부를 수 있는 건 만들기 · 보기 · 출석 · 환전 · 상점에 팔기 · 꾸미기 사기 · 사탕 사기뿐이다 */
 export async function walletRoute(request, env, id, action) {
   if (request.method !== "POST") return fail("POST 로 보내 주세요", 405);
   const len = Number(request.headers.get("content-length") || 0);
@@ -268,6 +292,6 @@ export async function walletRoute(request, env, id, action) {
     }
     return fail("지갑을 만들지 못했습니다. 다시 시도해 주세요", 503);
   }
-  if (!["checkin", "exchange", "sell", "buy"].includes(action || "") && action) return fail("모르는 요청입니다", 404);
+  if (!["checkin", "exchange", "sell", "buy", "candy"].includes(action || "") && action) return fail("모르는 요청입니다", 404);
   return walletStub(env, id).fetch("https://wallet/" + (action || "view"), { method: "POST", body: await request.text() });
 }

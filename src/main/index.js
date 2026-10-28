@@ -907,6 +907,8 @@ async function walletInfo() {
     exLeft: r.exDay === today ? r.exLeft : 5,
     sellLeft: r.sellDay === today ? r.sellLeft : 10,
     sellCoinsLeft: r.sellDay === today ? r.sellCoinsLeft : 100,
+    cbLeft: r.cbDay === today ? r.cbLeft : 5, // 코인 → 사탕 오늘 남은 개수
+    candyCoins: r.candyCoins || 20, // 사탕 하나 값(🪙)
     log: r.log || [],
     candy: candy().left,
   };
@@ -933,6 +935,25 @@ async function walletExchange(n) {
   refresh(true);
   pushShop();
   return { ok: true, message: `🍬${n} → 🪙${r.got} 환전했습니다 (🪙${r.balance})` };
+}
+
+/**
+ * 코인 → 사탕. 코인은 서버 지갑에서 빠지고(서버가 값 · 하루 한도를 정한다), 사탕은 내 세이브에
+ * 보너스로 더한다(candyBonus — 졸업 보상과 같은 칸)
+ */
+async function walletBuyCandy(n) {
+  n = Math.floor(Number(n) || 0);
+  if (n < 1 || n > 5) return { ok: false, reason: "사탕은 한 번에 1~5개까지 삽니다" };
+  const e = await walletEnsure();
+  if (!e.ok) return e;
+  const r = await walletCall(`/${save.wallet.id}/candy`, { key: save.wallet.key, day: dayKey(new Date()), n });
+  if (!r.ok) return r;
+  save.candyBonus = (save.candyBonus ?? 0) + r.got;
+  coinCache = { balance: r.balance, at: Date.now() };
+  writeSave();
+  refresh(true);
+  pushShop();
+  return { ok: true, message: `🪙${r.paid} → 🍬${r.got} 샀습니다 (🍬${candy().left} · 🪙${r.balance})` };
 }
 
 /** 박스에서 뺀다 — 팔거나 몰에 맡길 때. 키우던 아이·펫·방에서도 정리한다 */
@@ -1336,8 +1357,9 @@ const SHOP = [
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
   { id: "everstone", name: "변하지않는돌", cost: 3, desc: "지닌 아이는 진화하지 않는다. 박스 › 상세에서 지니게 하거나 뺀다. 빼면 돌아온다", icon: "🪨" },
   { id: "tm", name: "기술머신", cost: 3, desc: "키우는 아이가 배울 수 있는 기술머신 기술 하나를 가르친다", icon: "💿" },
-  { id: "great-ball", name: "슈퍼볼 3개", cost: 1, desc: "야생 포켓몬이 1.5배 잘 잡힌다", icon: "🔵" },
-  { id: "ultra-ball", name: "하이퍼볼 3개", cost: 2, desc: "야생 포켓몬이 2배 잘 잡힌다", icon: "🟡" },
+  { id: "great-ball", name: "슈퍼볼 3개", cost: 1, desc: "야생 포켓몬이 1.5배 잘 잡힌다", icon: "🔵", ball: "great" },
+  { id: "ultra-ball", name: "하이퍼볼 3개", cost: 2, desc: "야생 포켓몬이 2배 잘 잡힌다", icon: "🟡", ball: "ultra" },
+  { id: "master-ball", name: "마스터볼", cost: 40, desc: "던지면 반드시 잡힌다. 전설도. 한 주에 1개만 살 수 있다", icon: "🟣", ball: "master", weekly: true },
   { id: "charm", name: "반짝이는 부적", cost: 60, desc: "이로치 확률 2배. 한 번만 살 수 있다", icon: "✨", once: true },
 ];
 
@@ -1645,6 +1667,7 @@ function buy(itemId) {
   const item = SHOP.find((x) => x.id === itemId);
   if (!item) return { ok: false, reason: "없는 물건" };
   if (item.once && save.charm) return { ok: false, reason: "이미 가지고 있습니다" };
+  if (item.weekly && save.masterWeek === localMonday()) return { ok: false, reason: "마스터볼은 한 주에 1개만 살 수 있습니다. 다음 주 월요일에 다시 살 수 있습니다" };
   const c = candy();
   const cost = priceOf(item.cost);
   if (c.left < cost) return { ok: false, reason: "사탕이 모자랍니다" };
@@ -1681,6 +1704,12 @@ function buy(itemId) {
     save.balls = save.balls || { great: 0, ultra: 0 };
     save.balls[key] = (save.balls[key] || 0) + 3;
     msg = BALLS[key].name + " 3개를 샀습니다 (가진 수 " + save.balls[key] + ")";
+    if (wildNow) ballInfo();
+  } else if (itemId === "master-ball") {
+    save.balls = save.balls || { great: 0, ultra: 0 };
+    save.balls.master = (save.balls.master || 0) + 1;
+    save.masterWeek = localMonday(); // 한 주에 1개 — 이번 주 월요일을 적어 둔다
+    msg = "마스터볼을 샀습니다 (가진 수 " + save.balls.master + ") — 야생에서 볼을 눌러 마스터볼로 바꿔 던지세요";
     if (wildNow) ballInfo();
   } else if (itemId === "everstone") {
     save.items = save.items || {};
@@ -2243,8 +2272,8 @@ function pushShop() {
     items: SHOP.map((x) => ({
       ...x,
       cost: priceOf(x.cost),
-      owned: x.once ? Boolean(save.charm) : false,
-      have: x.id === "everstone" ? stoneCount() : undefined,
+      owned: x.once ? Boolean(save.charm) : x.weekly ? save.masterWeek === localMonday() : false,
+      have: x.id === "everstone" ? stoneCount() : x.ball ? ((save.balls || {})[x.ball] || 0) : undefined,
       afford: c.left >= priceOf(x.cost),
     })),
   });
@@ -2894,14 +2923,16 @@ const BALL_W = 64;
 
 /**
  * 볼. 보정은 원작 그대로다. 몬스터볼은 출현마다 공짜(wild.BALLS_PER_ENCOUNTER),
- * 슈퍼볼·하이퍼볼은 상점에서 사서 가방(save.balls)에 둔다.
+ * 슈퍼볼·하이퍼볼·마스터볼은 상점에서 사서 가방(save.balls)에 둔다.
+ * 마스터볼은 무조건 잡힌다(wild.MASTER). 한 주에 1개만 산다.
  */
 const BALLS = {
   poke: { name: "몬스터볼", mul: 1 },
   great: { name: "슈퍼볼", mul: 1.5 },
   ultra: { name: "하이퍼볼", mul: 2 },
+  master: { name: "마스터볼", mul: wild.MASTER },
 };
-const BALL_ORDER = ["poke", "great", "ultra"];
+const BALL_ORDER = ["poke", "great", "ultra", "master"];
 
 /** 지금 이 볼을 몇 개 던질 수 있나 */
 function ballsLeft(W, key) {
@@ -2916,14 +2947,21 @@ function ballInfo() {
   ballSend({ t: "set", key: W.ballKey, name: BALLS[W.ballKey].name, n: ballsLeft(W, W.ballKey), p: wildOdds(W) });
 }
 
-/** 남은 볼이 있는 다음 종류로. 없으면 그대로 */
-function nextBall(W, from = W.ballKey) {
+/**
+ * 남은 볼이 있는 다음 종류로. 없으면 그대로.
+ * auto(던진 볼이 떨어져 저절로 바꿀 때)면 마스터볼은 건너뛴다 — 다른 볼이 하나도 없을 때만.
+ * 한 주에 하나뿐인 마스터볼을 아무 포켓몬에게나 모르고 던지지 않게, 마스터볼은 눌러서 고른다
+ */
+function nextBall(W, from = W.ballKey, auto = false) {
   const i = BALL_ORDER.indexOf(from);
+  let master = null;
   for (let k = 1; k <= BALL_ORDER.length; k++) {
     const key = BALL_ORDER[(i + k) % BALL_ORDER.length];
-    if (ballsLeft(W, key) > 0) return key;
+    if (ballsLeft(W, key) <= 0) continue;
+    if (auto && key === "master") { master = key; continue; }
+    return key;
   }
-  return from;
+  return master || from;
 }
 
 /** 오늘 더 나올 수 있는 횟수 */
@@ -3071,7 +3109,7 @@ async function spawnWild() {
       title: L.legendary && L.single
         ? `✨ ${L.mythical ? "환상" : "전설"}의 포켓몬 ${battle.josa(d.name, "이가")} 나타났다!`
         : `야생 ${r.shiny ? "★ " : ""}${battle.josa(d.name, "이가")} 나타났다!`,
-      body: (L.legendary && L.single ? "아주 잡기 어렵습니다. 결투로 약하게 만들고 하이퍼볼을 쓰세요. " : "") + (isNew ? "처음 보는 포켓몬입니다. " : "") + "화면 아래 몬스터볼을 잡고 던져 보세요",
+      body: (L.legendary && L.single ? "아주 잡기 어렵습니다. 결투로 약하게 만들고 하이퍼볼을 쓰세요(마스터볼이면 반드시 잡힙니다). " : "") + (isNew ? "처음 보는 포켓몬입니다. " : "") + "화면 아래 몬스터볼을 잡고 던져 보세요",
       silent: false,
     }).show();
   }
@@ -3267,7 +3305,7 @@ async function hitWild() {
   if (wildNow !== W) return;
   if (!BALL_ORDER.some((k) => ballsLeft(W, k) > 0)) return wildFlee("볼이 다 떨어졌다… 도망쳤다");
   if (Math.random() < wild.fleeChance(W.rate)) return wildFlee("도망쳐 버렸다!");
-  if (ballsLeft(W, W.ballKey) <= 0) W.ballKey = nextBall(W);
+  if (ballsLeft(W, W.ballKey) <= 0) W.ballKey = nextBall(W, W.ballKey, true);
   ballInfo();
   await slideBall(W.home, 400);
   if (wildNow !== W) return;
@@ -3578,6 +3616,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("wallet-info", () => walletInfo());
   ipcMain.handle("wallet-checkin", () => walletCheckin());
   ipcMain.handle("wallet-exchange", (_e, n) => walletExchange(n));
+  ipcMain.handle("wallet-buy-candy", (_e, n) => walletBuyCandy(n));
   ipcMain.handle("shop-sell", (_e, id) => shopSell(String(id || "")));
   ipcMain.handle("market-view", () => marketView());
   ipcMain.handle("market-list", (_e, a) => marketList(a || {}));

@@ -60,7 +60,8 @@ window.ptb.onBall((d) => {
   const b = document.body.classList;
   switch (d.t) {
     case "set":
-      // 볼 종류에 따라 위쪽 색이 바뀐다 — 몬스터볼 빨강, 슈퍼볼 파랑, 하이퍼볼 검정·노랑
+      // 볼 종류에 따라 그림이 바뀐다 — 몬스터볼 빨강, 슈퍼볼 파랑, 하이퍼볼 검정·노랑, 마스터볼 보라(ballart.js)
+      if (document.body.dataset.ball !== d.key) ball.innerHTML = window.ptbBall.inner(d.key, "w");
       document.body.dataset.ball = d.key;
       document.getElementById("n").textContent = "×" + d.n;
       document.getElementById("odds").textContent = Math.round(d.p * 100) + "%";

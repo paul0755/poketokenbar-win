@@ -628,13 +628,13 @@ window.ptb.onShop((s) => {
     .map((it) => {
       const dis = it.owned || !it.afford ? " disabled" : "";
       return `<div class="item">
-          <div class="ic">${it.icon}</div>
+          <div class="ic">${it.ball && window.ptbBall ? window.ptbBall.svg(it.ball) : it.icon}</div>
           <div class="body">
             <div class="nm">${it.name}</div>
             <div class="de">${it.desc}</div>
             <div class="pr">가격 🍬${it.cost}${it.have != null ? ` · 가진 수 ${it.have}` : ""}</div>
           </div>
-          <button data-id="${it.id}"${dis}>${it.owned ? "보유" : "구매"}</button>
+          <button data-id="${it.id}"${dis}>${it.owned ? (it.weekly ? "이번 주 ✓" : "보유") : "구매"}</button>
         </div>`;
     })
     .join("");

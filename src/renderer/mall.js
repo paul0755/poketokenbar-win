@@ -78,13 +78,19 @@
           → 🪙<span id="mlExGet">5</span>
           <button class="mini2" id="mlEx" ${w.exLeft <= 0 || w.candy < 1 ? "disabled" : ""}>환전</button>
         </span>
+        <span class="ex">🪙<span id="mlCbCost">${w.candyCoins}</span> →
+          🍬<select id="mlCbN">${[1, 2, 3, 4, 5].filter((n) => n <= Math.max(1, w.cbLeft)).map((n) => `<option value="${n}">${n}</option>`).join("")}</select>
+          <button class="mini2" id="mlCb" ${w.cbLeft <= 0 || w.balance < w.candyCoins ? "disabled" : ""}>사탕 사기</button>
+        </span>
       </div>
-      <div class="sub">사탕 → 코인은 하루 사탕 ${5}개까지(오늘 ${w.exLeft}개 남음 · 가진 사탕 🍬${w.candy}). 코인은 서버에 있어 PC 를 바꿔도 세이브만 있으면 그대로입니다.${
+      <div class="sub">사탕 → 코인은 하루 사탕 ${5}개까지(오늘 ${w.exLeft}개 남음 · 가진 사탕 🍬${w.candy}).
+        코인 → 사탕은 🍬1에 🪙${w.candyCoins}, 하루 5개까지(오늘 ${w.cbLeft}개 남음). 코인은 서버에 있어 PC 를 바꿔도 세이브만 있으면 그대로입니다.${
         waitH() ? `<br>새 지갑이라 <b>${waitH()}시간 뒤</b>부터 몰에서 살 수 있습니다. 파는 건 바로 됩니다.` : ""}</div>`;
   }
 
   $("mlWallet").addEventListener("change", (e) => {
     if (e.target.id === "mlExN") $("mlExGet").textContent = Number(e.target.value) * 5;
+    if (e.target.id === "mlCbN" && wallet) $("mlCbCost").textContent = Number(e.target.value) * wallet.candyCoins;
   });
   $("mlWallet").addEventListener("click", async (e) => {
     const b = e.target.closest("button");
@@ -94,6 +100,7 @@
       if (b.id === "mlSettings") return void window.ptb.openSettings();
       if (b.id === "mlCheckin") done(await window.ptb.walletCheckin());
       if (b.id === "mlEx") done(await window.ptb.walletExchange(Number($("mlExN").value)));
+      if (b.id === "mlCb") done(await window.ptb.walletBuyCandy(Number($("mlCbN").value)));
       await loadWallet();
     } finally {
       busy = false;

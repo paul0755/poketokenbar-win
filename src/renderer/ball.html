@@ -28,12 +28,9 @@
   body.vanish #ball { opacity: 0; }
   body.vanish #n, body.vanish #odds { display: none; }
   #ball.caught { filter: brightness(.8) drop-shadow(0 3px 4px rgba(0, 0, 0, .5)); }
-  /* 볼 종류 — 위쪽 반구 색과 무늬만 바꾼다 */
-  body[data-ball="great"] #top { fill: #3a7bd5; }
-  body[data-ball="great"] .stripe { display: block; fill: #e3373b; }
-  body[data-ball="ultra"] #top { fill: #2b2b33; }
-  body[data-ball="ultra"] .hband { display: block; fill: #ffcb05; }
-  .stripe, .hband { display: none; }
+  /* 볼 그림은 ballart.js 가 그린다 — 볼 종류를 바꾸면 위 반구 색과 무늬가 바뀐다 */
+  /* 마스터볼을 골랐을 때 — 남은 수 표시를 보라로 */
+  body[data-ball="master"] #n { background: #c9a6ff; }
   /* 지금 던지면 잡힐 확률. 약하게 만들면 오른다 */
   #odds {
     position: fixed; left: 2px; top: 2px; padding: 1px 4px; border-radius: 6px;
@@ -49,17 +46,10 @@
   #star.on { animation: star 1.2s ease forwards; }
   @keyframes star { 0% { opacity: 0; scale: .4; } 25% { opacity: 1; scale: 1.2; } 100% { opacity: 0; scale: 1.6; translate: 0 -30%; } }
 </style>
-<svg id="ball" viewBox="0 0 100 100" aria-hidden="true">
-  <circle cx="50" cy="50" r="46" fill="#f2f3f5" stroke="#1b1c22" stroke-width="6" />
-  <path id="top" d="M4 50 A46 46 0 0 1 96 50 Z" fill="#e3373b" stroke="#1b1c22" stroke-width="6" />
-  <path class="stripe" d="M24 16 Q30 30 26 44 L34 44 Q38 28 32 12 Z M76 16 Q70 30 74 44 L66 44 Q62 28 68 12 Z" />
-  <path class="hband" d="M20 20 L36 44 L28 44 L14 26 Z M80 20 L64 44 L72 44 L86 26 Z" />
-  <rect x="4" y="46" width="92" height="8" fill="#1b1c22" />
-  <circle cx="50" cy="50" r="13" fill="#f2f3f5" stroke="#1b1c22" stroke-width="6" />
-  <circle cx="50" cy="50" r="5" fill="#f2f3f5" stroke="#1b1c22" stroke-width="3" />
-  <path d="M22 26 Q30 16 42 14" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".55" />
-</svg>
+<svg id="ball" viewBox="0 0 100 100" aria-hidden="true"></svg>
 <div id="n"></div>
 <div id="odds"></div>
 <div id="star">✨</div>
+<script src="ballart.js"></script>
+<script>document.getElementById("ball").innerHTML = window.ptbBall.inner("poke", "w");</script>
 <script src="ball.js"></script>

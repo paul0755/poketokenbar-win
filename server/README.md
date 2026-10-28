@@ -95,6 +95,7 @@ npm run deploy       # https://poketokenbar-relay.<계정>.workers.dev
 | `POST /wallet/w0123456789ab` | `{ key }` | 잔액 · 오늘 출석했나 · 남은 환전 한도 · 최근 내역 |
 | `POST /wallet/w0123456789ab/checkin` | `{ key, day }` | 출석 🪙10, 하루 한 번 (그 사람 PC 날짜, 서버 시각 ±36시간 안) |
 | `POST /wallet/w0123456789ab/exchange` | `{ key, day, n }` | 사탕 n개 → 🪙5n, 하루 사탕 5개까지 |
+| `POST /wallet/w0123456789ab/candy` | `{ key, day, n }` | 코인 → 사탕 n개 — 🪙20n, 하루 사탕 5개까지. 사탕은 앱이 세이브에 더한다 |
 | `POST /wallet/w0123456789ab/sell` | `{ key, day, mon: { line, grown, shiny } }` | 상점에 팔기 — 값은 서버가 센다(희귀도 × 진화 단계 × 이로치, 전설 15). 하루 10마리 · 🪙100까지 |
 | `POST /wallet/w0123456789ab/buy` | `{ key, item }` | 코인 꾸미기 사기 — 값은 서버가 `src/main/deco.json`(앱과 같은 파일)에서 정한다. 산 것은 보기의 `deco` 에 남는다 |
 

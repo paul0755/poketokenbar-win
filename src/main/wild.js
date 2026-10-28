@@ -58,6 +58,7 @@ function roll(hasCharm) {
  * hp 는 남은 비율(0~1). 결투로 깎는 건 다음 단계다 — 지금은 늘 1.
  */
 function odds(captureRate, ball = 1, hp = 1, status = 1) {
+  if (ball >= MASTER) return { a: 255, shake: 1, total: 1 }; // 마스터볼 — 원작처럼 무조건 잡힌다
   const a = Math.min(255, Math.floor((((3 - 2 * hp) * captureRate * ball) / 3) * status));
   if (a >= 255) return { a, shake: 1, total: 1 };
   const b = Math.floor(65536 / Math.pow(255 / Math.max(1, a), 0.25));
@@ -69,6 +70,9 @@ function odds(captureRate, ball = 1, hp = 1, status = 1) {
  * 한 번 던진 결과. 원작처럼 세 번 흔들리고, 다 버티면 잡힌다.
  * shakes 는 버틴 횟수(0~3) — 화면은 그만큼 흔들고 나서 결과를 보여 준다.
  */
+/** 볼 보정이 이 값 이상이면 마스터볼 — 공식을 거치지 않고 잡힌다 */
+const MASTER = 255;
+
 function throwBall(captureRate, ball = 1, hp = 1, status = 1, rng = Math.random) {
   const o = odds(captureRate, ball, hp, status);
   let shakes = 0;
@@ -105,4 +109,4 @@ function quietEndsIn(now, q) {
  */
 const fleeChance = (captureRate) => 0.1 + ((255 - Math.min(255, captureRate)) / 255) * 0.25;
 
-module.exports = { PACE, STAY_MS, BALLS_PER_ENCOUNTER, nextDelay, roll, odds, throwBall, fleeChance, inQuiet, quietEndsIn };
+module.exports = { PACE, STAY_MS, BALLS_PER_ENCOUNTER, MASTER, nextDelay, roll, odds, throwBall, fleeChance, inQuiet, quietEndsIn };

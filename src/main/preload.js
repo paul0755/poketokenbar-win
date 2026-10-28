@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld("ptb", {
   // 코인 지갑 · 상점에 팔기 · 길드 몰
   walletInfo: () => ipcRenderer.invoke("wallet-info"),
   walletCheckin: () => ipcRenderer.invoke("wallet-checkin"),
+  walletBuyCandy: (n) => ipcRenderer.invoke("wallet-buy-candy", n),
   walletExchange: (n) => ipcRenderer.invoke("wallet-exchange", n),
   shopSell: (id) => ipcRenderer.invoke("shop-sell", id),
   marketView: () => ipcRenderer.invoke("market-view"),
