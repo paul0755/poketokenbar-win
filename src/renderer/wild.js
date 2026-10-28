@@ -7,6 +7,12 @@ const mon = document.getElementById("mon");
 // 내 펫을 끌어다 놓으면 싸운다. 그리는 건 펫 창과 같은 duel.js
 window.ptbDuel.attach({ img: mon, body: document.getElementById("body"), flipClass: "right" });
 
+// 우클릭 — 쫓아내기 메뉴(메인이 띄운다)
+window.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  window.ptb.wildMenu();
+});
+
 function say(text) {
   const el = document.getElementById("say");
   el.textContent = text;

@@ -1804,6 +1804,16 @@ function loadSave() {
   if (!save.maxStage || typeof save.maxStage !== "object") save.maxStage = {};
   if (!Array.isArray(save.box)) save.box = [];
   if (!Array.isArray(save.petIds)) save.petIds = [];
+  // 0.13.0 까지 야생에서 잡은 아이는 부화 단계(Lv.1)로 들어왔다. 야생은 다 큰 아이라 1차 진화부터가 맞다 —
+  // 한 번만, 부화와 1차 진화의 차이만큼 성장을 더해 준다(그 사이 키운 만큼은 그대로 위에 얹힌다)
+  for (const m of save.box) {
+    if (!m || !m.wild || m.wildMid) continue;
+    m.fed = (m.fed || 0) + (poke.STAGES[2].at - poke.STAGES[1].at);
+    m.wildMid = true;
+    const st = poke.stageFor(box.effOf(m, growthSpeed()));
+    m.maxStage = Math.max(m.maxStage || 0, st); // 켤 때 "진화했다" 알림이 몰려 뜨지 않게
+    save.maxStage[m.line] = Math.max(save.maxStage[m.line] ?? -1, st);
+  }
 }
 
 function writeSave() {
@@ -3292,10 +3302,10 @@ async function spawnWild() {
   writeSave();
 
   const r = wild.roll(save.charm);
-  // 부화한 모습(첫 형태)으로 나온다. 잡으면 그 모습 그대로 박스에 들어간다
-  const d = poke.describe(poke.STAGES[1].at, r.line, { shiny: r.shiny });
+  // 야생은 알에서 갓 나온 아이가 아니라 다 큰 아이다 — 1차 진화 모습으로 나오고, 잡으면 그 모습 그대로 박스에 들어간다
+  const d = poke.describe(WILD_GROWN, r.line, { shiny: r.shiny });
   const sprite = await poke.spriteWithFallback(d, CACHE, "anim");
-  const isNew = (save.maxStage[r.line] ?? -1) < 1; // 이 종을 만난 적이 없다 — 놓치기 아까운 아이
+  const isNew = (save.maxStage[r.line] ?? -1) < poke.stageFor(WILD_GROWN); // 이 모습을 만난 적이 없다 — 놓치기 아까운 아이
 
   // 커서가 있는 화면에 나온다. 보고 있는 화면이어야 알아챈다
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
@@ -3376,6 +3386,25 @@ async function wildFlee(text) {
   const left = W.pos.x + w / 2 < W.area.x + W.area.width / 2;
   await walkWild({ x: left ? W.area.x - w : W.area.x + W.area.width, y: W.pos.y }, 900);
   if (wildNow === W) endWild();
+}
+
+/**
+ * 야생을 우클릭하면 — 쫓아내기. 볼에 들어가 흔들리는 중이나 결투 중(busy)에는 쫓아낼 수 없다.
+ * 쫓아내도 오늘 나올 몫은 돌려주지 않는다 — 돌려주면 마음에 드는 아이가 나올 때까지 계속 쫓아낼 수 있다
+ */
+function wildMenu(sender) {
+  const W = wildNow;
+  if (!W || W.fleeing || W.win.isDestroyed() || sender !== W.win.webContents) return;
+  const busy = W.busy;
+  Menu.buildFromTemplate([
+    { label: `${W.name}${W.shiny ? " ★" : ""}`, enabled: false },
+    { type: "separator" },
+    {
+      label: busy ? "쫓아내기 (지금은 안 됩니다 — 결투 · 포획 중)" : "🏃 쫓아내기",
+      enabled: !busy,
+      click: () => { if (wildNow === W && !W.busy) wildFlee("훠이훠이! 달아났다…"); },
+    },
+  ]).popup({ window: W.win });
 }
 
 /**
@@ -3564,7 +3593,7 @@ function wildOdds(W, ballKey = W.ballKey || "poke") {
  * 웬만하면 안 고르고 상태이상 기술을 즐겨 쓴다(battle.js gentle). 그래도 급소로
  * 넘칠 수 있다 — 쓰러지면 잡을 수 없다. 그 긴장이 재미다.
  *
- * 둘 다 Lv.50 이다. 야생은 레벨이 없다(부화한 모습으로 나온다). 깎인 체력과
+ * 둘 다 Lv.50 이다. 야생은 레벨이 없다(1차 진화 모습으로 나온다). 깎인 체력과
  * 상태이상은 야생이 들고 있다가 다음 결투와 포획에 그대로 쓴다.
  */
 async function wildBattle(petId) {
@@ -3579,7 +3608,7 @@ async function wildBattle(petId) {
   W.walkId = (W.walkId || 0) + 1; // 걷던 걸음을 멈춘다
   // 야생의 개체값·성격은 처음 싸울 때 정해 두고 계속 쓴다 — 잡으면 이 아이가 박스에 들어간다
   W.mon = W.mon || box.make(W.line, W.nature, W.shiny);
-  const r = battle.run(box.withLv(pm, growthSpeed()), grown, W.mon, poke.STAGES[1].at, Math.random, {
+  const r = battle.run(box.withLv(pm, growthSpeed()), grown, W.mon, WILD_GROWN, Math.random, {
     level: 50,
     gentle: 0,
     init: [null, W.state || null],
@@ -3632,16 +3661,21 @@ async function wildBattle(petId) {
   return true;
 }
 
-/** 잡았다 — 박스에 넣는다. 이미 부화한 모습이다 */
+/** 야생의 성장량 — 1차 진화. 진화 없는 종은 같은 모습이고 이로치(마스터)까지 남은 길만 줄어든다 */
+const WILD_GROWN = poke.STAGES[2].at;
+
+/** 잡았다 — 박스에 넣는다. 다 큰 아이라 1차 진화부터다 */
 function catchWild(W) {
   // 싸워 본 아이면 그때 정해진 개체값·성격 그대로 들어간다
   const m = W.mon || box.make(W.line, W.nature, W.shiny);
-  m.fed = poke.STAGES[1].at;
-  m.maxStage = 1;
+  const st = poke.stageFor(WILD_GROWN);
+  m.fed = WILD_GROWN;
+  m.maxStage = st;
   m.wild = true; // 알이 아니라 바탕화면에서 잡은 아이
+  m.wildMid = true; // 1차 진화부터 들어왔다(옛 세이브 고치기 표시 — loadSave)
   save.box.push(m);
   if (!save.seen.includes(W.line)) save.seen.push(W.line);
-  save.maxStage[W.line] = Math.max(save.maxStage[W.line] ?? -1, 1);
+  save.maxStage[W.line] = Math.max(save.maxStage[W.line] ?? -1, st);
   writeSave();
   refresh(true);
   pushDex();
@@ -3786,6 +3820,7 @@ app.whenReady().then(async () => {
    * 보면 손을 떼며 멈칫한 것까지 속도가 되어 볼이 툭 떨어진다.
    */
   ipcMain.handle("wild-spawn", () => spawnWild());
+  ipcMain.on("wild-menu", (e) => wildMenu(e.sender));
   const okPt = (p) => p && Number.isFinite(p.x) && Number.isFinite(p.y);
   ipcMain.on("ball-drag-start", (_e, p) => {
     const W = wildNow;

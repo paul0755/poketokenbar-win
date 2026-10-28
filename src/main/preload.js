@@ -87,6 +87,7 @@ contextBridge.exposeInMainWorld("ptb", {
   // 펫 창 전용 — 바탕화면 결투 장면
   onDuel: (cb) => ipcRenderer.on("duel", (_e, d) => cb(d)),
   wildSpawn: () => ipcRenderer.invoke("wild-spawn"),
+  wildMenu: () => ipcRenderer.send("wild-menu"), // 야생 창 우클릭 — 쫓아내기
   // 야생 포켓몬 · 몬스터볼 창 전용
   onWild: (cb) => ipcRenderer.on("wild", (_e, d) => cb(d)),
   onBall: (cb) => ipcRenderer.on("ball", (_e, d) => cb(d)),
