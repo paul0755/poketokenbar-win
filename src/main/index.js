@@ -1804,17 +1804,23 @@ function loadSave() {
   if (!save.maxStage || typeof save.maxStage !== "object") save.maxStage = {};
   if (!Array.isArray(save.box)) save.box = [];
   if (!Array.isArray(save.petIds)) save.petIds = [];
-  // 0.13.0 까지 야생에서 잡은 아이는 부화 단계(Lv.1)로 들어왔다. 야생은 다 큰 아이라 1차 진화부터가 맞다 —
-  // 한 번만, 부화와 1차 진화의 차이만큼 성장을 더해 준다(그 사이 키운 만큼은 그대로 위에 얹힌다)
+  // 0.13.1 은 야생 아이를 1차 진화로 올렸다 — 옛 아이는 부화와 1차 진화의 차이만큼 더해 주고(wildMid),
+  // 새로 잡은 아이는 1차 진화 성장량으로 넣었다. 잘못 알아들은 것이었다: 니드런은 니드런으로 나오고 잡혀야 한다.
+  // "알에서 부화를 기다리는 것처럼" 보이던 건 단계 이름(부화) 탓이었다 — stageLabel 이 고친다.
+  // 한 번만, 더한 만큼을 도로 뺀다(그 사이 키운 만큼은 그대로 남는다)
   for (const m of save.box) {
-    if (!m || !m.wild || m.wildMid) continue;
-    m.fed = (m.fed || 0) + (poke.STAGES[2].at - poke.STAGES[1].at);
-    m.wildMid = true;
-    const st = poke.stageFor(box.effOf(m, growthSpeed()));
-    m.maxStage = Math.max(m.maxStage || 0, st); // 켤 때 "진화했다" 알림이 몰려 뜨지 않게
-    save.maxStage[m.line] = Math.max(save.maxStage[m.line] ?? -1, st);
+    if (!m || !m.wildMid) continue;
+    m.fed = Math.max(0, (m.fed || 0) - (poke.STAGES[2].at - poke.STAGES[1].at));
+    delete m.wildMid;
+    m.maxStage = poke.stageFor(box.effOf(m, growthSpeed())); // 다시 진화하면 알림이 뜨게
   }
 }
+
+/**
+ * 화면에 보일 단계 이름. 야생에서 잡은 아이의 첫 모습은 "부화"가 아니다 — 알에서 나온 적이 없다.
+ * "부화"라고 적혀 있으면 알이 깨기를 기다리는 아이처럼 보인다
+ */
+const stageLabel = (m, d) => (m && m.wild && d.stage.key === "baby" ? "야생에서 잡음" : d.stage.label);
 
 function writeSave() {
   // 못 읽고 시작한 판은 저장하지 않는다. 덮어쓰면 진짜 진행이 날아간다.
@@ -2057,7 +2063,8 @@ async function buildStats() {
   const grown = act ? act.raw || 0 : 0;
   recordStage(act, eff);
   checkGraduation(act, eff);
-  const mon = poke.describe(eff, act ? act.line : 0, { shiny: act && act.shiny });
+  const desc = poke.describe(eff, act ? act.line : 0, { shiny: act && act.shiny });
+  const mon = { ...desc, stage: { ...desc.stage, label: stageLabel(act, desc) } }; // 홈 · 트레이 · 알림의 단계 이름
   // 트레이는 정적 PNG(nativeImage는 GIF를 움직이지 못한다), 화면은 애니메이션 GIF.
   const still = await poke.spriteWithFallback(mon, CACHE, "still");
   const anim = await poke.spriteWithFallback(mon, CACHE, "anim");
@@ -2076,7 +2083,7 @@ async function buildStats() {
       return {
         id: m.id,
         name: d.name,
-        stage: d.stage.label,
+        stage: stageLabel(m, d),
         stageKey: d.stage.key,
         ratio: d.progress.ratio,
         next: d.progress.next,
@@ -3357,10 +3364,10 @@ async function spawnWild() {
   writeSave();
 
   const r = wild.roll(save.charm);
-  // 야생은 알에서 갓 나온 아이가 아니라 다 큰 아이다 — 1차 진화 모습으로 나오고, 잡으면 그 모습 그대로 박스에 들어간다
+  // 첫 모습(니드런이면 니드런)으로 나온다. 잡으면 그 모습 그대로 박스에 들어간다
   const d = poke.describe(WILD_GROWN, r.line, { shiny: r.shiny });
   const sprite = await poke.spriteWithFallback(d, CACHE, "anim");
-  const isNew = (save.maxStage[r.line] ?? -1) < poke.stageFor(WILD_GROWN); // 이 모습을 만난 적이 없다 — 놓치기 아까운 아이
+  const isNew = (save.maxStage[r.line] ?? -1) < 1; // 이 종을 만난 적이 없다 — 놓치기 아까운 아이
 
   // 커서가 있는 화면에 나온다. 보고 있는 화면이어야 알아챈다
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
@@ -3649,7 +3656,7 @@ function wildOdds(W, ballKey = W.ballKey || "poke") {
  * 웬만하면 안 고르고 상태이상 기술을 즐겨 쓴다(battle.js gentle). 그래도 급소로
  * 넘칠 수 있다 — 쓰러지면 잡을 수 없다. 그 긴장이 재미다.
  *
- * 둘 다 Lv.50 이다. 야생은 레벨이 없다(1차 진화 모습으로 나온다). 깎인 체력과
+ * 둘 다 Lv.50 이다. 야생은 레벨이 없다(첫 모습으로 나온다). 깎인 체력과
  * 상태이상은 야생이 들고 있다가 다음 결투와 포획에 그대로 쓴다.
  */
 async function wildBattle(petId) {
@@ -3717,10 +3724,10 @@ async function wildBattle(petId) {
   return true;
 }
 
-/** 야생의 성장량 — 1차 진화. 진화 없는 종은 같은 모습이고 이로치(마스터)까지 남은 길만 줄어든다 */
-const WILD_GROWN = poke.STAGES[2].at;
+/** 야생의 성장량 — 첫 모습(알 다음 칸). 레벨은 1이지만 결투는 Lv.50 으로 맞춰 싸운다 */
+const WILD_GROWN = poke.STAGES[1].at;
 
-/** 잡았다 — 박스에 넣는다. 다 큰 아이라 1차 진화부터다 */
+/** 잡았다 — 박스에 넣는다. 나온 모습(첫 모습) 그대로다 */
 function catchWild(W) {
   // 싸워 본 아이면 그때 정해진 개체값·성격 그대로 들어간다
   const m = W.mon || box.make(W.line, W.nature, W.shiny);
@@ -3728,7 +3735,6 @@ function catchWild(W) {
   m.fed = WILD_GROWN;
   m.maxStage = st;
   m.wild = true; // 알이 아니라 바탕화면에서 잡은 아이
-  m.wildMid = true; // 1차 진화부터 들어왔다(옛 세이브 고치기 표시 — loadSave)
   save.box.push(m);
   if (!save.seen.includes(W.line)) save.seen.push(W.line);
   save.maxStage[W.line] = Math.max(save.maxStage[W.line] ?? -1, st);

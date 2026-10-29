@@ -41,9 +41,13 @@ const NATURES = require("./natures.json");
  *
  * 가중치 차이는 4배까지만 둔다. 포획률을 그대로 쓰면 85배가 되어
  * 가장 희귀한 종이 1/12,000이 된다 — 평생 안 나오는 건 등급이 아니라 부재다.
+ *
+ * ★5 는 전설과 같은 포획률 3 만이다(진화 라인으로는 메탕뿐). 처음엔 30 이하를 ★5 로 묶어
+ * 타만타(25) · 니로우 · 피오네(30)가 전설과 같은 별이었는데, 원작에서 이들은 전설보다
+ * 8~10배 잘 잡힌다 — ★4 로 내렸다.
  */
 const RARITY = [
-  { max: 30, weight: 5, label: "초희귀", stars: 5 },
+  { max: 3, weight: 5, label: "초희귀", stars: 5 },
   { max: 45, weight: 8, label: "희귀", stars: 4 },
   { max: 90, weight: 11, label: "보기 드묾", stars: 3 },
   { max: 150, weight: 15, label: "보통", stars: 2 },
@@ -172,16 +176,18 @@ function stoneCap(lineIndex, total) {
 }
 
 /**
- * 상점이 사 주는 값(🪙) — 희귀도 × 진화 단계 × 이로치, 전설은 기본 15. 화면에 보일 값이다.
- * 실제로 주는 건 서버(server/src/wallet.js shopPrice)가 같은 셈으로 다시 센다.
+ * 상점이 사 주는 값(🪙) — 포획률 × 진화 단계 × 이로치, 전설은 기본 15. 화면에 보일 값이다.
+ * 실제로 주는 건 서버(server/src/wallet.js shopPrice)가 같은 셈으로 다시 센다 — 그래서 별이 아니라
+ * 서버와 같은 포획률 표로 센다. ★5 경계를 3 으로 내렸을 때 별로 세면 옛 앱 · 서버와 값이 어긋났다
+ * (포획률 30 이하는 ★4 여도 🪙8)
  */
-const STAR_COINS = { 1: 1, 2: 2, 3: 3, 4: 5, 5: 8 };
+const RATE_COINS = [[30, 8], [45, 5], [90, 3], [150, 2], [Infinity, 1]];
 const STAGE_COINS = [0, 1, 1.5, 2, 3];
 function shopPrice(lineIndex, total, shiny) {
   const L = LINES[lineIndex];
   const st = stageFor(total);
   if (!L || !st) return 0;
-  const base = L.single && L.legendary ? 15 : STAR_COINS[rarityOf(lineIndex).stars];
+  const base = L.single && L.legendary ? 15 : RATE_COINS.find(([max]) => (L.captureRate ?? 45) <= max)[1];
   return Math.max(1, Math.round(base * STAGE_COINS[st] * (shiny ? 3 : 1)));
 }
 
