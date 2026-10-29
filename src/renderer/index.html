@@ -177,8 +177,14 @@
   .wallet .n { font-size: 27px; font-weight: 800; letter-spacing: -0.8px; margin-top: 1px; }
   .wallet .sub { font-size: 10.5px; color: var(--dim); margin-top: 3px; line-height: 1.5; }
   .item { display: flex; align-items: center; gap: 11px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px; margin-top: 8px; }
-  .item .ic { font-size: 22px; width: 28px; text-align: center; flex-shrink: 0; }
+  .item .ic { font-size: 22px; width: 34px; text-align: center; flex-shrink: 0; }
   .item .ic svg { display: block; margin: 0 auto; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45)); }
+  /* 희귀 알 — 빛이 천천히 숨 쉬고 반짝이가 깜빡인다(egg.js) */
+  .item .ic .egg-legend .egg-halo { animation: eggHalo 2.4s ease-in-out infinite; transform-origin: 50px 54px; }
+  .item .ic .egg-legend .egg-spark { animation: eggSpark 1.6s ease-in-out infinite; }
+  @keyframes eggHalo { 50% { opacity: .45; transform: scale(.9); } }
+  @keyframes eggSpark { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .item .ic .egg-legend * { animation: none !important; } }
   .item .body { flex: 1; min-width: 0; }
   .item .nm { font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 5px; }
   .item .de { font-size: 10.5px; color: var(--dim); margin-top: 1px; }
@@ -203,6 +209,13 @@
   }
   .dexfilter button.on { color: var(--accent); border-color: #4a3a16; }
   /* ---------- 박스 ---------- */
+  .boxall { margin-left: auto; display: flex; gap: 5px; }
+  .boxall button {
+    padding: 4px 9px; font: inherit; font-size: 10.5px; color: var(--muted);
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+  }
+  .boxall button:hover:not(:disabled) { color: var(--accent); border-color: #4a3a16; }
+  .boxall button:disabled { opacity: .45; cursor: default; }
   #boxNote { margin: 0 0 10px; font-size: 10px; color: var(--dim); line-height: 1.5; }
   .bx {
     display: flex; align-items: center; gap: 10px; margin-bottom: 7px; padding: 9px 11px;
@@ -540,7 +553,9 @@
 
   <!-- ---------------- 박스 ---------------- -->
   <section id="tab-box" hidden>
-    <div class="dexhead"><span class="t">박스</span><span class="c" id="boxCount"></span></div>
+    <div class="dexhead"><span class="t">박스</span><span class="c" id="boxCount"></span>
+      <span class="boxall"><button id="petAllOn">모두 띄우기</button><button id="petAllOff">모두 내리기</button></span>
+    </div>
     <div class="note" id="boxNote">
       키우는 아이만 자랍니다. 바탕화면에는 여러 마리를 동시에 세울 수 있습니다.
     </div>

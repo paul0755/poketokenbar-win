@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld("ptb", {
   // 박스
   setActive: (id) => ipcRenderer.send("set-active", id),
   togglePetMember: (id) => ipcRenderer.send("toggle-pet-member", id),
+  petAll: (on) => ipcRenderer.invoke("pet-all", on), // 박스 › 모두 띄우기(true) · 모두 내리기(false)
   release: (id) => ipcRenderer.invoke("release", id),
   // 결투 · 나무열매. 결과(사건 목록·보상)를 받아야 하므로 invoke
   battle: (a) => ipcRenderer.invoke("battle", a),
@@ -95,6 +96,7 @@ contextBridge.exposeInMainWorld("ptb", {
   ballDrag: (p) => ipcRenderer.send("ball-drag", p),
   ballDragEnd: (p) => ipcRenderer.send("ball-drag-end", p),
   ballClick: () => ipcRenderer.send("ball-click"),
+  ballMenu: () => ipcRenderer.send("ball-menu"), // 볼 창 우클릭 — 던질 볼 고르기
 
   // 상점
   openShop: () => ipcRenderer.send("open-shop"),

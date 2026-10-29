@@ -223,6 +223,10 @@ let openProfile = null; // 펼쳐 둔 개체 id
 function renderBox(s) {
   const list = s.box || [];
   $("boxCount").textContent = list.length + "마리";
+  // 이미 다 떠 있으면 모두 띄우기, 숨겨 두었으면 모두 내리기는 누를 게 없다.
+  // 아무도 안 골랐어도 키우는 아이는 떠 있으니(petTargets) 내리기는 "보이는가"로만 정한다
+  $("petAllOn").disabled = !list.length || (s.petVisible !== false && list.every((m) => m.isPet));
+  $("petAllOff").disabled = s.petVisible === false;
   if (!list.length) return void ($("boxList").innerHTML = '<div class="note">아직 없습니다.</div>');
 
   $("boxList").innerHTML = list
@@ -629,7 +633,7 @@ window.ptb.onShop((s) => {
     .map((it) => {
       const dis = it.owned || !it.afford ? " disabled" : "";
       return `<div class="item">
-          <div class="ic">${it.ball && window.ptbBall ? window.ptbBall.svg(it.ball) : it.icon}</div>
+          <div class="ic">${it.ball && window.ptbBall ? window.ptbBall.svg(it.ball) : it.egg && window.ptbEgg ? window.ptbEgg.svg(it.egg, 34) : it.icon}</div>
           <div class="body">
             <div class="nm">${it.name}</div>
             <div class="de">${it.desc}</div>
@@ -761,6 +765,13 @@ $("refreshNow").onclick = () => {
 setInterval(renderScanWhen, 30_000);
 
 $("petToggle").onclick = () => window.ptb.togglePet();
+for (const [bid, on] of [["petAllOn", true], ["petAllOff", false]]) {
+  $(bid).onclick = async () => {
+    $(bid).disabled = true; // 연타로 창을 두 번 만들지 않게. 다음 갱신이 다시 정한다
+    const r = await window.ptb.petAll(on);
+    if (r) toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
+  };
+}
 $("gear").onclick = () => window.ptb.openSettings();
 $("close").onclick = () => window.ptb.hide();
 window.addEventListener("keydown", (e) => {

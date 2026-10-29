@@ -1578,9 +1578,9 @@ function toggleStone(id) {
 }
 
 const SHOP = [
-  { id: "egg", name: "포켓몬 알", cost: 2, desc: "평범한 알. 박스에 한 마리 늘어난다", icon: "🥚" },
-  { id: "egg-super", name: "슈퍼 알", cost: 7, desc: "★3 이상 확정", icon: "🥚" },
-  { id: "egg-legend", name: "희귀 알", cost: 18, desc: "★4 이상 확정. 진짜 전설은 알에서 안 나오고 야생에서만 만난다", icon: "🥚" },
+  { id: "egg", name: "포켓몬 알", cost: 2, desc: "평범한 알. 박스에 한 마리 늘어난다", icon: "🥚", egg: "plain" },
+  { id: "egg-super", name: "슈퍼 알", cost: 7, desc: "★3 이상 확정", icon: "🥚", egg: "super" },
+  { id: "egg-legend", name: "희귀 알", cost: 18, desc: "★4 이상 확정. 진짜 전설은 알에서 안 나오고 야생에서만 만난다", icon: "🥚", egg: "legend" },
   { id: "rare-candy", name: "이상한사탕", cost: 1, desc: "키우는 아이를 1000만 만큼 자라게 한다", icon: "🍬" },
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
   { id: "everstone", name: "변하지않는돌", cost: 3, desc: "지닌 아이는 진화하지 않는다. 박스 › 상세에서 지니게 하거나 뺀다. 빼면 돌아온다", icon: "🪨" },
@@ -2959,6 +2959,36 @@ function togglePetMember(id) {
   refresh(true);
 }
 
+/**
+ * 박스 › 모두 띄우기 · 모두 내리기.
+ *
+ * 펫 한 마리가 창 하나(렌더러 프로세스 하나)라 박스가 크면 수십 개가 한꺼번에 뜬다.
+ * 모두 띄우기는 PET_ALL_MAX 마리까지 — 키우는 아이 먼저, 나머지는 박스 순서대로.
+ * 모두 내리기는 고른 걸 비우고 펫도 숨긴다. 비우기만 하면 petTargets 가 키우는 아이를 다시 띄운다
+ */
+const PET_ALL_MAX = 30;
+function setAllPets(on) {
+  if (on) {
+    const a = box.active(save);
+    const ids = [...new Set([...(a ? [a.id] : []), ...save.box.map((m) => m.id)])];
+    save.petIds = ids.slice(0, PET_ALL_MAX);
+    save.petVisible = true;
+  } else {
+    save.petIds = [];
+    save.petVisible = false;
+  }
+  writeSave();
+  syncPets();
+  refresh(true);
+  const n = save.petIds.length;
+  return {
+    ok: true,
+    message: !on ? "바탕화면의 포켓몬을 모두 내렸습니다"
+      : n < save.box.length ? `바탕화면에 ${n}마리를 띄웠습니다 — 한 번에 ${PET_ALL_MAX}마리까지(키우는 아이 먼저)`
+      : `바탕화면에 ${n}마리를 모두 띄웠습니다`,
+  };
+}
+
 function setWanderLevel(level) {
   save.wanderLevel = level;
   writeSave();
@@ -3183,7 +3213,32 @@ function ballsLeft(W, key) {
 function ballInfo() {
   const W = wildNow;
   if (!W) return;
-  ballSend({ t: "set", key: W.ballKey, name: BALLS[W.ballKey].name, n: ballsLeft(W, W.ballKey), p: wildOdds(W) });
+  // alt — 지금 고른 것 말고 던질 수 있는 볼 종류 수. 있으면 볼 창이 ⇄ 를 단다(누르면 바뀐다는 걸 보이게)
+  const alt = BALL_ORDER.filter((k) => k !== W.ballKey && ballsLeft(W, k) > 0).length;
+  ballSend({ t: "set", key: W.ballKey, name: BALLS[W.ballKey].name, n: ballsLeft(W, W.ballKey), p: wildOdds(W), alt });
+}
+
+/**
+ * 볼 창 우클릭 — 가진 볼을 모두 보이고 골라 쥔다. 누를 때마다 차례로 바뀌는 것만으로는
+ * 마스터볼까지 몇 번 눌러야 하는지, 무엇을 가졌는지 알기 어렵다
+ */
+function ballMenu(sender) {
+  const W = wildNow;
+  if (!W || W.busy || W.fleeing || W.ball.isDestroyed() || sender !== W.ball.webContents) return;
+  Menu.buildFromTemplate([
+    { label: "던질 볼 고르기", enabled: false },
+    { type: "separator" },
+    ...BALL_ORDER.map((key) => {
+      const n = ballsLeft(W, key);
+      return {
+        label: `${BALLS[key].name}  ×${n}${n > 0 ? `  — 잡힐 확률 ${Math.round(wildOdds(W, key) * 100)}%` : ""}`,
+        type: "radio",
+        checked: W.ballKey === key,
+        enabled: n > 0,
+        click: () => { if (wildNow === W && !W.busy && ballsLeft(W, key) > 0) { W.ballKey = key; ballInfo(); } },
+      };
+    }),
+  ]).popup({ window: W.ball });
 }
 
 /**
@@ -3348,7 +3403,8 @@ async function spawnWild() {
       title: L.legendary && L.single
         ? `✨ ${L.mythical ? "환상" : "전설"}의 포켓몬 ${battle.josa(d.name, "이가")} 나타났다!`
         : `야생 ${r.shiny ? "★ " : ""}${battle.josa(d.name, "이가")} 나타났다!`,
-      body: (L.legendary && L.single ? "아주 잡기 어렵습니다. 결투로 약하게 만들고 하이퍼볼을 쓰세요(마스터볼이면 반드시 잡힙니다). " : "") + (isNew ? "처음 보는 포켓몬입니다. " : "") + "화면 아래 몬스터볼을 잡고 던져 보세요",
+      body: (L.legendary && L.single ? "아주 잡기 어렵습니다. 결투로 약하게 만들고 하이퍼볼을 쓰세요(마스터볼이면 반드시 잡힙니다). " : "") + (isNew ? "처음 보는 포켓몬입니다. " : "") + "화면 아래 몬스터볼을 잡고 던져 보세요" +
+        (BALL_ORDER.some((k) => k !== "poke" && ballsLeft(W, k) > 0) ? ". 볼을 누르거나 우클릭하면 슈퍼볼 · 하이퍼볼 · 마스터볼로 바꿉니다" : ""),
       silent: false,
     }).show();
   }
@@ -3808,6 +3864,7 @@ app.whenReady().then(async () => {
 
   /** 박스: 바탕화면에 띄울지 토글 */
   ipcMain.on("toggle-pet-member", (_e, id) => togglePetMember(id));
+  ipcMain.handle("pet-all", (_e, on) => setAllPets(Boolean(on)));
 
   /** 박스: 놓아주기 */
   ipcMain.handle("battle", (_e, { a, b, level } = {}) => startBattle(a, b, level));
@@ -3821,6 +3878,7 @@ app.whenReady().then(async () => {
    */
   ipcMain.handle("wild-spawn", () => spawnWild());
   ipcMain.on("wild-menu", (e) => wildMenu(e.sender));
+  ipcMain.on("ball-menu", (e) => ballMenu(e.sender));
   const okPt = (p) => p && Number.isFinite(p.x) && Number.isFinite(p.y);
   ipcMain.on("ball-drag-start", (_e, p) => {
     const W = wildNow;

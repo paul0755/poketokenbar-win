@@ -42,6 +42,12 @@
     color: #14151a; background: #ffcb05; box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
   }
   body.fly #n, body.busy #n { display: none; }
+  /* 다른 볼도 가졌다 — 누르면 바뀐다 */
+  #sw {
+    position: fixed; right: 3px; top: 2px; padding: 1px 3px; border-radius: 6px;
+    color: #14151a; background: #9ad0ff; font-size: 9px; box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+  }
+  body.fly #sw, body.busy #sw, body.vanish #sw { display: none; }
   #star { position: fixed; inset: 0; display: grid; place-items: center; font-size: 22px; opacity: 0; }
   #star.on { animation: star 1.2s ease forwards; }
   @keyframes star { 0% { opacity: 0; scale: .4; } 25% { opacity: 1; scale: 1.2; } 100% { opacity: 0; scale: 1.6; translate: 0 -30%; } }
@@ -49,6 +55,7 @@
 <svg id="ball" viewBox="0 0 100 100" aria-hidden="true"></svg>
 <div id="n"></div>
 <div id="odds"></div>
+<div id="sw" hidden title="누르면 다음 볼 · 우클릭하면 골라 쥐기">⇄</div>
 <div id="star">✨</div>
 <script src="ballart.js"></script>
 <script>document.getElementById("ball").innerHTML = window.ptbBall.inner("poke", "w");</script>

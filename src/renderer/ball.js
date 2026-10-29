@@ -14,6 +14,12 @@ let locked = false; // 날아가는 중·포획 판정 중에는 잡을 수 없�
 
 document.body.classList.add("idle");
 
+// 우클릭 — 가진 볼을 모두 보이는 메뉴(메인이 띄운다)
+window.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  if (!locked) window.ptb.ballMenu();
+});
+
 window.addEventListener("mousedown", (e) => {
   if (e.button !== 0 || locked) return;
   dragging = true;
@@ -65,7 +71,9 @@ window.ptb.onBall((d) => {
       document.body.dataset.ball = d.key;
       document.getElementById("n").textContent = "×" + d.n;
       document.getElementById("odds").textContent = Math.round(d.p * 100) + "%";
-      document.body.title = `${d.name} — 끌어서 던지기 · 누르면 볼 바꾸기`;
+      // 다른 볼도 있으면 ⇄ — 누르면 바뀐다는 걸 글자 없이 보인다
+      document.getElementById("sw").hidden = !d.alt;
+      document.body.title = `${d.name} — 끌어서 던지기${d.alt ? ` · 누르면 다음 볼 · 우클릭하면 골라 쥐기(${d.alt}종 더)` : ""}`;
       break;
     case "fly":
       locked = true;
