@@ -1068,7 +1068,7 @@ async function raidShards() {
   return { ok: true, shards: shards.sort((a, b) => b.n - a.n), need: r.shardNeed || 5, swapRate: r.swapRate || 2, legends: legends.map((line) => ({ line, name: raidName(line) })) };
 }
 
-/** 조각 5개로 그 전설을 받는다 — 지갑이 조각을 뺀 뒤 박스에 넣는다. 야생에서 잡은 것처럼 부화한 모습이다 */
+/** 조각 5개로 그 전설을 받는다 — 지갑이 조각을 뺀 뒤 박스에 넣는다. 야생에서 잡은 것처럼 첫 모습(1차 진화)이다 */
 async function raidRedeem(line) {
   line = Number(line);
   const L = poke.LINES[line];
@@ -1580,14 +1580,20 @@ function toggleStone(id) {
 const SHOP = [
   { id: "egg", name: "포켓몬 알", cost: 2, desc: "평범한 알. 박스에 한 마리 늘어난다", icon: "🥚", egg: "plain" },
   { id: "egg-super", name: "슈퍼 알", cost: 7, desc: "★3 이상 확정", icon: "🥚", egg: "super" },
-  { id: "egg-legend", name: "희귀 알", cost: 18, desc: "★4 이상 확정. 진짜 전설은 알에서 안 나오고 야생에서만 만난다", icon: "🥚", egg: "legend" },
+  { id: "egg-legend", name: "희귀 알", cost: 18, desc: "★4 이상 확정", icon: "🥚", egg: "legend" },
+  /*
+   * 전설은 야생(출현의 0.5% 남짓)과 레이드 조각으로만 얻었다 — 사탕을 아무리 모아도 운이었다.
+   * 무작위 전설 하나(환상 제외). 레이드 조각은 "고른" 전설이라 쓸모가 겹치지 않는다.
+   * 값은 마스터볼(🍬40)보다 비싸게, 한 주에 하나 — 사탕이 쌓인 사람이 전설을 한 번에 다 모으지 않게
+   */
+  { id: "egg-mythic", name: "전설의 알", cost: 60, desc: "전설의 포켓몬 하나가 깨어난다(환상의 포켓몬은 야생에서만). 한 주에 1개만 살 수 있다", icon: "🥚", egg: "mythic", weekly: "mythicWeek" },
   { id: "rare-candy", name: "이상한사탕", cost: 1, desc: "키우는 아이를 1000만 만큼 자라게 한다", icon: "🍬" },
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
   { id: "everstone", name: "변하지않는돌", cost: 3, desc: "지닌 아이는 진화하지 않는다. 박스 › 상세에서 지니게 하거나 뺀다. 빼면 돌아온다", icon: "🪨" },
   { id: "tm", name: "기술머신", cost: 3, desc: "키우는 아이가 배울 수 있는 기술머신 기술 하나를 가르친다", icon: "💿" },
   { id: "great-ball", name: "슈퍼볼 3개", cost: 1, desc: "야생 포켓몬이 1.5배 잘 잡힌다", icon: "🔵", ball: "great" },
   { id: "ultra-ball", name: "하이퍼볼 3개", cost: 2, desc: "야생 포켓몬이 2배 잘 잡힌다", icon: "🟡", ball: "ultra" },
-  { id: "master-ball", name: "마스터볼", cost: 40, desc: "던지면 반드시 잡힌다. 전설도. 한 주에 1개만 살 수 있다", icon: "🟣", ball: "master", weekly: true },
+  { id: "master-ball", name: "마스터볼", cost: 40, desc: "던지면 반드시 잡힌다. 전설도. 한 주에 1개만 살 수 있다", icon: "🟣", ball: "master", weekly: "masterWeek" },
   { id: "charm", name: "반짝이는 부적", cost: 60, desc: "이로치 확률 2배. 한 번만 살 수 있다", icon: "✨", once: true },
 ];
 
@@ -1804,9 +1810,9 @@ function loadSave() {
   if (!save.maxStage || typeof save.maxStage !== "object") save.maxStage = {};
   if (!Array.isArray(save.box)) save.box = [];
   if (!Array.isArray(save.petIds)) save.petIds = [];
-  // 0.13.1 은 야생 아이를 1차 진화로 올렸다 — 옛 아이는 부화와 1차 진화의 차이만큼 더해 주고(wildMid),
-  // 새로 잡은 아이는 1차 진화 성장량으로 넣었다. 잘못 알아들은 것이었다: 니드런은 니드런으로 나오고 잡혀야 한다.
-  // "알에서 부화를 기다리는 것처럼" 보이던 건 단계 이름(부화) 탓이었다 — stageLabel 이 고친다.
+  // 0.13.1 은 야생 아이를 한 칸 더 키워 넣었다(baby → mid) — 옛 아이는 그 차이만큼 더해 주고(wildMid),
+  // 새로 잡은 아이는 mid 성장량으로 넣었다. 잘못 알아들은 것이었다: 니드런은 니드런으로 나오고 잡혀야 한다.
+  // "알에서 부화를 기다리는 것처럼" 보이던 건 단계 이름("부화") 탓이었다 — 이제 첫 모습은 "1차 진화"다.
   // 한 번만, 더한 만큼을 도로 뺀다(그 사이 키운 만큼은 그대로 남는다)
   for (const m of save.box) {
     if (!m || !m.wildMid) continue;
@@ -1815,12 +1821,6 @@ function loadSave() {
     m.maxStage = poke.stageFor(box.effOf(m, growthSpeed())); // 다시 진화하면 알림이 뜨게
   }
 }
-
-/**
- * 화면에 보일 단계 이름. 야생에서 잡은 아이의 첫 모습은 "부화"가 아니다 — 알에서 나온 적이 없다.
- * "부화"라고 적혀 있으면 알이 깨기를 기다리는 아이처럼 보인다
- */
-const stageLabel = (m, d) => (m && m.wild && d.stage.key === "baby" ? "야생에서 잡음" : d.stage.label);
 
 function writeSave() {
   // 못 읽고 시작한 판은 저장하지 않는다. 덮어쓰면 진짜 진행이 날아간다.
@@ -1892,10 +1892,10 @@ function candy(total = lastTotal) {
  * 0.1.x에서는 여기서 키우던 아이를 덮어썼다. 이제는 박스에 더하고
  * 새 아이를 "키우는 중"으로 옮긴다 — 이전 아이는 그 자리에 남는다.
  */
-function hatch(minStars = 0) {
+function hatch(minStars = 0, legend = false) {
   const cur = box.active(save);
   const exclude = cur ? cur.line : null;
-  const line = minStars > 0 ? poke.rollAtLeast(minStars, exclude) : poke.roll(exclude);
+  const line = legend ? poke.rollLegend(exclude) : minStars > 0 ? poke.rollAtLeast(minStars, exclude) : poke.roll(exclude);
   const m = box.make(line, poke.rollNature(), poke.rollShiny(Boolean(save.charm)));
   save.box.push(m);
   save.activeId = m.id;
@@ -1911,7 +1911,8 @@ function buy(itemId) {
   const item = SHOP.find((x) => x.id === itemId);
   if (!item) return { ok: false, reason: "없는 물건" };
   if (item.once && save.charm) return { ok: false, reason: "이미 가지고 있습니다" };
-  if (item.weekly && save.masterWeek === localMonday()) return { ok: false, reason: "마스터볼은 한 주에 1개만 살 수 있습니다. 다음 주 월요일에 다시 살 수 있습니다" };
+  // weekly 는 이번 주 월요일을 적어 둘 세이브 칸 이름이다
+  if (item.weekly && save[item.weekly] === localMonday()) return { ok: false, reason: `${item.name}은 한 주에 1개만 살 수 있습니다. 다음 주 월요일에 다시 살 수 있습니다` };
   const c = candy();
   const cost = priceOf(item.cost);
   if (c.left < cost) return { ok: false, reason: "사탕이 모자랍니다" };
@@ -1921,6 +1922,7 @@ function buy(itemId) {
   if (itemId === "egg") { hatch(0); msg = "새 알을 받았습니다"; }
   else if (itemId === "egg-super") { hatch(3); msg = "슈퍼 알 — ★3 이상"; }
   else if (itemId === "egg-legend") { hatch(4); msg = "희귀 알 — ★4 이상"; }
+  else if (itemId === "egg-mythic") { hatch(0, true); msg = "전설의 알 — 5M 쓰면 깨어납니다"; }
   else if (itemId === "mint") {
     const a = box.active(save);
     if (!a) { save.candySpent -= cost; return { ok: false, reason: "키우는 아이가 없습니다" }; }
@@ -1952,7 +1954,6 @@ function buy(itemId) {
   } else if (itemId === "master-ball") {
     save.balls = save.balls || { great: 0, ultra: 0 };
     save.balls.master = (save.balls.master || 0) + 1;
-    save.masterWeek = localMonday(); // 한 주에 1개 — 이번 주 월요일을 적어 둔다
     msg = "마스터볼을 샀습니다 (가진 수 " + save.balls.master + ") — 야생에서 볼을 눌러 마스터볼로 바꿔 던지세요";
     if (wildNow) ballInfo();
   } else if (itemId === "everstone") {
@@ -1960,6 +1961,7 @@ function buy(itemId) {
     save.items.everstone = (save.items.everstone || 0) + 1;
     msg = "변하지않는돌을 샀습니다 (가진 수 " + save.items.everstone + ") — 박스 › 상세에서 지니게 하세요";
   } else if (itemId === "charm") { save.charm = true; msg = "이로치 확률이 2배가 됩니다"; }
+  if (item.weekly) save[item.weekly] = localMonday(); // 한 주에 1개 — 이번 주 월요일을 적어 둔다
 
   writeSave();
   refresh(true);
@@ -2063,8 +2065,7 @@ async function buildStats() {
   const grown = act ? act.raw || 0 : 0;
   recordStage(act, eff);
   checkGraduation(act, eff);
-  const desc = poke.describe(eff, act ? act.line : 0, { shiny: act && act.shiny });
-  const mon = { ...desc, stage: { ...desc.stage, label: stageLabel(act, desc) } }; // 홈 · 트레이 · 알림의 단계 이름
+  const mon = poke.describe(eff, act ? act.line : 0, { shiny: act && act.shiny });
   // 트레이는 정적 PNG(nativeImage는 GIF를 움직이지 못한다), 화면은 애니메이션 GIF.
   const still = await poke.spriteWithFallback(mon, CACHE, "still");
   const anim = await poke.spriteWithFallback(mon, CACHE, "anim");
@@ -2083,8 +2084,9 @@ async function buildStats() {
       return {
         id: m.id,
         name: d.name,
-        stage: stageLabel(m, d),
+        stage: d.stage.label,
         stageKey: d.stage.key,
+        single: Boolean(d.single), // 알이면 전설의 알 그림으로
         ratio: d.progress.ratio,
         next: d.progress.next,
         remaining: d.progress.remaining,
@@ -2517,7 +2519,7 @@ function pushShop() {
     items: SHOP.map((x) => ({
       ...x,
       cost: priceOf(x.cost),
-      owned: x.once ? Boolean(save.charm) : x.weekly ? save.masterWeek === localMonday() : false,
+      owned: x.once ? Boolean(save.charm) : x.weekly ? save[x.weekly] === localMonday() : false,
       have: x.id === "everstone" ? stoneCount() : x.ball ? ((save.balls || {})[x.ball] || 0) : undefined,
       afford: c.left >= priceOf(x.cost),
     })),

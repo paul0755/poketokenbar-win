@@ -11,11 +11,14 @@ const path = require("node:path");
 
 const STAGES = [
   { key: "egg", at: 0, label: "알" },
-  { key: "baby", at: 5_000_000, label: "부화" },
-  { key: "mid", at: 80_000_000, label: "1차 진화" },
-  { key: "final", at: 400_000_000, label: "최종 진화" },
+  { key: "baby", at: 5_000_000, label: "1차 진화" },
+  { key: "mid", at: 80_000_000, label: "2차 진화" },
+  { key: "final", at: 400_000_000, label: "3차 진화" },
   { key: "master", at: 1_500_000_000, label: "마스터" },
 ];
+// 이름은 알에서 깬 첫 모습부터 1차 · 2차 · 3차로 센다. 처음엔 부화 · 1차 진화 · 최종 진화였는데,
+// "부화"는 야생에서 잡은 첫 모습에도 붙어 알이 깨기를 기다리는 아이처럼 보였고 칸 이름이 들쭉날쭉했다.
+// 2단 라인은 2차에서 마지막 모습이 되고 3차는 같은 모습이다(키는 그대로 — 세이브 · 서버가 키로 센다)
 
 /**
  * 진화 라인. ids/names는 STAGES와 같은 길이로 맞춘다.
@@ -72,10 +75,24 @@ function wildWeight(lineIndex) {
   return rarityOf(lineIndex).weight;
 }
 
+/**
+ * 별은 포획률로 정하되 진화 단계 수로 한 번 더 묶는다 — 3단 진화는 ★3 이상, 2단 진화는 ★3 까지.
+ * 포획률만 쓰면 스라크 · 만타인(2단)이 ★4 로 스타팅(3단)과 같고, 구구 · 캐터피(3단)는 ★1 이었다.
+ * 세 번 진화하는 아이가 더 귀해야 키우는 맛이 난다. 진화 없는 종은 포획률 그대로.
+ * 포획 확률(captureRate)과 판매가(포획률로 센다 — 서버와 같은 표)는 바꾸지 않는다.
+ */
+const STAR3 = RARITY.find((r) => r.stars === 3);
+const formsOf = (L) => new Set(L.ids.slice(1, 4)).size;
+
 function rarityOf(lineIndex) {
   const L = LINES[lineIndex % LINES.length];
   const cr = L.captureRate ?? 45;
-  const tier = RARITY.find((r) => cr <= r.max);
+  let tier = RARITY.find((r) => cr <= r.max);
+  if (!L.single) {
+    const forms = formsOf(L);
+    if (forms >= 3 && tier.stars < 3) tier = STAR3;
+    if (forms <= 2 && tier.stars > 3) tier = STAR3;
+  }
   return { ...tier, captureRate: cr, legendary: Boolean(L.legendary) };
 }
 
@@ -99,6 +116,15 @@ function rollWild() {
     if (r <= 0) return i;
   }
   return 0;
+}
+
+/**
+ * 전설의 알(상점) — 전설 중 하나를 고르게 뽑는다. 환상의 포켓몬은 뺀다(야생에서만 만나는 특별함으로 둔다).
+ * 키우는 아이와 같은 종은 피한다(roll 과 같은 이유)
+ */
+function rollLegend(exclude = null) {
+  const pool = LINES.map((_, i) => i).filter((i) => i !== exclude && LINES[i].single && LINES[i].legendary && !LINES[i].mythical);
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 /**
@@ -229,20 +255,25 @@ function describe(total, lineIndex = 0, opts = {}) {
  */
 function describeSingle(L, total, i, opts) {
   const master = STAGES[i].key === "master";
-  const label = master ? STAGES[4].label : L.mythical ? "환상의 포켓몬" : L.legendary ? "전설의 포켓몬" : "진화 없음";
+  const kind = L.mythical ? "환상의 포켓몬" : L.legendary ? "전설의 포켓몬" : "진화 없음";
+  // 전설의 알(상점)에서 나온 아이는 알부터 시작한다 — 알 칸은 보통 알과 같게, 깨면 "전설의 포켓몬"
+  const egg = i === 0;
+  const label = master ? STAGES[4].label : egg ? STAGES[0].label : kind;
   const from = STAGES[1].at;
   const to = STAGES[4].at;
   return {
     line: L.line,
     name: L.names[i],
-    stageIndex: master ? 4 : 1,
-    stage: { ...STAGES[i], key: master ? "master" : i === 0 ? "egg" : "final", label },
+    stageIndex: master ? 4 : egg ? 0 : 1, // 알 → 1 로 오를 때 "깨어났다" 알림이 뜬다
+    stage: { ...STAGES[i], key: master ? "master" : egg ? "egg" : "final", label },
     dexId: L.ids[i],
     isEgg: i === 0,
     isShiny: master || Boolean(opts.shiny),
     single: true,
     progress: master
       ? { ratio: 1, remaining: 0, next: null }
+      : egg
+      ? { ratio: Math.max(0, Math.min(1, total / from)), remaining: from - total, next: kind }
       : { ratio: Math.max(0, Math.min(1, (total - from) / (to - from))), remaining: to - total, next: "마스터(이로치)" },
   };
 }
@@ -330,4 +361,4 @@ async function spriteWithFallback(mon, cacheDir, kind) {
   catch (e) { console.error("[sprite] 실패 " + mon.dexId + " " + kind + ": " + e.message); return null; }
 }
 
-module.exports = { STAGES, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollWild, isSingle, shopPrice, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };
+module.exports = { STAGES, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollWild, rollLegend, isSingle, shopPrice, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };

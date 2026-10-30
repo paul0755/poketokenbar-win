@@ -12,6 +12,8 @@
  *   plain   포켓몬 알  크림색 + 초록 점
  *   super   슈퍼 알    하늘색 + 흰 지그재그 띠 + 별
  *   legend  희귀 알    금빛 + 보라 왕관 무늬 + 반짝이(희귀도 색 #c084fc 와 맞춘다)
+ *   mythic  전설의 알  진주빛 은색 + 무지개 띠 + 무지개 빛 — 희귀 알의 금빛과 한눈에 달라야 한다.
+ *           박스 · 홈에서도 전설의 알은 이 그림이다(eggSvg 의 두 번째 인자)
  *
  * 쓰는 쪽: <div>${eggSvg(112)}</div> · 상점 아이콘은 window.ptbEgg.svg("super", 28)
  */
@@ -53,7 +55,20 @@
         <circle cx="48" cy="74" r="2.2" fill="#fff" opacity=".8"/>
         <path d="M60 18 l2 7 7 2 -7 2 -2 7 -2 -7 -7 -2 7 -2 Z" fill="#fff"/>`,
       // 알 밖까지 번지는 빛 — 비싼 알은 멀리서도 다르게 보여야 한다
-      halo: true,
+      halo: ["#ffd45e", "#c084fc"],
+    },
+    mythic: {
+      body: ["#ffffff", "#e4e9f2", "#9aa6bb"], line: "#5d6b84",
+      rainbow: true,
+      // 가운데를 비스듬히 두르는 무지개 띠와 위아래 은빛 물결
+      deco: (u) => `<path d="M0 50 C25 38 75 62 100 48 L100 66 C75 80 25 56 0 68 Z" fill="url(#er-${u})" opacity=".95"/>
+        <path d="M0 50 C25 38 75 62 100 48" fill="none" stroke="#fff" stroke-width="2.2" opacity=".9"/>
+        <path d="M0 68 C25 56 75 80 100 66" fill="none" stroke="#fff" stroke-width="2.2" opacity=".9"/>
+        <path d="M14 30 C30 24 44 30 58 24" fill="none" stroke="#b9c3d6" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M30 86 C44 80 58 86 74 80" fill="none" stroke="#b9c3d6" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M66 22 l2 7 7 2 -7 2 -2 7 -2 -7 -7 -2 7 -2 Z" fill="#fff"/>
+        <circle cx="50" cy="58" r="5" fill="#fff" stroke="#5d6b84" stroke-width="1.5"/>`,
+      halo: ["#a5f3fc", "#f0abfc"],
     },
   };
 
@@ -77,12 +92,13 @@
       <stop offset=".5" stop-color="#000" stop-opacity="0"/>
       <stop offset="1" stop-color="#000" stop-opacity=".26"/>
     </radialGradient>
-    ${k.halo ? `<radialGradient id="eh-${u}"><stop offset=".45" stop-color="#ffd45e" stop-opacity=".55"/><stop offset="1" stop-color="#c084fc" stop-opacity="0"/></radialGradient>` : ""}
+    ${k.halo ? `<radialGradient id="eh-${u}"><stop offset=".45" stop-color="${k.halo[0]}" stop-opacity=".55"/><stop offset="1" stop-color="${k.halo[1]}" stop-opacity="0"/></radialGradient>` : ""}
+    ${k.rainbow ? `<linearGradient id="er-${u}" x1="0" x2="1">${["#ff6b6b", "#ffb347", "#ffe66d", "#7ee08a", "#5ec8ff", "#a78bfa", "#f472b6"].map((c, j) => `<stop offset="${j / 6}" stop-color="${c}"/>`).join("")}</linearGradient>` : ""}
   </defs>
   ${k.halo ? `<circle class="egg-halo" cx="50" cy="54" r="50" fill="url(#eh-${u})"/>` : ""}
   <ellipse cx="50" cy="99" rx="26" ry="4" fill="rgba(0,0,0,.28)"/>
   <path d="${SHAPE}" fill="url(#eb-${u})"/>
-  <g clip-path="url(#ec-${u})">${k.deco}<path d="${SHAPE}" fill="url(#es-${u})"/></g>
+  <g clip-path="url(#ec-${u})">${typeof k.deco === "function" ? k.deco(u) : k.deco}<path d="${SHAPE}" fill="url(#es-${u})"/></g>
   <path d="${SHAPE}" fill="none" stroke="${k.line}" stroke-width="2.5"/>
   <!-- 광택. 있으면 평평한 타원이 아니라 알로 보인다 -->
   <ellipse cx="36" cy="28" rx="9" ry="13" fill="#fff" opacity=".5" transform="rotate(-20 36 28)"/>
@@ -95,6 +111,6 @@
   }
 
   window.ptbEgg = { svg };
-  // 키우는 아이 자리의 알 — 평범한 알이다
-  window.eggSvg = (size = 112) => svg("plain", size);
+  // 키우는 아이 자리의 알 — 평범한 알, 진화 없는 종(전설의 알에서 온 아이)이면 전설의 알
+  window.eggSvg = (size = 112, single = false) => svg(single ? "mythic" : "plain", size);
 })();

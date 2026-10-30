@@ -88,7 +88,7 @@ function renderHome(s) {
   // 개체
   $("pic").innerHTML = s.animUrl || s.stillUrl
     ? `<img src="${s.animUrl || s.stillUrl}" alt="">`
-    : window.eggSvg(70);
+    : window.eggSvg(70, mon.single);
   $("monName").textContent = mon.name;
 
   const b = [];
@@ -245,7 +245,7 @@ function renderBox(s) {
       const lv = p ? `Lv.${p.level} · ` : "";
       return `
         <div class="bx ${m.active ? "act" : ""}" data-id="${m.id}">
-          <div class="pic">${m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50)}</div>
+          <div class="pic">${m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50, m.single)}</div>
           <div class="info" title="눌러서 상세 보기">
             <div class="nm">${m.name}${m.shiny ? " ★" : ""}${tags}</div>
             <div class="sub">${lv}${"★".repeat(m.stars)} ${m.stage}${m.nature ? " · " + m.nature : ""}</div>

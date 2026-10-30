@@ -180,11 +180,11 @@
   .item .ic { font-size: 22px; width: 34px; text-align: center; flex-shrink: 0; }
   .item .ic svg { display: block; margin: 0 auto; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45)); }
   /* 희귀 알 — 빛이 천천히 숨 쉬고 반짝이가 깜빡인다(egg.js) */
-  .item .ic .egg-legend .egg-halo { animation: eggHalo 2.4s ease-in-out infinite; transform-origin: 50px 54px; }
-  .item .ic .egg-legend .egg-spark { animation: eggSpark 1.6s ease-in-out infinite; }
+  .item .ic :is(.egg-legend, .egg-mythic) .egg-halo { animation: eggHalo 2.4s ease-in-out infinite; transform-origin: 50px 54px; }
+  .item .ic :is(.egg-legend, .egg-mythic) .egg-spark { animation: eggSpark 1.6s ease-in-out infinite; }
   @keyframes eggHalo { 50% { opacity: .45; transform: scale(.9); } }
   @keyframes eggSpark { 50% { opacity: .25; } }
-  @media (prefers-reduced-motion: reduce) { .item .ic .egg-legend * { animation: none !important; } }
+  @media (prefers-reduced-motion: reduce) { .item .ic :is(.egg-legend, .egg-mythic) * { animation: none !important; } }
   .item .body { flex: 1; min-width: 0; }
   .item .nm { font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 5px; }
   .item .de { font-size: 10.5px; color: var(--dim); margin-top: 1px; }
