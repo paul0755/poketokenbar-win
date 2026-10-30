@@ -29,7 +29,7 @@
   }
   nav button {
     -webkit-app-region: no-drag;
-    padding: 6px 13px; font: inherit; font-size: 12px; font-weight: 600;
+    padding: 6px min(13px, 2.2vw); font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap;
     color: var(--muted); background: transparent; border: 0; border-radius: 9px; cursor: pointer;
   }
   nav button:hover { color: var(--text); }
@@ -312,39 +312,6 @@
   #toast.shiny { background: #3a2f16; border-color: #6a5420; color: var(--accent); }
 
   /* ---------- 결투 ---------- */
-  .btlpick { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
-  .btlpick select {
-    flex: 1; min-width: 0; padding: 6px 7px; font: inherit; font-size: 11px; color: var(--text);
-    background: var(--card2); border: 1px solid var(--line); border-radius: 8px;
-  }
-  .btlpick .vs { font-size: 11px; font-weight: 800; color: var(--accent); }
-  .btlrow { display: flex; gap: 6px; margin-top: 8px; }
-  .btlrow button {
-    flex: 1; padding: 8px; font: inherit; font-size: 12px; font-weight: 700; border-radius: 9px; cursor: pointer;
-    background: var(--accent); color: #14151a; border: 0;
-  }
-  .btlrow button:disabled { background: #33363f; color: var(--dim); cursor: default; }
-  .btlrow #btlSkip, .btlrow #btlDesk { flex: 0 0 auto; background: var(--card2); color: var(--muted); border: 1px solid var(--line); }
-  .btlrow #btlDesk:not(:disabled):hover { color: var(--text); border-color: var(--accent); }
-  .arena { display: flex; gap: 8px; margin-top: 10px; }
-  .arena .side { flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 8px; }
-  .arena .hd { display: flex; align-items: baseline; gap: 5px; font-size: 11.5px; }
-  .arena .hd .nm { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .arena .hd .lv { color: var(--accent); font-weight: 700; font-size: 10.5px; }
-  .arena .hd .st { margin-left: auto; font-size: 9.5px; font-weight: 700; color: var(--orange); }
-  .arena .hpbar { height: 6px; margin-top: 5px; background: #2b2e37; border-radius: 99px; overflow: hidden; }
-  .arena .hpbar i { display: block; height: 100%; width: 100%; background: var(--green); border-radius: 99px; transition: width .45s ease; }
-  .arena .hpbar i.yellow { background: #f5c542; }
-  .arena .hpbar i.red { background: var(--red); }
-  .arena .hpn { font-size: 9.5px; color: var(--muted); text-align: right; margin-top: 2px; }
-  /* 무대. 연출 캔버스가 이 안에 깔린다 (moves.css 의 .fx 는 absolute) */
-  .arena .stage { position: relative; aspect-ratio: 1; margin-top: 4px; overflow: hidden; border-radius: 8px; background: radial-gradient(ellipse 34% 7% at 50% 92%, #2a2d36 0 70%, transparent 100%); }
-  .arena .fbody { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
-  .arena .fbody img { width: 82%; height: 82%; object-fit: contain; image-rendering: pixelated; }
-  .arena .fbody img.flip { transform: scaleX(-1); }
-  .arena .fbody.hit img { animation: hitblink .45s steps(2, end); }
-  @keyframes hitblink { 50% { opacity: .15; } }
-  .arena .fbody.faint { transition: transform .6s ease-in, opacity .6s; transform: translateY(40%); opacity: 0; }
   .btllog {
     margin-top: 8px; max-height: 150px; overflow-y: auto; padding: 8px 10px; font-size: 10.5px; line-height: 1.6;
     background: var(--card); border: 1px solid var(--line); border-radius: 10px; color: var(--muted);
@@ -356,41 +323,12 @@
   .btllog .ft { color: var(--red); font-weight: 700; }
   .btllog .sys { color: var(--accent); }
   .btllog .rw { color: var(--green); font-weight: 700; }
-  .bag { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
-  .berry { display: flex; flex-direction: column; align-items: center; padding: 7px 2px; background: var(--card); border: 1px solid var(--line); border-radius: 9px; font-size: 10px; }
-  .berry b { font-size: 10.5px; }
-  .berry span { color: var(--dim); font-size: 9px; }
-  .berry i { font-style: normal; font-weight: 800; color: var(--accent); margin-top: 2px; }
-  .berry.none { opacity: .45; }
 
-  /* 친선 배틀 */
-  .btlpick input {
-    flex: 1; min-width: 0; padding: 6px 7px; font: inherit; font-size: 11px; color: var(--text);
-    background: var(--card2); border: 1px solid var(--line); border-radius: 8px;
-  }
-  .frcode { display: flex; gap: 6px; margin-top: 8px; }
-  .frcode textarea, .frin {
-    flex: 1; min-width: 0; width: 100%; box-sizing: border-box; resize: none; padding: 6px 8px;
-    font: 10px/1.4 Consolas, monospace; color: var(--text); word-break: break-all;
-    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
-  }
-  .frin { margin-top: 8px; }
-  .frcode button {
-    padding: 0 12px; font: inherit; font-size: 11px; font-weight: 700; border-radius: 8px; cursor: pointer;
-    background: var(--card2); color: var(--text); border: 1px solid var(--line);
-  }
-  .frfoe { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 11.5px; font-weight: 700; }
-  .frfoe img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; }
   .mini2 {
     flex: 0 0 auto; padding: 6px 10px; font: inherit; font-size: 11px; font-weight: 700; border-radius: 8px; cursor: pointer;
     background: var(--card2); color: var(--text); border: 1px solid var(--line);
   }
   .mini2:disabled { color: var(--dim); cursor: default; }
-  .liveroom { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; font-size: 11px; color: var(--muted); }
-  .liveroom b { flex: 1; font-size: 20px; letter-spacing: 4px; color: var(--accent); font-family: Consolas, monospace; }
-  .btlrow #liveLeave { flex: 0 0 auto; background: var(--card2); color: var(--muted); border: 1px solid var(--line); }
-  #liveStatus.bad { color: var(--red); }
-  .frfoe .evo { padding: 1px 6px; border-radius: 6px; background: var(--accent); color: #14151a; font-size: 10px; }
 
   /* 개체 상세의 나무열매 */
   .feed { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -434,6 +372,7 @@
 <link rel="stylesheet" href="moves.css" />
 <link rel="stylesheet" href="room.css" />
 <link rel="stylesheet" href="mall.css" />
+<link rel="stylesheet" href="online.css" />
 <link rel="stylesheet" href="boss.css" />
 
 <nav>
@@ -442,7 +381,7 @@
   <button data-tab="box">박스</button>
   <button data-tab="room">방</button>
   <button data-tab="boss">보스</button>
-  <button data-tab="battle">결투</button>
+  <button data-tab="battle">온라인</button>
   <button data-tab="dex">도감</button>
   <span class="sp"></span>
   <button class="ico" id="gear" title="설정">⚙</button>
@@ -724,111 +663,100 @@
   </section>
 
   <section id="tab-battle" hidden>
-    <div class="dexhead"><span class="t">결투</span><span class="c" id="btlLeft"></span></div>
-    <div class="note">
-      박스의 두 아이를 싸움 붙입니다. 능력치·상성·기술은 원작 규칙 그대로입니다.
-      이기면 나무열매를 받습니다(하루 5번).
-      바탕화면에서 펫을 끌어 다른 펫 위에 놓아도 싸웁니다.
+    <!-- 온라인 — 친구와 실시간 결투 · 교환 코드 받기. 방 탭처럼 안에서 나눈다(online.css) -->
+    <div class="rm-switch" id="olSwitch">
+      <button data-view="battle" class="on">⚔️ 결투</button>
+      <button data-view="trade">🔁 교환</button>
+      <span class="c" id="olHint">친구와 같은 결투를 동시에</span>
     </div>
-    <div class="btlpick">
-      <select id="btlA"></select><span class="vs">VS</span><select id="btlB"></select>
-    </div>
-    <div class="btlpick">
-      <select id="btlLv">
-        <option value="50" selected>Lv.50으로 맞추기 — 개체값·성격·기술로 승부</option>
-        <option value="real">실제 레벨로 — 레벨 차이 그대로</option>
-      </select>
-    </div>
-    <div class="btlrow">
-      <button id="btlGo">결투 시작</button>
-      <button id="btlDesk" title="두 펫이 바탕화면에서 마주 서서 싸웁니다">바탕화면에서</button>
-      <button id="btlSkip" hidden>건너뛰기</button>
-    </div>
-    <div class="note" id="btlNote"></div>
-    <div class="arena" id="arena" hidden>
-      <div class="side" id="sideA">
-        <div class="hd"><span class="nm"></span><span class="lv"></span><span class="st"></span></div>
-        <div class="hpbar"><i id="hpA"></i></div>
-        <div class="hpn" id="hpnA"></div>
-        <div class="stage" id="stageA"><div class="fbody" id="bodyA"><img alt="" /></div></div>
+
+    <!-- 결투 화면. 실시간 배틀도, 길드원과의 결투도 여기서 재생한다 -->
+    <div class="btlshow" id="btlShow" hidden>
+      <div class="btlbar"><b id="btlTitle">결투</b><button id="btlSkip" hidden>건너뛰기 ⏭</button><button id="btlClose" hidden>닫기 ✕</button></div>
+      <!--
+        결투 장면 — 상대는 오른쪽 위에서 앞모습으로, 나는 왼쪽 아래에서 뒷모습으로.
+        이름 · 체력 상자는 각자 반대편 구석에, 아래에는 한 줄씩 넘어가는 대사 창.
+        A 가 늘 내 쪽이다(메인이 화면용으로 뒤집어 준다)
+      -->
+      <div class="scene" id="arena">
+        <div class="plat foe"></div>
+        <div class="plat me"></div>
+        <div class="side foe" id="sideB">
+          <div class="hd"><span class="nm"></span><span class="lv"></span><span class="st"></span></div>
+          <div class="hprow"><span class="hpl">HP</span><div class="hpbar"><i id="hpB"></i></div></div>
+          <div class="hpn" id="hpnB"></div>
+        </div>
+        <div class="stage foe" id="stageB"><div class="fbody" id="bodyB"><img alt="" /></div></div>
+        <div class="stage me" id="stageA"><div class="fbody" id="bodyA"><img alt="" /></div></div>
+        <div class="side me" id="sideA">
+          <div class="hd"><span class="nm"></span><span class="lv"></span><span class="st"></span></div>
+          <div class="hprow"><span class="hpl">HP</span><div class="hpbar"><i id="hpA"></i></div></div>
+          <div class="hpn" id="hpnA"></div>
+        </div>
       </div>
-      <div class="side" id="sideB">
-        <div class="hd"><span class="nm"></span><span class="lv"></span><span class="st"></span></div>
-        <div class="hpbar"><i id="hpB"></i></div>
-        <div class="hpn" id="hpnB"></div>
-        <div class="stage" id="stageB"><div class="fbody" id="bodyB"><img alt="" /></div></div>
+      <div class="msgbox" id="btlMsg"><span id="btlMsgText"></span><i class="more"></i></div>
+      <div class="btlresult" id="btlResult" hidden></div>
+      <details class="btllogwrap"><summary>전체 기록</summary><div class="btllog" id="btlLog"></div></details>
+    </div>
+
+    <div id="olBattle">
+      <div class="olhero">
+        <div class="olt">📡 실시간 배틀</div>
+        <div class="ols">방을 만들어 6자리 코드를 친구에게 알려 주세요. 둘 다 <b>준비</b>를 누르면 같은 결투가 두 화면에서 동시에 시작합니다.
+          <span class="olpill">Lv.50</span><span class="olpill">보상 없음</span></div>
       </div>
-    </div>
-    <div class="btllog" id="btlLog"></div>
 
-    <h4>친선 배틀 — 친구와 코드로<span class="peak" id="frRec"></span></h4>
-    <div class="note">
-      서버 없이 코드 한 줄로 싸웁니다. 내 코드를 친구에게 보내고, 친구 코드를 받아 붙여 넣으세요.
-      둘 다 Lv.50이고, 서로 코드를 바꿔 넣으면 두 PC에서 똑같은 결투가 나옵니다. 보상은 없습니다.
-    </div>
-    <div class="btlpick">
-      <select id="frMine"></select>
-      <input id="frName" maxlength="16" placeholder="내 이름(선택)" />
-    </div>
-    <div class="btlrow"><button id="frMake">내 코드 만들기</button></div>
-    <div class="frcode" id="frMyBox" hidden>
-      <textarea id="frMyCode" readonly rows="2"></textarea>
-      <button id="frCopy">복사</button>
-    </div>
-    <div class="note" id="frMyNote"></div>
-    <textarea id="frTheirs" class="frin" rows="2" placeholder="친구에게 받은 코드(PTB1-…)를 붙여 넣으세요"></textarea>
-    <div class="frfoe" id="frFoe" hidden><img id="frFoeImg" alt="" /><span id="frFoeTxt"></span></div>
-    <div class="note" id="frInfo"></div>
-    <div class="btlrow"><button id="frGo" disabled>친선 배틀 시작</button></div>
+      <div class="olvs">
+        <div class="olside">
+          <div class="olcap">내 포켓몬</div>
+          <button class="olmon" id="liveMineCard" title="눌러서 바꾸기"></button>
+        </div>
+        <div class="olvsmark">VS</div>
+        <div class="olside">
+          <div class="olcap">상대</div>
+          <div class="olmon foe" id="liveFoe"><div class="olwait" id="liveFoeWait">상대를<br />기다리는 중</div><img id="liveFoeImg" alt="" hidden /><div class="olnm" id="liveFoeTxt"></div></div>
+        </div>
+      </div>
+      <select id="liveMine" hidden></select>
+      <div class="fpick" id="livePick" hidden>
+        <div class="fphd"><b>누구로 싸울까요?</b><button id="livePickClose" title="닫기">✕</button></div>
+        <div class="fpgrid" id="livePickGrid"></div>
+      </div>
 
-    <h4>실시간 배틀 — 같은 결투를 동시에</h4>
-    <div class="note">
-      내 포켓몬을 고르고 방을 만들어 6자리 코드를 친구에게 알려 주세요. 둘 다 준비를 누르면 같은 결투가
-      두 화면에서 동시에 시작합니다(Lv.50, 보상 없음). 방 안에서도 포켓몬을 바꿀 수 있고, 바꾸면 둘 다 다시 준비합니다.
-    </div>
-    <div class="btlpick">
-      <span class="vs" style="color:var(--muted);font-weight:700">내 포켓몬</span>
-      <select id="liveMine"></select>
-    </div>
-    <div class="btlpick">
-      <button id="liveMake" class="mini2">방 만들기</button>
-      <input id="liveCodeIn" maxlength="6" inputmode="numeric" placeholder="받은 코드 6자리" />
-      <button id="liveJoin" class="mini2">참가</button>
-    </div>
-    <div class="liveroom" id="liveRoom" hidden>
-      <span>방 코드</span><b id="liveRoomCode"></b><button id="liveCopyCode" class="mini2">복사</button>
-    </div>
-    <div class="frfoe" id="liveFoe" hidden><img id="liveFoeImg" alt="" /><span id="liveFoeTxt"></span></div>
-    <div class="note" id="liveStatus"></div>
-    <div class="btlrow">
-      <button id="liveReady" hidden>준비</button>
-      <button id="liveLeave" hidden>나가기</button>
+      <div class="olroom" id="liveRoom" hidden>
+        <span>방 코드</span><b id="liveRoomCode"></b><button id="liveCopyCode" class="mini2">복사</button>
+      </div>
+      <div class="oljoin" id="liveJoinRow">
+        <button id="liveMake" class="olbtn">🏠 방 만들기</button>
+        <div class="olor">또는</div>
+        <div class="olcode"><input id="liveCodeIn" maxlength="6" inputmode="numeric" placeholder="받은 코드 6자리" /><button id="liveJoin" class="olbtn sub">참가</button></div>
+      </div>
+      <div class="olstatus" id="liveStatus"></div>
+      <div class="oljoin" id="liveRoomRow">
+        <button id="liveReady" class="olbtn" hidden>✋ 준비</button>
+        <button id="liveLeave" class="olbtn sub" hidden>나가기</button>
+      </div>
+      <div class="note oltip">연습 결투는 바탕화면에서 펫을 끌어 다른 펫 위에 놓으면 됩니다(이기면 나무열매, 하루 5번). 길드원과의 결투는 방 › 길드에서.</div>
     </div>
 
-    <h4>교환 받기 — 이미 받은 코드만</h4>
-    <div class="note">
-      교환은 <b>상점 탭의 길드 몰</b>로 바뀌었습니다. 예전에 받은 교환 코드(PTBT-…)는 다음 몇 버전 동안 여기서 받을 수 있습니다.
-      원작에서 교환으로 진화하는 아이는 이제 몰에서 데려올 때 진화합니다.
-    </div>
-    <div class="btlpick" hidden>
-      <select id="trMine"></select>
-    </div>
-    <div class="btlrow" hidden><button id="trSend">교환 보내기</button></div>
-    <div class="frcode" id="trSentBox" hidden>
-      <textarea id="trSentCode" readonly rows="2"></textarea>
-      <button id="trCopy">복사</button>
-    </div>
-    <div class="note" id="trSentNote"></div>
-    <textarea id="trIn" class="frin" rows="2" placeholder="친구에게 받은 교환 코드(PTBT-…)를 붙여 넣으세요"></textarea>
-    <div class="frfoe" id="trFoe" hidden><img id="trFoeImg" alt="" /><span id="trFoeTxt"></span></div>
-    <div class="note" id="trInfo"></div>
-    <div class="btlrow"><button id="trGet" disabled>받기</button></div>
+    <div id="olTrade" hidden>
+      <div class="olhero">
+        <div class="olt">🎁 교환 코드 받기</div>
+        <div class="ols">친구에게 받은 교환 코드(PTBT-…)를 붙여 넣으면 누가 오는지 먼저 보여 줍니다. 같은 코드는 한 번만 받을 수 있습니다.</div>
+      </div>
+      <textarea id="trIn" class="olin" rows="3" placeholder="PTBT-… 코드를 여기에 붙여 넣으세요"></textarea>
+      <div class="trcard" id="trFoe" hidden>
+        <img id="trFoeImg" alt="" />
+        <div class="trinfo"><div class="trnm" id="trFoeTxt"></div><div class="trsub" id="trInfo"></div></div>
+      </div>
+      <div class="note" id="trNote"></div>
+      <button id="trGet" class="olbtn wide" disabled>받기</button>
 
-    <h4>가방 — 나무열매</h4>
-    <div class="bag" id="bag"></div>
-    <div class="note">
-      박스에서 아이를 펼쳐 먹이면 그 아이의 <b>토큰 경험치가 2배</b>가 됩니다.
-      성격에 따라 좋아하는 맛이면 더 오래 가고, 싫어하는 맛은 먹지 않습니다.
+      <div class="olmall">
+        <div class="mt">🛒 새 교환은 길드 몰에서</div>
+        <div class="ms">포켓몬을 코인으로 사고팝니다. 원작에서 교환으로 진화하는 아이는 몰에서 데려올 때 진화합니다.</div>
+        <button id="olGoMall" class="olbtn sub">길드 몰 열기</button>
+      </div>
     </div>
   </section>
 

@@ -1,0 +1,208 @@
+/* ---------- 온라인 탭 (결투 · 교환) — battle.js ---------- */
+
+/* 맨 위 소개 카드. 무엇을 하는 칸인지 한 장으로 */
+.olhero {
+  padding: 12px 13px; border-radius: 12px; border: 1px solid var(--line);
+  background: linear-gradient(135deg, rgba(255, 205, 40, .10), rgba(120, 140, 255, .06) 60%, transparent), var(--card);
+}
+.olhero .olt { font-size: 14px; font-weight: 800; }
+.olhero .ols { margin-top: 4px; font-size: 10.5px; line-height: 1.55; color: var(--muted); }
+.olpill {
+  display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 99px; vertical-align: 1px;
+  font-size: 9.5px; font-weight: 700; color: var(--accent); background: rgba(255, 205, 40, .12);
+}
+
+/* 내 포켓몬 VS 상대 */
+.olvs { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.olside { flex: 1; min-width: 0; }
+.olcap { font-size: 9.5px; font-weight: 700; color: var(--dim); margin: 0 0 4px 2px; }
+.olvsmark { flex: none; padding-top: 14px; font-size: 13px; font-weight: 900; font-style: italic; color: var(--accent); }
+.olmon {
+  position: relative; display: flex; flex-direction: column; align-items: center; width: 100%; min-height: 150px;
+  padding: 8px 6px 9px; border-radius: 12px; border: 1px solid var(--line); background: var(--card);
+  font: inherit; color: var(--text); text-align: center;
+}
+button.olmon { cursor: pointer; transition: border-color .15s, transform .15s; }
+button.olmon:not(:disabled):hover { border-color: var(--accent); transform: translateY(-1px); }
+button.olmon:disabled { cursor: default; opacity: .75; }
+button.olmon::after {
+  content: "바꾸기"; position: absolute; top: 6px; right: 7px; font-size: 9px; color: var(--dim);
+}
+button.olmon:disabled::after { content: ""; }
+.olmon img { width: 84px; height: 84px; object-fit: contain; image-rendering: pixelated; }
+.olmon.foe img { transform: scaleX(-1); }
+.olnm { margin-top: 2px; font-size: 12px; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.olmeta { margin-top: 2px; font-size: 10px; color: var(--muted); }
+.olmeta .st { color: var(--accent); letter-spacing: -1px; }
+.oltys { display: flex; gap: 3px; justify-content: center; margin-top: 5px; }
+.oltys .ty { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 99px; } /* 색은 index.html 의 .ty.t-* */
+.olmon.foe { border-style: dashed; }
+.olmon.foe.on { border-style: solid; border-color: #5a4a8a; }
+.olwait { margin: auto 0; font-size: 10.5px; line-height: 1.6; color: var(--dim); }
+.olwait::before { content: "?"; display: block; margin: 0 auto 6px; width: 42px; height: 42px; line-height: 42px; border-radius: 50%; background: #2b2e37; font-size: 20px; font-weight: 800; color: var(--muted); }
+
+/* 고르기 — 박스의 아이들을 그림으로 */
+.fpick { margin-top: 8px; padding: 9px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); }
+.fphd { display: flex; align-items: center; font-size: 11.5px; margin-bottom: 7px; }
+.fphd button { margin-left: auto; background: none; border: 0; color: var(--muted); font-size: 13px; cursor: pointer; }
+.fpgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 5px; max-height: 236px; overflow-y: auto; }
+.fpgrid button {
+  display: flex; flex-direction: column; align-items: center; padding: 4px 2px 5px; border-radius: 9px; cursor: pointer;
+  border: 1px solid transparent; background: var(--card); color: var(--text); font: inherit;
+}
+.fpgrid button:hover { border-color: var(--line); }
+.fpgrid button.on { border-color: var(--accent); }
+.fpgrid img { width: 46px; height: 46px; object-fit: contain; image-rendering: pixelated; }
+.fpgrid .n { font-size: 10px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fpgrid .l { font-size: 9px; color: var(--muted); }
+
+/* 방 만들기 · 참가 */
+.oljoin { display: flex; align-items: center; gap: 7px; margin-top: 12px; }
+.oljoin:empty { display: none; }
+.olor { flex: none; font-size: 10px; color: var(--dim); }
+.olcode { flex: 1.3; display: flex; min-width: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--card2); }
+.olcode input {
+  flex: 1; min-width: 0; padding: 0 10px; border: 0; background: none; color: var(--text);
+  font: inherit; font-size: 14px; letter-spacing: 3px; font-family: Consolas, monospace;
+}
+.olcode input::placeholder { font-size: 10.5px; letter-spacing: 0; font-family: inherit; color: var(--dim); }
+.olcode input:focus { outline: none; }
+.olcode:focus-within { border-color: var(--accent); }
+.olcode .olbtn { flex: none; border-radius: 0; }
+.olbtn {
+  flex: 1; padding: 10px 12px; border: 0; border-radius: 10px; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 800; background: var(--accent); color: #14151a;
+}
+.olbtn.sub { background: var(--card); color: var(--text); border: 1px solid var(--line); font-weight: 700; }
+.olbtn:not(:disabled):hover { filter: brightness(1.08); }
+.olbtn.sub:not(:disabled):hover { border-color: var(--accent); filter: none; }
+.olbtn:disabled { background: #33363f; color: var(--dim); cursor: default; border-color: transparent; }
+.olbtn.wide { width: 100%; margin-top: 8px; }
+#liveReady[data-on] { background: var(--green); color: #14151a; }
+#liveReady[data-on]::after { content: " ✓"; }
+
+/* 방 코드 — 크게, 알려 주기 쉽게 */
+.olroom {
+  display: flex; align-items: center; gap: 9px; margin-top: 12px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid #5a4a8a; background: linear-gradient(135deg, rgba(160, 120, 255, .14), transparent), var(--card);
+  font-size: 10.5px; color: var(--muted);
+}
+.olroom b { flex: 1; font-size: 24px; letter-spacing: 6px; color: var(--accent); font-family: Consolas, monospace; }
+
+.olstatus { margin-top: 10px; min-height: 16px; font-size: 11px; color: var(--muted); text-align: center; }
+.olstatus.bad { color: var(--red); }
+.oltip { margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--line); line-height: 1.55; }
+
+/* 결투 재생 — 위에 띄운다 */
+.btlshow { margin-bottom: 12px; padding: 9px; border-radius: 13px; border: 1px solid var(--line); background: var(--card2); }
+.btlbar { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.btlbar b { flex: 1; }
+.btlbar button {
+  padding: 4px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+  color: var(--muted); font: inherit; font-size: 10.5px; cursor: pointer;
+}
+.btlbar button:hover { color: var(--text); border-color: var(--accent); }
+
+/*
+ * 결투 장면 — 상대는 오른쪽 위(앞모습), 나는 왼쪽 아래(뒷모습). 이름 · 체력 상자는 각자 반대편 구석.
+ * 좌우로 마주 서는 것보다 "내가 싸운다"는 느낌이 난다. 원작의 배치만 빌리고 모양은 앱에 맞춘다
+ */
+.scene {
+  position: relative; margin-top: 8px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 12px; border: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse 70% 40% at 80% 10%, rgba(255, 255, 255, .10), transparent 70%),
+    linear-gradient(180deg, #34415e 0%, #4a5a78 40%, #50684f 52%, #3f5640 100%);
+}
+.scene .plat { position: absolute; border-radius: 50%; }
+.scene .plat.foe { right: 4%; top: 41%; width: 44%; height: 10%; background: radial-gradient(ellipse at 50% 40%, #7d9a6a, #5b7a4c 70%); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .18); }
+.scene .plat.me { left: -2%; bottom: 3%; width: 56%; height: 13%; background: radial-gradient(ellipse at 50% 40%, #84a26f, #5e7d4f 70%); box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .18); }
+.scene .stage { position: absolute; aspect-ratio: 1; }
+.scene .stage.foe { right: 7%; top: -4%; width: 38%; }
+.scene .stage.me { left: 3%; bottom: -5%; width: 47%; }
+.scene .fbody { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+.scene .fbody img { width: 88%; height: 88%; object-fit: contain; image-rendering: pixelated; }
+.scene .fbody img.flip { transform: scaleX(-1); }
+.scene .fbody.hit img { animation: hitblink .45s steps(2, end); }
+@keyframes hitblink { 50% { opacity: .15; } }
+.scene .fbody.faint { transition: transform .6s ease-in, opacity .6s; transform: translateY(40%); opacity: 0; }
+/* 들어오는 장면 — 상대는 오른쪽에서, 나는 왼쪽에서 미끄러져 들어온다 */
+.scene.enter .stage.foe, .scene.enter .plat.foe { animation: inR .55s ease-out both; }
+.scene.enter .stage.me, .scene.enter .plat.me { animation: inL .55s ease-out both; }
+.scene.enter .side.foe { animation: inL .4s .35s ease-out both; }
+.scene.enter .side.me { animation: inR .4s .35s ease-out both; }
+@keyframes inR { from { transform: translateX(60%); opacity: 0; } }
+@keyframes inL { from { transform: translateX(-60%); opacity: 0; } }
+
+/* 이름 · 체력 상자 — 바깥쪽 모서리를 굵게 꺾어 화면 안쪽을 가리킨다 */
+.scene .side {
+  position: absolute; z-index: 2; width: 50%; box-sizing: border-box; padding: 6px 9px 6px;
+  background: rgba(22, 24, 30, .86); border: 1px solid rgba(255, 255, 255, .10); border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+}
+.scene .side.foe { left: 4%; top: 6%; border-left: 3px solid var(--accent); }
+.scene .side.me { right: 3%; bottom: 7%; border-right: 3px solid var(--accent); }
+.scene .hd { display: flex; align-items: baseline; gap: 5px; font-size: 11.5px; }
+.scene .hd .nm { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scene .hd .lv { flex: none; color: var(--accent); font-weight: 800; font-size: 10px; }
+.scene .hd .st { flex: none; margin-left: auto; padding: 0 5px; border-radius: 4px; font-size: 9px; font-weight: 800; color: #14151a; background: var(--orange); }
+.scene .hd .st:empty { display: none; }
+.scene .hprow { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.scene .hpl { flex: none; padding: 0 4px; border-radius: 3px; font-size: 8px; font-weight: 900; color: #ffd54a; background: #2b2e37; }
+.scene .hpbar { flex: 1; height: 6px; background: #2b2e37; border-radius: 99px; overflow: hidden; }
+.scene .hpbar i { display: block; height: 100%; width: 100%; background: var(--green); border-radius: 99px; transition: width .45s ease; }
+.scene .hpbar i.yellow { background: #f5c542; }
+.scene .hpbar i.red { background: var(--red); }
+.scene .hpn { margin-top: 2px; font-size: 11px; font-weight: 800; text-align: right; letter-spacing: .5px; font-variant-numeric: tabular-nums; }
+.scene .side.foe .hpn { display: none; } /* 상대 체력은 막대만 — 숫자는 내 것만 */
+
+/* 대사 창 — 한 줄씩 넘어간다. 전체 기록은 아래 접힌 칸에 */
+.msgbox {
+  position: relative; margin-top: 8px; min-height: 46px; padding: 10px 26px 10px 14px; box-sizing: border-box;
+  border-radius: 10px; background: #fbf8ef; color: #22242b; border: 2px solid #d9d4c4;
+  box-shadow: inset 0 0 0 2px #fbf8ef, inset 0 0 0 3px #b9b3a0;
+  font-size: 13px; font-weight: 700; line-height: 1.55; word-break: keep-all;
+}
+.msgbox.good { color: #b4470e; }
+.msgbox.ft { color: #c0262d; }
+.msgbox .more { position: absolute; right: 11px; bottom: 8px; width: 0; height: 0; border: 5px solid transparent; border-top: 6px solid #c0262d; border-bottom: 0; opacity: 0; }
+.msgbox.idle .more { animation: more .8s steps(2, end) infinite; }
+@keyframes more { 50% { opacity: 1; } }
+.btllogwrap { margin-top: 6px; }
+.btllogwrap summary { font-size: 10px; color: var(--dim); cursor: pointer; }
+.btllogwrap .btllog { max-height: 130px; }
+@media (prefers-reduced-motion: reduce) {
+  .scene.enter * { animation: none !important; }
+  .msgbox.idle .more { animation: none; opacity: 1; }
+}
+.btlresult {
+  margin-top: 8px; padding: 10px; border-radius: 10px; text-align: center;
+  font-size: 15px; font-weight: 900; background: var(--card); border: 1px solid var(--line);
+}
+.btlresult.win { color: #14151a; background: linear-gradient(135deg, #ffd54a, #ffb020); border-color: transparent; }
+.btlresult.lose { color: var(--muted); }
+.btlresult small { display: block; margin-top: 2px; font-size: 10.5px; font-weight: 600; opacity: .8; }
+
+/* 교환 */
+.olin {
+  width: 100%; margin-top: 12px; padding: 10px 11px; border-radius: 11px; resize: none; box-sizing: border-box;
+  border: 1px solid var(--line); background: var(--card2); color: var(--text);
+  font: 11px/1.5 Consolas, monospace;
+}
+.olin:focus { outline: none; border-color: var(--accent); }
+.olin::placeholder { font-family: inherit; color: var(--dim); }
+.trcard {
+  display: flex; align-items: center; gap: 12px; margin-top: 10px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--card);
+}
+.trcard img { flex: none; width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated; }
+.trinfo { min-width: 0; }
+.trnm { font-size: 12.5px; font-weight: 800; line-height: 1.5; }
+.trnm .evo { display: inline-block; margin-top: 3px; padding: 2px 8px; border-radius: 99px; background: var(--accent); color: #14151a; font-size: 10px; }
+.trsub { margin-top: 3px; font-size: 10.5px; color: var(--muted); }
+.olmall {
+  margin-top: 18px; padding: 12px 13px; border-radius: 12px; border: 1px dashed var(--line);
+  display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; align-items: center;
+}
+.olmall .mt { font-size: 12px; font-weight: 800; }
+.olmall .ms { grid-column: 1; font-size: 10px; line-height: 1.5; color: var(--dim); }
+.olmall .olbtn { grid-column: 2; grid-row: 1 / span 2; flex: none; padding: 8px 12px; font-size: 11px; }

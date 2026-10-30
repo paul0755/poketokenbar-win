@@ -161,22 +161,38 @@ for (const stages of candidates) {
 
 lines.sort((a, b) => a.ids[1] - b.ids[1]);
 
+const single = (d, extra = {}) => {
+  const i = info.get(d);
+  return {
+    line: i.name,
+    ids: [null, d, d, d, d],
+    names: ["알", i.name, i.name, i.name, i.name],
+    captureRate: i.captureRate,
+    legendary: Boolean(i.isLegendary || i.isMythical),
+    ...(i.isMythical ? { mythical: true } : {}),
+    single: true,
+    ...extra,
+  };
+};
+
+/*
+ * PokéAPI 는 피오네(489)와 마나피(490)를 한 진화 체인에 넣어 두었다 — 마나피의 알에서 피오네가 나올 뿐,
+ * 원작에서 둘은 서로 진화하지 않는 환상의 포켓몬이다. 그대로 두면 피오네가 알에서 나와 마나피로 진화했다.
+ * 라인 번호를 지키려고 피오네는 그 자리에서 진화 없는 종으로 바꾸고, 마나피는 맨 뒤에 붙인다(MANAPHY_TAIL).
+ * noRaid — 서버 레이드 보스 순서(raid.js BOSSES)가 바뀌지 않게 둘은 보스에서 뺀다
+ */
+const PHIONE = 489;
+const MANAPHY = 490;
+const phione = lines.findIndex((l) => l.ids[1] === PHIONE);
+if (phione >= 0) lines[phione] = single(PHIONE, { noRaid: true });
+
 // 진화 없는 종 — 진화 라인 뒤에, 도감 번호 순으로
 const singles = singleDex
   .filter((d) => info.get(d) && info.get(d).name)
   .sort((a, b) => a - b)
-  .map((d) => {
-    const i = info.get(d);
-    return {
-      line: i.name,
-      ids: [null, d, d, d, d],
-      names: ["알", i.name, i.name, i.name, i.name],
-      captureRate: i.captureRate,
-      legendary: Boolean(i.isLegendary || i.isMythical),
-      ...(i.isMythical ? { mythical: true } : {}),
-      single: true,
-    };
-  });
+  .map((d) => single(d));
+// 피오네에서 떼어 낸 마나피 — 뒤에 붙인다(앞 번호를 바꾸지 않게)
+if (phione >= 0) singles.push(single(MANAPHY, { noRaid: true }));
 
 const out = path.join(process.cwd(), "src", "main", "lines.json");
 // 이미 있는 순서를 지킨다 — 세이브가 라인 번호로 포켓몬을 기억한다

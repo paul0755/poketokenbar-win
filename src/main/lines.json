@@ -3201,19 +3201,22 @@
   "ids": [
    null,
    489,
-   490,
-   490,
-   490
+   489,
+   489,
+   489
   ],
   "names": [
    "알",
    "피오네",
-   "마나피",
-   "마나피",
-   "마나피"
+   "피오네",
+   "피오네",
+   "피오네"
   ],
   "captureRate": 30,
-  "legendary": true
+  "legendary": true,
+  "mythical": true,
+  "single": true,
+  "noRaid": true
  },
  {
   "line": "주리비얀",
@@ -6163,5 +6166,27 @@
   "legendary": true,
   "mythical": true,
   "single": true
+ },
+ {
+  "line": "마나피",
+  "ids": [
+   null,
+   490,
+   490,
+   490,
+   490
+  ],
+  "names": [
+   "알",
+   "마나피",
+   "마나피",
+   "마나피",
+   "마나피"
+  ],
+  "captureRate": 3,
+  "legendary": true,
+  "mythical": true,
+  "single": true,
+  "noRaid": true
  }
 ]

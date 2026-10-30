@@ -72,8 +72,8 @@ import DECO from "../../src/main/deco.json" with { type: "json" };
 /** 코인 꾸미기 카탈로그 — id → { name, coins } (배경·가구 id 는 겹치지 않는다) */
 export const DECO_ITEMS = new Map([...DECO.themes, ...DECO.furni].map((d) => [d.id, d]));
 export const DECO_THEMES = new Set(DECO.themes.map((d) => d.id));
-/** 조각이 될 수 있는 라인 — 전설 · 환상 */
-const LEGEND_LINES = new Set(LINES.map((l, i) => (l.single && l.legendary ? i : -1)).filter((i) => i >= 0));
+/** 조각이 될 수 있는 라인 — 전설 · 환상. 레이드 보스(raid.js BOSSES)와 같은 목록이라 noRaid 는 뺀다 */
+const LEGEND_LINES = new Set(LINES.map((l, i) => (l.single && l.legendary && !l.noRaid ? i : -1)).filter((i) => i >= 0));
 export const SHARD_NEED = 5;
 export const SWAP_RATE = 2;
 

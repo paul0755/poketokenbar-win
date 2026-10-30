@@ -54,8 +54,8 @@ const KEEP_RAIDS = 4; // 조각을 아직 못 넣은 지난 레이드를 이만�
 const DAY_MS = 86_400_000;
 const KST = 9 * 3_600_000;
 
-/** 보스가 될 수 있는 라인 — 전설 · 환상 */
-export const BOSSES = LINES.map((l, i) => (l.single && l.legendary ? i : -1)).filter((i) => i >= 0);
+/** 보스가 될 수 있는 라인 — 전설 · 환상. noRaid(나중에 떼어 낸 피오네 · 마나피)는 빼서 보스 순서를 지킨다 */
+export const BOSSES = LINES.map((l, i) => (l.single && l.legendary && !l.noRaid ? i : -1)).filter((i) => i >= 0);
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });

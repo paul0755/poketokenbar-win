@@ -286,14 +286,14 @@ async function friendBattle(code, opts = {}) {
   const log = flip ? r.log.map((e) => ({ ...e, side: sw(e.side) })) : r.log;
   const winner = r.winner == null ? null : sw(r.winner);
 
-  const urls = await Promise.all(
-    [mine, theirs].map(async (x) => {
-      const p = await poke.spriteWithFallback(poke.describe(x.grown, x.mon.line, { shiny: x.mon.shiny }), CACHE, "anim");
-      return p ? pathToFileURL(p).href : null;
-    }),
-  );
-  fighters[0] = { ...fighters[0], url: urls[0], label: (mine.trainer ? mine.trainer + "의 " : "") + fighters[0].name };
-  fighters[1] = { ...fighters[1], url: urls[1], label: (theirs.trainer ? theirs.trainer + "의 " : "친구의 ") + fighters[1].name };
+  // 앞모습 · 뒷모습 둘 다 — 결투 화면은 내 아이를 뒤에서 본다. 메타몽이 변신하면 서로의 그림을 빌린다
+  const sprite = async (x, kind) => {
+    const p = await poke.spriteWithFallback(poke.describe(x.grown, x.mon.line, { shiny: x.mon.shiny }), CACHE, kind);
+    return p ? pathToFileURL(p).href : null;
+  };
+  const [urls, backs] = await Promise.all(["anim", "back"].map((kind) => Promise.all([mine, theirs].map((x) => sprite(x, kind)))));
+  fighters[0] = { ...fighters[0], url: urls[0], backUrl: backs[0], label: (mine.trainer ? mine.trainer + "의 " : "") + fighters[0].name };
+  fighters[1] = { ...fighters[1], url: urls[1], backUrl: backs[1], label: (theirs.trainer ? theirs.trainer + "의 " : "친구의 ") + fighters[1].name };
 
   const rec = save.friendRecord || (save.friendRecord = { w: 0, l: 0, d: 0 });
   if (winner == null) rec.d++;
@@ -1620,6 +1620,7 @@ let save = {
    */
   bornAt: 0,
   candySpent: 0, // 지금까지 쓴 사탕
+  phioneSplit: true, // 피오네 · 마나피를 나눈 뒤의 세이브인가(0.13.4) — 새 세이브는 처음부터 나뉘어 있다
   candyBonus: 0, // 졸업·한도 달성으로 받은 보너스 사탕
   charm: false, // 반짝이는 부적 보유
   shiny: false, // 지금 키우는 개체가 이로치인가
@@ -1695,7 +1696,7 @@ let save = {
   tradeReceived: [],
   /**
    * 온라인 기능(실시간 배틀). 이 앱이 처음으로 밖으로 무언가를 보내는 기능이라 기본은 꺼짐.
-   * 켜면 결투 탭의 실시간 배틀이 중계 서버(server/)에 붙는다. 보내는 건 팀 코드와 이름뿐 —
+   * 켜면 온라인 탭의 실시간 배틀이 중계 서버(server/)에 붙는다. 보내는 건 팀 코드와 이름뿐 —
    * 토큰 기록은 보내지 않는다. relay 가 비어 있으면 DEFAULT_RELAY 를 쓴다.
    */
   online: { enabled: false, relay: "" },
@@ -1795,6 +1796,7 @@ function loadSave() {
       // bornAt이 없던 시절의 세이브는 0으로 둔다 —
       // 지금 키우던 개체가 갑자기 알로 돌아가면 진행을 빼앗는 셈이다.
       if (typeof loaded.bornAt !== "number") save.bornAt = 0;
+      if (!loaded.phioneSplit) save.phioneSplit = false; // 옛 세이브 — 아래에서 한 번 옮긴다
     } catch (e) {
       // 파일은 있는데 깨졌다. 덮어쓰지 않고 따로 치워 둔 뒤 멈춘다.
       loadFailed = true;
@@ -1814,11 +1816,42 @@ function loadSave() {
   // 새로 잡은 아이는 mid 성장량으로 넣었다. 잘못 알아들은 것이었다: 니드런은 니드런으로 나오고 잡혀야 한다.
   // "알에서 부화를 기다리는 것처럼" 보이던 건 단계 이름("부화") 탓이었다 — 이제 첫 모습은 "1차 진화"다.
   // 한 번만, 더한 만큼을 도로 뺀다(그 사이 키운 만큼은 그대로 남는다)
+  const wildLines = new Set();
   for (const m of save.box) {
     if (!m || !m.wildMid) continue;
     m.fed = Math.max(0, (m.fed || 0) - (poke.STAGES[2].at - poke.STAGES[1].at));
     delete m.wildMid;
     m.maxStage = poke.stageFor(box.effOf(m, growthSpeed())); // 다시 진화하면 알림이 뜨게
+    wildLines.add(m.line);
+  }
+  /*
+   * 0.13.1 은 잡을 때 도감에도 2차 진화(니드리노)를 "만남"으로 적었다. 되돌린 라인마다 박스에서
+   * 실제로 닿은 가장 높은 단계로 내린다 — 0.13.1 이 적는 값(2)일 때만, 그보다 높은 기록은 건드리지 않는다.
+   * 박스를 떠난 아이(판 · 몰에 올린)가 닿았던 2차 진화는 여기서 알 수 없어 같이 내려간다 — 다시 키우면 돌아온다
+   */
+  for (const line of wildLines) {
+    if (save.maxStage[line] !== 2) continue;
+    const best = Math.max(1, ...save.box.filter((m) => m && m.line === line).map((m) => m.maxStage ?? 0));
+    if (best < 2) save.maxStage[line] = best;
+  }
+
+  /*
+   * 피오네 · 마나피 나누기(lines.json · scripts/build-lines.mjs). 예전엔 피오네 라인이 80M 에 마나피로 진화했다.
+   * 마나피 모습까지 자란 아이는 새 마나피 라인으로 옮겨 보이던 모습 그대로 둔다. 한 번만 —
+   * 이제 피오네는 진화하지 않으니, 다음에 또 하면 다 자란 피오네가 마나피가 된다
+   */
+  if (save.phioneSplit === false) {
+    const phione = poke.LINES.findIndex((l) => l.single && l.ids[1] === 489);
+    const manaphy = poke.LINES.findIndex((l) => l.single && l.ids[1] === 490);
+    if (phione >= 0 && manaphy >= 0) {
+      for (const m of save.box) {
+        if (!m || m.line !== phione || poke.stageFor(box.effOf(m, growthSpeed())) < 2) continue;
+        m.line = manaphy;
+        if (!save.seen.includes(manaphy)) save.seen.push(manaphy);
+        save.maxStage[manaphy] = Math.max(save.maxStage[manaphy] ?? -1, m.maxStage ?? 1);
+      }
+    }
+    save.phioneSplit = true;
   }
 }
 

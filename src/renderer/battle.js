@@ -1,22 +1,33 @@
 "use strict";
 /**
- * 결투 탭 — 메인이 끝까지 계산한 사건 목록(main/battle.js)을 차례로 재생한다.
+ * 온라인 탭 — 결투(실시간 배틀) · 교환(코드 받기). 방 탭처럼 안에서 둘로 나눈다.
  *
- * 화면은 승패를 정하지 않는다. 재생 속도만 정한다 — "건너뛰기"를 눌러도
- * 결과와 보상은 이미 정해져 있다.
+ * 처음엔 "결투" 탭 한 줄에 연습 결투 · 친선 배틀(코드) · 실시간 배틀 · 교환 받기 · 가방을 다 늘어놓았다.
+ * 무엇부터 봐야 할지 몰랐다 — 친구와 하는 것만 남겼다. 연습 결투는 바탕화면에서 펫을 끌어 놓으면 되고,
+ * 나무열매는 박스 › 상세에서 보인다.
+ *
+ * 결투 재생은 그대로다 — 메인이 끝까지 계산한 사건 목록(main/battle.js)을 차례로 재생한다.
+ * 화면은 승패를 정하지 않는다. 재생 속도만 정한다. 길드원과의 결투(방 › 길드)도 여기서 재생한다.
  *
  * 기술 연출은 펫과 같은 moves.js 를 쓴다. 칸(무대)이 둘이라 create() 로 따로 만든다.
  */
 (function () {
   const $ = (id) => document.getElementById(id);
+  const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const SIDE = ["A", "B"];
-  // 왼쪽(A)은 오른쪽을 보고 서야 한다. 원본 스프라이트는 왼쪽을 본다 — 뒤집는다
+  // A(내 쪽, 왼쪽 아래)는 오른쪽 위를, B(상대, 오른쪽 위)는 왼쪽 아래를 보고 기술을 쓴다
   const DIR = [1, -1];
+  /** 받침이 있으면 a, 없으면 b — "망나뇽이" · "비리디온은" */
+  const josa = (w, a, b) => {
+    const c = String(w).charCodeAt(String(w).length - 1);
+    return w + (c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 ? a : b);
+  };
 
   let stages = null;
   let playing = false;
   let fast = false;
   let last = null; // 마지막으로 받은 갱신
+  let cur = null; // 재생 중인 결투의 두 아이 — 변신할 때 서로의 그림을 빌린다
 
   const ensureStages = () =>
     stages || (stages = SIDE.map((k) => window.ptbMoves.create($("stage" + k))));
@@ -24,117 +35,45 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, fast ? 0 : ms));
   const fighters = (s) => (s.box || []).filter((m) => m.stageKey !== "egg" && m.profile);
 
-  /* ---------------- 고르기 ---------------- */
+  /* ---------------- 결투 · 교환 나누기 ---------------- */
 
-  function fillPick(s) {
-    const list = fighters(s);
-    for (const [i, k] of SIDE.entries()) {
-      const sel = $("btl" + k);
-      const keep = sel.value;
-      sel.innerHTML = list
-        .map((m) => `<option value="${m.id}">${m.name} Lv.${m.profile.level}${m.active ? " (키우는 중)" : ""}</option>`)
-        .join("");
-      // 고른 게 있으면 지킨다. 처음이면 키우는 아이와 레벨이 가장 비슷한 아이를 붙인다
-      if (list.some((m) => m.id === keep)) sel.value = keep;
-      else if (i === 0) sel.value = (list.find((m) => m.active) || list[0] || {}).id || "";
-      else {
-        const a = list.find((m) => m.id === $("btlA").value);
-        const rest = list.filter((m) => !a || m.id !== a.id);
-        rest.sort((x, y) => Math.abs(x.profile.level - (a ? a.profile.level : 0)) - Math.abs(y.profile.level - (a ? a.profile.level : 0)));
-        sel.value = (rest[0] || {}).id || "";
-      }
-    }
-    $("btlGo").disabled = $("btlDesk").disabled = playing || list.length < 2;
-    $("btlNote").textContent = list.length < 2 ? "싸울 수 있는 아이가 두 마리 이상 있어야 합니다. 알은 싸우지 않습니다." : "";
+  const HINT = { battle: "친구와 같은 결투를 동시에", trade: "예전 교환 코드 받기" };
+  function setView(v) {
+    for (const x of $("olSwitch").querySelectorAll("button")) x.classList.toggle("on", x.dataset.view === v);
+    $("olBattle").hidden = v !== "battle";
+    $("olTrade").hidden = v !== "trade";
+    $("olHint").textContent = HINT[v] || "";
   }
-
-  function renderBag(s) {
-    const left = s.battleRewardsLeft ?? 0;
-    $("btlLeft").textContent = `오늘 보상 ${left}/${s.battleRewardsMax ?? 5}`;
-    const bag = s.berries || [];
-    $("bag").innerHTML = bag
-      .map((b) => `<div class="berry ${b.count ? "" : "none"}"><b>${b.name}</b><span>${b.flavorName}</span><i>×${b.count}</i></div>`)
-      .join("");
-  }
+  $("olSwitch").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-view]");
+    if (b) setView(b.dataset.view);
+  });
 
   window.ptb.onStats((s) => {
     if (!s || !s.box) return;
     last = s;
-    if (!playing) fillPick(s);
-    renderBag(s);
-    renderFriend(s);
-    renderTrade(s);
     liveUi();
   });
 
-  /* ---------------- 친선 배틀 ----------------
-     내 코드 만들기 → 친구에게 보내기, 친구 코드 붙여 넣기 → 싸우기.
-     계산·검사는 메인(friend.js)이 한다. 여기서는 고르고, 보여 주고, 재생한다. */
+  /* ---------------- 포켓몬 카드 · 고르기 ---------------- */
 
-  function renderFriend(s) {
-    const f = s.friend || {};
-    const list = fighters(s);
-    const sel = $("frMine");
-    const keep = sel.value || (f.team && f.team.monId) || (list.find((m) => m.active) || {}).id;
-    sel.innerHTML = list.map((m) => `<option value="${m.id}">${m.name} Lv.${m.profile.level}</option>`).join("");
-    if (list.some((m) => m.id === keep)) sel.value = keep;
-    if (document.activeElement !== $("frName") && !$("frName").value) $("frName").value = f.trainer || "";
-    if (f.team) {
-      $("frMyBox").hidden = false;
-      $("frMyCode").value = f.team.code;
-      const who = list.find((m) => m.id === f.team.monId);
-      $("frMyNote").textContent = `등록한 팀: ${who ? who.name : "놓아준 아이"} — 이 코드를 친구에게 보내세요. 등록한 뒤 자라도 코드는 그대로입니다.`;
-    }
-    const r = f.record || {};
-    $("frRec").textContent = r.w || r.l || r.d ? `${r.w}승 ${r.l}패${r.d ? " " + r.d + "무" : ""}` : "";
-    updateGo();
+  /** 카드 한 장 — 그림 · 이름 · 별 · 레벨 · 타입. 셀렉트 한 줄로는 누구인지 안 보였다 */
+  function monCard(m) {
+    if (!m) return `<div class="olwait">싸울 수 있는 아이가<br />없습니다</div>`;
+    const p = m.profile || {};
+    const tys = (p.typeKeys || []).map((k, i) => `<span class="ty t-${k}">${esc((p.types || [])[i])}</span>`).join("");
+    return `<img src="${esc(m.animUrl || m.url || "")}" alt="" />
+      <div class="olnm">${esc(m.name)}${m.shiny ? " ★" : ""}</div>
+      <div class="olmeta"><span class="st">${"★".repeat(m.stars || 0)}</span> Lv.${p.level ?? "?"} → 50</div>
+      <div class="oltys">${tys}</div>`;
   }
 
-  let foeOk = false;
-  const updateGo = () => ($("frGo").disabled = playing || !foeOk || !(last && last.friend && last.friend.team));
-
-  $("frMake").onclick = async () => {
-    const r = await window.ptb.friendRegister({ id: $("frMine").value, trainer: $("frName").value });
-    if (!r || !r.ok) return void ($("frMyNote").textContent = (r && r.reason) || "만들지 못했습니다");
-    $("frMyBox").hidden = false;
-    $("frMyCode").value = r.code;
-    $("frMyNote").textContent = "코드를 만들었습니다. 복사해서 친구에게 보내세요.";
-  };
-  $("frCopy").onclick = async () => {
-    const t = $("frMyCode").value;
-    try {
-      await navigator.clipboard.writeText(t);
-    } catch {
-      $("frMyCode").select();
-      document.execCommand("copy");
-    }
-    window.toast && toast("코드를 복사했습니다");
-  };
-
-  // 붙여 넣으면 바로 누구인지 보여 준다. 잘못 붙였으면 무엇이 틀렸는지 말한다
-  let inspectTimer = null;
-  $("frTheirs").addEventListener("input", () => {
-    clearTimeout(inspectTimer);
-    inspectTimer = setTimeout(async () => {
-      const code = $("frTheirs").value.trim();
-      foeOk = false;
-      $("frFoe").hidden = true;
-      if (!code) { $("frInfo").textContent = ""; return updateGo(); }
-      const r = await window.ptb.friendInspect(code);
-      if (!r || !r.ok) {
-        $("frInfo").textContent = (r && r.reason) || "읽지 못했습니다";
-      } else if (r.self) {
-        $("frInfo").textContent = "내 코드입니다. 친구에게 받은 코드를 넣어 주세요.";
-      } else {
-        foeOk = true;
-        $("frFoe").hidden = false;
-        $("frFoeImg").src = r.url || "";
-        $("frFoeTxt").textContent = `${r.trainer ? r.trainer + "의 " : "친구의 "}${r.name}${r.shiny ? " ★" : ""} (${r.stage})`;
-        $("frInfo").textContent = last && last.friend && last.friend.team ? "" : "싸우려면 위에서 내 팀부터 등록해 주세요.";
-      }
-      updateGo();
-    }, 250);
-  });
+  function pickGrid(list, cur) {
+    return list
+      .map((m) => `<button data-id="${esc(m.id)}" class="${m.id === cur ? "on" : ""}" title="${esc(m.name)} Lv.${m.profile.level}">
+        <img src="${esc(m.url || "")}" alt="" /><span class="n">${esc(m.name)}</span><span class="l">Lv.${m.profile.level}${m.active ? " · 키우는 중" : ""}</span></button>`)
+      .join("");
+  }
 
   /* ---------------- 실시간 배틀 ----------------
      중계 서버(server/)로 같은 방에 들어온 두 사람이 같은 결투를 같은 시각에 본다.
@@ -154,20 +93,46 @@
 
   function liveState(text, cls = "") {
     $("liveStatus").textContent = text;
-    $("liveStatus").className = "note " + cls;
+    $("liveStatus").className = "olstatus " + cls;
   }
 
   /**
-   * 내 포켓몬 고르기. 처음엔 친선 배틀에 등록한 아이를 몰래 썼는데, 방을 만들 때 누구로
-   * 들어가는지 알 수가 없었다. 이 칸에서 직접 고르고, 방 안에서도 바꿀 수 있다.
+   * 내 포켓몬 고르기. 셀렉트(liveMine)는 값만 들고 숨어 있고, 화면은 카드와 그림 목록이다.
+   * 방 안에서도 바꿀 수 있다 — 바꾸면 change 이벤트로 새 코드를 보낸다(아래)
    */
   function fillLiveMine(s) {
     const sel = $("liveMine");
     const keep = sel.value;
     const list = fighters(s);
-    sel.innerHTML = list.map((m) => `<option value="${m.id}">${m.name} Lv.${m.profile.level}${m.active ? " (키우는 중)" : ""}</option>`).join("");
+    sel.innerHTML = list.map((m) => `<option value="${esc(m.id)}"></option>`).join("");
     if (list.some((m) => m.id === keep)) sel.value = keep;
     else sel.value = (list.find((m) => m.active) || list[0] || {}).id || "";
+    $("liveMineCard").innerHTML = monCard(list.find((m) => m.id === sel.value));
+    if (!$("livePick").hidden) $("livePickGrid").innerHTML = pickGrid(list, sel.value);
+  }
+
+  $("liveMineCard").onclick = () => {
+    const open = $("livePick").hidden;
+    $("livePick").hidden = !open;
+    if (open && last) $("livePickGrid").innerHTML = pickGrid(fighters(last), $("liveMine").value);
+  };
+  $("livePickClose").onclick = () => ($("livePick").hidden = true);
+  $("livePickGrid").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-id]");
+    if (!b) return;
+    $("liveMine").value = b.dataset.id;
+    $("livePick").hidden = true;
+    if (last) fillLiveMine(last);
+    $("liveMine").dispatchEvent(new Event("change"));
+  });
+
+  function showFoe(img, text) {
+    const on = Boolean(text);
+    $("liveFoe").classList.toggle("on", on);
+    $("liveFoeWait").hidden = on;
+    $("liveFoeImg").hidden = !img;
+    $("liveFoeImg").src = img || "";
+    $("liveFoeTxt").textContent = text || "";
   }
 
   function liveUi() {
@@ -175,14 +140,16 @@
     const on = liveOn(s);
     const inRoom = Boolean(live.ws);
     if (s) fillLiveMine(s);
-    $("liveMine").disabled = !on || playing; // 결투 중에는 못 바꾼다. 방 안에서는 바꿀 수 있다
+    $("liveMine").disabled = $("liveMineCard").disabled = !on || playing; // 결투 중에는 못 바꾼다. 방 안에서는 바꿀 수 있다
+    if ($("liveMineCard").disabled) $("livePick").hidden = true;
     $("liveMake").disabled = $("liveJoin").disabled = !on || !$("liveMine").value || inRoom || playing;
     $("liveCodeIn").disabled = !on || inRoom;
+    $("liveJoinRow").hidden = inRoom; // 방에 들어가면 방 코드 · 준비 · 나가기만 남긴다
     $("liveLeave").hidden = !inRoom;
     $("liveReady").hidden = !(inRoom && live.peer);
     $("liveReady").disabled = playing || !live.peer || !live.peer.ok;
     if (!on) liveState("설정 › 온라인 기능을 켜면 쓸 수 있습니다. 보내는 건 팀 코드와 이름뿐입니다.");
-    else if (!inRoom) liveState("내 포켓몬을 고르고, 방을 만들거나 친구에게 받은 6자리 코드로 참가하세요.");
+    else if (!inRoom) liveState("내 포켓몬을 고르고, 방을 만들거나 친구에게 받은 코드로 참가하세요.");
   }
 
   function liveClose(text) {
@@ -194,7 +161,7 @@
     live.peer = null;
     live.code = null;
     $("liveRoom").hidden = true;
-    $("liveFoe").hidden = true;
+    showFoe(null, null);
     liveUi();
     if (text) liveState(text);
   }
@@ -235,14 +202,8 @@
         // 받은 코드는 메인이 검사한다 — 버전이 다르거나 말이 안 되면 여기서 끝난다
         const r = await window.ptb.friendInspect(m.team);
         live.peer = { team: m.team, name: m.name, ok: Boolean(r && r.ok && !r.self) };
-        $("liveFoe").hidden = false;
-        if (r && r.ok) {
-          $("liveFoeImg").src = r.url || "";
-          $("liveFoeTxt").textContent = `${m.name || r.trainer || "상대"}의 ${r.name}${r.shiny ? " ★" : ""} (${r.stage})`;
-        } else {
-          $("liveFoeImg").src = "";
-          $("liveFoeTxt").textContent = "상대 팀을 읽지 못했습니다";
-        }
+        if (r && r.ok) showFoe(r.url || null, `${m.name || r.trainer || "상대"}의 ${r.name}${r.shiny ? " ★" : ""}`);
+        else showFoe(null, "상대 팀을 읽지 못했습니다");
         // 누가 포켓몬을 바꾸면 서버가 양쪽 준비를 내린다 — 내 준비 표시도 내린다
         delete $("liveReady").dataset.on;
         // 내가 방금 바꿔서 서버가 상대 정보를 다시 보낸 거면, 내가 바꿨다는 말을 남긴다
@@ -262,7 +223,7 @@
         await liveStart(m.at);
       } else if (m.t === "left") {
         live.peer = null;
-        $("liveFoe").hidden = true;
+        showFoe(null, null);
         liveState("상대가 나갔습니다. 다른 친구를 기다리거나 방을 나가세요.");
         liveUi();
       } else if (m.t === "error") {
@@ -290,7 +251,6 @@
       return liveState((r && r.reason) || "결투를 시작하지 못했습니다", "bad");
     }
     const localAt = at - live.offset; // 서버 시각 → 내 시계
-    $("arena").scrollIntoView({ behavior: "smooth", block: "start" });
     while (Date.now() < localAt) {
       liveState(`${Math.ceil((localAt - Date.now()) / 1000)}초 뒤 시작!`);
       await new Promise((res) => setTimeout(res, Math.min(250, Math.max(10, localAt - Date.now()))));
@@ -298,7 +258,8 @@
     liveState("결투 중 — 상대 화면에서도 같은 결투가 진행됩니다.");
     fast = false;
     try {
-      await play(r);
+      // 같은 결투를 동시에 본다 — 건너뛰기는 두지 않는다
+      await play(r, { title: "📡 실시간 배틀", skip: false });
     } finally {
       playing = false;
       liveUi();
@@ -315,6 +276,9 @@
     if (code.length !== 6) return liveState("6자리 숫자 코드를 넣어 주세요.", "bad");
     liveConnect(code, "guest");
   };
+  $("liveCodeIn").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !$("liveJoin").disabled) $("liveJoin").click();
+  });
   $("liveReady").onclick = () => {
     if (!live.ws || !live.peer) return;
     live.ws.send(JSON.stringify({ t: "ready" }));
@@ -338,53 +302,13 @@
     window.toast && toast("방 코드를 복사했습니다");
   };
 
-  /* ---------------- 교환 ----------------
-     보내기 → 박스에서 빠지고 코드가 나온다(메인이 한 번 묻는다). 받기 → 같은 코드는 한 번만.
+  /* ---------------- 교환 받기 ----------------
+     교환은 길드 몰로 바뀌었다. 예전에 받은 코드(PTBT-…)만 여기서 받는다 — 같은 코드는 한 번만.
      교환으로 진화하는 아이는 받기 전에 미리 알려 준다 — 받는 맛이 거기 있다. */
-
-  function renderTrade(s) {
-    const list = fighters(s);
-    const sel = $("trMine");
-    const keep = sel.value;
-    sel.innerHTML = list.map((m) => `<option value="${m.id}">${m.name} Lv.${m.profile.level}${m.active ? " (키우는 중)" : ""}</option>`).join("");
-    if (list.some((m) => m.id === keep)) sel.value = keep;
-    else {
-      // 처음엔 키우는 아이가 아닌 아이를 골라 둔다 — 키우던 걸 실수로 보내지 않게
-      const other = list.find((m) => !m.active);
-      if (other) sel.value = other.id;
-    }
-    $("trSend").disabled = list.length < 2 || (s.box || []).length < 2;
-    const sent = (s.friend && s.friend.sent) || [];
-    if (sent.length && !$("trSentCode").value) {
-      $("trSentBox").hidden = false;
-      $("trSentCode").value = sent[0].code;
-      $("trSentNote").textContent = `최근에 보낸 아이: ${sent[0].name} — 코드를 잃어버렸으면 여기서 다시 복사하세요.`;
-    }
-  }
-
-  $("trSend").onclick = async () => {
-    const r = await window.ptb.tradeSend($("trMine").value);
-    if (!r || !r.ok) {
-      if (r && r.reason) $("trSentNote").textContent = r.reason;
-      return;
-    }
-    $("trSentBox").hidden = false;
-    $("trSentCode").value = r.code;
-    $("trSentNote").textContent = `${r.name}을(를) 보냈습니다. 코드를 복사해서 친구에게 보내세요.`;
-    window.toast && toast(`${r.name}을(를) 보냈습니다`);
-  };
-  $("trCopy").onclick = async () => {
-    try {
-      await navigator.clipboard.writeText($("trSentCode").value);
-    } catch {
-      $("trSentCode").select();
-      document.execCommand("copy");
-    }
-    window.toast && toast("코드를 복사했습니다");
-  };
 
   let tradeOk = false;
   let tradeTimer = null;
+  const tradeNote = (t) => ($("trNote").textContent = t || "");
   $("trIn").addEventListener("input", () => {
     clearTimeout(tradeTimer);
     tradeTimer = setTimeout(async () => {
@@ -392,17 +316,22 @@
       tradeOk = false;
       $("trFoe").hidden = true;
       $("trGet").disabled = true;
-      if (!code) return void ($("trInfo").textContent = "");
+      tradeNote("");
+      if (!code) return;
       const r = await window.ptb.tradeInspect(code);
-      if (!r || !r.ok) return void ($("trInfo").textContent = (r && r.reason) || "읽지 못했습니다");
+      if (!r || !r.ok) return tradeNote((r && r.reason) || "읽지 못했습니다");
       $("trFoe").hidden = false;
       $("trFoeImg").src = r.url || "";
       $("trFoeTxt").innerHTML =
-        `${r.trainer ? r.trainer + "에게서 " : ""}${r.name}${r.shiny ? " ★" : ""} (${r.stage})` +
-        (r.evolvesTo ? ` <span class="evo">교환하면 ${r.evolvesTo}(으)로 진화!</span>` : "") +
-        (r.stone ? " · 🪨 변하지않는돌을 지니고 온다" : "");
-      if (r.used) return void ($("trInfo").textContent = "이미 받은 코드입니다. 같은 코드는 한 번만 받을 수 있습니다.");
-      $("trInfo").textContent = r.mine ? "내가 보낸 코드입니다. 받으면 돌아옵니다." : r.ot && r.ot !== r.trainer ? `처음 키운 트레이너: ${r.ot}` : "";
+        `${esc(r.name)}${r.shiny ? " ★" : ""} <span class="trsub">(${esc(r.stage)})</span>` +
+        (r.evolvesTo ? `<br /><span class="evo">✨ 교환하면 ${esc(r.evolvesTo)}(으)로 진화!</span>` : "");
+      $("trInfo").textContent = [
+        r.trainer ? `${r.trainer}에게서` : "",
+        r.ot && r.ot !== r.trainer ? `처음 키운 트레이너: ${r.ot}` : "",
+        r.stone ? "🪨 변하지않는돌을 지니고 온다" : "",
+      ].filter(Boolean).join(" · ");
+      if (r.used) return tradeNote("이미 받은 코드입니다. 같은 코드는 한 번만 받을 수 있습니다.");
+      if (r.mine) tradeNote("내가 보낸 코드입니다. 받으면 돌아옵니다.");
       tradeOk = true;
       $("trGet").disabled = false;
     }, 250);
@@ -412,63 +341,53 @@
     if (!tradeOk) return;
     $("trGet").disabled = true;
     const r = await window.ptb.tradeReceive($("trIn").value.trim());
-    if (!r || !r.ok) return void ($("trInfo").textContent = (r && r.reason) || "받지 못했습니다");
+    if (!r || !r.ok) return tradeNote((r && r.reason) || "받지 못했습니다");
     tradeOk = false;
-    $("trInfo").textContent = r.evolved
+    tradeNote(r.evolved
       ? `✨ ${r.before}이(가) 교환으로 ${r.name}(으)로 진화했다! 박스에 들어갔습니다.`
       : r.returned
         ? `${r.name}이(가) 돌아왔습니다.`
-        : `${r.name}을(를) 받았습니다. 박스에 들어갔습니다.`;
+        : `${r.name}을(를) 받았습니다. 박스에 들어갔습니다.`);
     window.toast && toast(r.evolved ? `${r.name}(으)로 진화!` : `${r.name}을(를) 받았습니다`);
   };
 
-  $("frGo").onclick = async () => {
-    if (playing) return;
-    playing = true;
-    fast = false;
-    $("btlGo").disabled = $("btlDesk").disabled = true;
-    updateGo();
-    $("btlSkip").hidden = false;
-    try {
-      const r = await window.ptb.friendBattle($("frTheirs").value.trim());
-      if (!r || !r.ok) return void ($("frInfo").textContent = (r && r.reason) || "결투를 시작하지 못했습니다");
-      $("arena").scrollIntoView({ behavior: "smooth", block: "start" });
-      await play(r);
-    } finally {
-      playing = false;
-      $("btlSkip").hidden = true;
-      if (last) fillPick(last);
-      updateGo();
-    }
+  $("olGoMall").onclick = () => {
+    setTab("shop");
+    const b = document.querySelector('#shSwitch button[data-view="mall"]');
+    if (b) b.click();
   };
 
   /**
    * 길드원과 결투 — 방 탭의 길드 화면이 부른다(guild.js). 결과는 메인이 끝까지 계산하고
-   * 여기서 결투 탭으로 넘어와 재생만 한다. 친선 배틀과 같다(Lv.50, 보상 없음).
+   * 여기서 온라인 탭으로 넘어와 재생만 한다(Lv.50, 보상 없음).
    */
   window.ptbGuildBattle = async (memberId) => {
     if (playing) return { ok: false, reason: "이미 결투 중입니다" };
     const r = await window.ptb.guildBattle(memberId);
     if (!r || !r.ok) return r || { ok: false };
     setTab("battle");
+    setView("battle");
     playing = true;
     fast = false;
-    $("btlGo").disabled = $("btlDesk").disabled = true;
-    updateGo();
-    $("btlSkip").hidden = false;
+    liveUi();
     try {
-      $("arena").scrollIntoView({ behavior: "smooth", block: "start" });
-      await play(r);
+      await play(r, { title: "🏰 길드원과 결투", skip: true });
     } finally {
       playing = false;
-      $("btlSkip").hidden = true;
-      if (last) fillPick(last);
-      updateGo();
+      liveUi();
     }
     return { ok: true };
   };
 
   /* ---------------- 재생 ---------------- */
+
+  /** 앞모습 · 뒷모습. 내 쪽(0)은 뒤에서 본다 — 뒷모습이 없는 종이면 앞모습을 뒤집어 상대를 보게 한다 */
+  function setImg(img, i, f, m) {
+    const front = f.url || (m && (m.animUrl || m.url)) || "";
+    const back = i === 0 ? f.backUrl : null;
+    img.src = back || front;
+    img.classList.toggle("flip", i === 0 && !back);
+  }
 
   function setSide(i, m, f) {
     const k = SIDE[i];
@@ -476,10 +395,8 @@
     box.querySelector(".nm").textContent = f.label || f.name;
     box.querySelector(".lv").textContent = "Lv." + f.level;
     box.querySelector(".st").textContent = "";
-    const img = box.querySelector("img");
-    // 친선 배틀의 친구 아이는 내 박스에 없다 — 메인이 그림 주소를 같이 준다
-    img.src = (m && (m.animUrl || m.url)) || f.url || "";
-    img.classList.toggle("flip", DIR[i] > 0);
+    // 상대 아이는 내 박스에 없다 — 메인이 그림 주소를 같이 준다
+    setImg($("body" + k).querySelector("img"), i, f, m);
     $("body" + k).className = "fbody";
     setHp(i, f.maxHp, f.maxHp, true);
   }
@@ -497,8 +414,33 @@
 
   const AIL_SHORT = { paralysis: "마비", burn: "화상", poison: "독", sleep: "잠듦", freeze: "얼음", confusion: "혼란" };
 
-  function line(text, cls = "") {
+  /** 대사 창 — 한 글자씩 찍는다. 다 찍으면 ▼ 가 깜빡인다. 건너뛰는 중이면 바로 */
+  let typing = null;
+  function say(text, cls = "") {
+    const box = $("btlMsg");
+    const el = $("btlMsgText");
+    clearInterval(typing);
+    box.className = "msgbox " + cls;
+    if (fast) {
+      el.textContent = text;
+      return box.classList.add("idle");
+    }
+    let n = 0;
+    el.textContent = "";
+    typing = setInterval(() => {
+      n += 2;
+      el.textContent = text.slice(0, n);
+      if (n >= text.length) {
+        clearInterval(typing);
+        box.classList.add("idle");
+      }
+    }, 16);
+  }
+
+  /** 기록에 한 줄 — quiet 면 대사 창은 그대로 두고 기록에만 */
+  function line(text, cls = "", quiet = false) {
     if (!text) return;
+    if (!quiet) say(text, cls === "good" || cls === "ft" ? cls : "");
     const el = document.createElement("div");
     el.textContent = text;
     if (cls) el.className = cls;
@@ -514,105 +456,78 @@
     b.classList.add("hit");
   }
 
-  async function play(r) {
+  /** 끝나면 크게 — 로그 맨 아래 한 줄로는 이겼는지 졌는지 놓쳤다. 왼쪽(0)이 늘 내 쪽이다 */
+  function showResult(r) {
+    const el = $("btlResult");
+    const [a, b] = r.fighters.map((f) => f.label || f.name);
+    el.className = "btlresult " + (r.winner === 0 ? "win" : r.winner === 1 ? "lose" : "");
+    el.innerHTML = (r.winner == null ? "🤝 무승부" : r.winner === 0 ? "🏆 이겼다!" : "졌다…") + `<small>${esc(a)} VS ${esc(b)}</small>`;
+    el.hidden = false;
+  }
+
+  async function play(r, { title = "결투", skip = true } = {}) {
     const byId = Object.fromEntries((last ? last.box : []).map((m) => [m.id, m]));
+    cur = r.fighters;
     r.fighters.forEach((f, i) => setSide(i, byId[f.id], f));
-    $("arena").hidden = false;
+    $("btlTitle").textContent = title;
+    $("btlShow").hidden = false;
+    $("btlResult").hidden = true;
+    $("btlClose").hidden = true;
+    $("btlSkip").hidden = !skip;
     $("btlLog").innerHTML = "";
+    $("btlShow").scrollIntoView({ behavior: "smooth", block: "start" });
     ensureStages();
+    // 들어오는 장면을 다시 틀려면 클래스를 뗐다 붙인다
+    const scene = $("arena");
+    scene.classList.remove("enter");
+    void scene.offsetWidth;
+    scene.classList.add("enter");
+    say(`${josa(r.fighters[1].label || r.fighters[1].name, "이", "가")} 승부를 걸어왔다!`);
+    await sleep(1100);
+    say(`가랏, ${r.fighters[0].name}!`);
+    await sleep(800);
 
-    for (const ev of r.log) {
-      if (ev.t === "move") {
-        line(ev.text, "mv");
-        if (!fast) stages[ev.side].play(ev.move, { body: $("body" + SIDE[ev.side]), dir: DIR[ev.side], force: true });
-        await sleep(ev.move.damageClass === "status" ? 900 : 650);
-      } else if (ev.t === "hp") {
-        const before = parseInt($("hpn" + SIDE[ev.side]).textContent, 10);
-        if (ev.hp < before) hit(ev.side);
-        setHp(ev.side, ev.hp, ev.max);
-        line(ev.text);
-        await sleep(450);
-      } else if (ev.t === "faint") {
-        $("body" + SIDE[ev.side]).classList.add("faint");
-        line(ev.text, "ft");
-        await sleep(700);
-      } else {
-        if (ev.transform && ev.side >= 0) {
-          // 변신 — 상대 그림을 그대로 쓴다. 바라보는 방향은 내 자리 그대로
-          const mine = $("body" + SIDE[ev.side]).querySelector("img");
-          const theirs = $("body" + SIDE[ev.transform.side]).querySelector("img");
-          if (mine && theirs) mine.src = theirs.src;
+    try {
+      for (const ev of r.log) {
+        if (ev.t === "move") {
+          line(ev.text, "mv");
+          if (!fast) stages[ev.side].play(ev.move, { body: $("body" + SIDE[ev.side]), dir: DIR[ev.side], force: true });
+          await sleep(ev.move.damageClass === "status" ? 900 : 650);
+        } else if (ev.t === "hp") {
+          const before = parseInt($("hpn" + SIDE[ev.side]).textContent, 10);
+          if (ev.hp < before) hit(ev.side);
+          setHp(ev.side, ev.hp, ev.max);
+          line(ev.text);
+          await sleep(450);
+        } else if (ev.t === "faint") {
+          $("body" + SIDE[ev.side]).classList.add("faint");
+          line(ev.text, "ft");
+          await sleep(700);
+        } else {
+          if (ev.transform && ev.side >= 0 && cur) {
+            // 변신 — 상대의 모습을 빌린다. 내 쪽이면 상대의 뒷모습, 상대 쪽이면 내 앞모습
+            const theirs = cur[ev.transform.side];
+            setImg($("body" + SIDE[ev.side]).querySelector("img"), ev.side, { url: theirs.url, backUrl: theirs.backUrl }, null);
+          }
+          if (ev.status !== undefined && ev.side >= 0) {
+            $("side" + SIDE[ev.side]).querySelector(".st").textContent =
+              ev.status && ev.status !== "unconfused" ? AIL_SHORT[ev.status] || "" : "";
+          }
+          line(ev.text, ev.side < 0 ? "sys" : ev.eff > 1 ? "good" : ev.eff < 1 ? "bad" : "");
+          await sleep(ev.side < 0 ? 300 : 500);
         }
-        if (ev.status !== undefined && ev.side >= 0) {
-          $("side" + SIDE[ev.side]).querySelector(".st").textContent =
-            ev.status && ev.status !== "unconfused" ? AIL_SHORT[ev.status] || "" : "";
-        }
-        line(ev.text, ev.side < 0 ? "sys" : ev.eff > 1 ? "good" : ev.eff < 1 ? "bad" : "");
-        await sleep(ev.side < 0 ? 300 : 500);
       }
-    }
-
-    if (r.friendly) {
-      line(r.winner == null ? "무승부!" : r.winner === 0 ? "친선 배틀에서 이겼다!" : "친선 배틀에서 졌다…", "rw");
-      line("친선 배틀은 보상이 없습니다. 같은 두 코드로는 몇 번을 해도 같은 결과입니다.", "sys");
-    } else if (r.reward) {
-      line(`🎁 ${r.reward.name}(${r.reward.flavorName})을 얻었다!`, "rw");
-      window.toast && toast(`${r.reward.name}을(를) 얻었습니다`);
-    } else if (r.winner != null && !r.rewardsLeft) {
-      line("오늘 받을 수 있는 보상은 다 받았습니다. 결투는 계속할 수 있습니다.", "sys");
+      showResult(r);
+      say(r.winner == null ? "승부가 나지 않았다!" : r.winner === 0 ? `${r.fighters[0].name}의 승리!` : `${josa(r.fighters[0].name, "은", "는")} 지고 말았다…`);
+      line("친구와의 결투는 보상이 없습니다.", "sys", true);
+    } finally {
+      fast = false;
+      $("btlSkip").hidden = true;
+      $("btlClose").hidden = false;
     }
   }
 
-  $("btlGo").onclick = async () => {
-    if (playing) return;
-    const a = $("btlA").value;
-    const b = $("btlB").value;
-    const level = $("btlLv").value === "50" ? 50 : null;
-    if (!a || !b || a === b) return void (window.toast && toast("서로 다른 두 마리를 골라 주세요"));
-    playing = true;
-    fast = false;
-    $("btlGo").disabled = true;
-    $("btlSkip").hidden = false;
-    try {
-      const r = await window.ptb.battle({ a, b, level });
-      if (!r || !r.ok) return void (window.toast && toast((r && r.reason) || "결투를 시작하지 못했습니다"));
-      await play(r);
-    } finally {
-      playing = false;
-      $("btlSkip").hidden = true;
-      if (last) fillPick(last);
-    }
-  };
-  /**
-   * 바탕화면에서 싸운다. 장면은 펫 창들이 그리고(main desktopBattle), 이 창은 닫힌다.
-   * 끝나고 돌아오면 로그만 채워 둔다 — 다시 열었을 때 무슨 일이 있었는지 보이게.
-   */
-  $("btlDesk").onclick = async () => {
-    if (playing) return;
-    const a = $("btlA").value;
-    const b = $("btlB").value;
-    const level = $("btlLv").value === "50" ? 50 : null;
-    if (!a || !b || a === b) return void (window.toast && toast("서로 다른 두 마리를 골라 주세요"));
-    playing = true;
-    $("btlGo").disabled = $("btlDesk").disabled = true;
-    $("btlNote").textContent = "바탕화면에서 싸우는 중…";
-    try {
-      const r = await window.ptb.battleDesktop({ a, b, level });
-      if (!r || !r.ok) return void (window.toast && toast((r && r.reason) || "결투를 시작하지 못했습니다"));
-      fast = true;
-      await play(r);
-    } finally {
-      fast = false;
-      playing = false;
-      $("btlNote").textContent = "";
-      if (last) fillPick(last);
-    }
-  };
   // 결과는 이미 정해져 있다. 남은 장면을 건너뛸 뿐이다
   $("btlSkip").onclick = () => (fast = true);
-  // A 를 바꾸면 B 가 같은 아이가 되지 않게 다시 맞춘다
-  $("btlA").onchange = () => {
-    if ($("btlA").value === $("btlB").value) $("btlB").value = "";
-    if (last) fillPick(last);
-  };
+  $("btlClose").onclick = () => ($("btlShow").hidden = true);
 })();

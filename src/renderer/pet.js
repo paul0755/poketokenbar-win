@@ -1,7 +1,13 @@
 "use strict";
 const img = document.getElementById("pet");
 const egg = document.getElementById("egg");
-egg.innerHTML = window.eggSvg(100); // 초기값. 설정 크기가 오면 다시 그린다
+// 알 그림 — 크기는 설정에서, 모양은 맡은 아이에서(전설의 알이면 전설의 알 그림). 바뀔 때만 다시 그린다
+const eggArt = { size: 100, single: false, drawn: "" };
+function drawEgg() {
+  const key = eggArt.size + ":" + eggArt.single;
+  if (key !== eggArt.drawn) { egg.innerHTML = window.eggSvg(eggArt.size, eggArt.single); eggArt.drawn = key; }
+}
+drawEgg(); // 초기값. 설정 크기가 오면 다시 그린다
 
 window.ptb.onStats((s) => {
   // 설정에서 크기를 바꾸면 창은 메인이 줄이고, 그림은 여기서 맞춘다.
@@ -10,7 +16,8 @@ window.ptb.onStats((s) => {
     // max-*가 아니라 width/height여야 96px 원본이 실제로 커진다.
     img.style.width = px + "px";
     img.style.height = px + "px";
-    egg.innerHTML = window.eggSvg(Math.round(s.petSize * 0.78));
+    eggArt.size = Math.round(s.petSize * 0.78);
+    drawEgg();
     if (!s.mon && !s.facing) return;
   }
   // 배회 중에는 facing만 담은 부분 갱신이 온다. 그때는 이미지를 다시 그리지 않는다.
@@ -33,6 +40,8 @@ window.ptb.onStats((s) => {
     img.hidden = false;
     egg.hidden = true;
   } else {
+    eggArt.single = Boolean(mine ? mine.single : s.mon && s.mon.single);
+    drawEgg();
     img.hidden = true;
     egg.hidden = false;
   }

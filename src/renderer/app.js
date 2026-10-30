@@ -148,7 +148,7 @@ function renderHome(s) {
 
   // 펫 줄
   const purl = s.petAnimUrl || s.petStillUrl;
-  $("petThumb").innerHTML = purl ? `<img src="${purl}" alt="">` : window.eggSvg(34);
+  $("petThumb").innerHTML = purl ? `<img src="${purl}" alt="">` : window.eggSvg(34, mon.single);
   $("petName").textContent = s.petName || mon.name;
   $("petState").textContent = s.petLine == null ? "키우는 아이를 따라갑니다" : "도감에서 고른 아이";
   const pt = $("petToggle");
