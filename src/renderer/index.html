@@ -223,7 +223,29 @@
   }
   /* 키우는 중인 아이는 한눈에 구별돼야 한다 — 토큰이 들어가는 곳이 여기다 */
   .bx.act { border-color: var(--accent); background: #26220f; }
-  .bx .pic { width: 52px; height: 52px; flex-shrink: 0; display: grid; place-items: center; }
+  .bx .pic { position: relative; width: 52px; height: 52px; flex-shrink: 0; display: grid; place-items: center; }
+  /* 즐겨찾기 — 그림 왼쪽 위의 하트. 켜 두면 박스 위쪽에 모이고 놓아주기 · 팔기가 막힌다 */
+  .bx .fav {
+    position: absolute; top: -4px; left: -5px; z-index: 1; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
+    background: transparent; color: #4a4d58; font-size: 13px; line-height: 20px; cursor: pointer; transition: transform .12s, color .12s;
+  }
+  .bx .fav:hover { color: #ff7aa2; transform: scale(1.15); }
+  .bx .fav.on { color: #ff4f86; text-shadow: 0 0 6px rgba(255, 79, 134, .55); }
+  .bx.fv { border-color: #5a2a3c; }
+  .bx.fv.act { border-color: var(--accent); }
+  .boxbar { display: flex; align-items: center; gap: 6px; margin: 0 0 9px; }
+  .boxsort { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--dim); }
+  .boxsort select {
+    padding: 4px 6px; font: inherit; font-size: 10.5px; color: var(--text);
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
+  }
+  .boxchip {
+    padding: 4px 9px; font: inherit; font-size: 10.5px; color: var(--muted); cursor: pointer;
+    background: var(--card); border: 1px solid var(--line); border-radius: 99px;
+  }
+  .boxchip:hover { color: var(--text); }
+  .boxchip.on { color: #fff; background: #c43a6a; border-color: #c43a6a; }
+  .boxfavn { margin-left: auto; font-size: 10px; color: var(--dim); }
   .bx .pic img { width: 50px; height: 50px; object-fit: contain; image-rendering: pixelated; }
   .bx .info { flex: 1; min-width: 0; }
   .bx .nm { font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 5px; }
@@ -245,6 +267,7 @@
   .bx .acts button:hover { color: var(--text); border-color: var(--accent); }
   .bx .acts button.on { color: #14151a; background: var(--accent); border-color: var(--accent); }
   .bx .acts button.del:hover { color: var(--red); border-color: var(--red); }
+  .bx .acts button.del:disabled { opacity: .35; cursor: not-allowed; color: var(--muted); border-color: var(--line); }
 
   /* ---------- 개체 프로필 ---------- */
   .bx .info { cursor: pointer; }
@@ -497,6 +520,22 @@
     </div>
     <div class="note" id="boxNote">
       키우는 아이만 자랍니다. 바탕화면에는 여러 마리를 동시에 세울 수 있습니다.
+    </div>
+    <!-- 정렬 · 즐겨찾기. 고른 정렬은 이 PC 에 기억한다(localStorage) -->
+    <div class="boxbar">
+      <label class="boxsort">정렬
+        <select id="boxSort">
+          <option value="got">받은 순</option>
+          <option value="new">최근 받은 순</option>
+          <option value="lv">레벨 높은 순</option>
+          <option value="star">별 많은 순</option>
+          <option value="grow">많이 자란 순</option>
+          <option value="name">이름 순</option>
+          <option value="dex">도감 번호 순</option>
+        </select>
+      </label>
+      <button id="boxFavOnly" class="boxchip" title="즐겨찾기한 아이만 보기">♥ 즐겨찾기만</button>
+      <span class="boxfavn" id="boxFavN"></span>
     </div>
     <div id="boxList"></div>
   </section>

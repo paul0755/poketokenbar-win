@@ -1202,6 +1202,7 @@ function sellable(id) {
   if (!m) return { ok: false, reason: "없는 아이입니다" };
   if (save.box.length <= 1) return { ok: false, reason: "마지막 한 마리는 팔 수 없습니다" };
   if (isEggMon(m)) return { ok: false, reason: "알은 팔 수 없습니다" };
+  if (m.fav) return { ok: false, reason: "즐겨찾기한 아이는 팔 수 없습니다. 박스에서 ♥ 를 먼저 풀어 주세요" };
   return { ok: true, m };
 }
 
@@ -2120,6 +2121,8 @@ async function buildStats() {
         stage: d.stage.label,
         stageKey: d.stage.key,
         single: Boolean(d.single), // 알이면 전설의 알 그림으로
+        fav: Boolean(m.fav),
+        dex: d.dexId || 0, // 박스 정렬(도감 번호 순). 알은 0
         ratio: d.progress.ratio,
         next: d.progress.next,
         remaining: d.progress.remaining,
@@ -4009,10 +4012,24 @@ app.whenReady().then(async () => {
   ipcMain.handle("trade-send", (_e, id) => tradeSend(id));
   ipcMain.handle("trade-inspect", (_e, code) => tradeInspect(code));
   ipcMain.handle("trade-receive", (_e, code) => tradeReceive(code));
+  /*
+   * 즐겨찾기 — 박스 위쪽에 모이고(정렬은 화면이 한다), 놓아주기 · 상점에 팔기 · 몰에 올리기를 막는다.
+   * 아끼는 아이를 "정말?" 한 번 더 눌러 잃는 일이 없게
+   */
+  ipcMain.handle("box-fav", (_e, id) => {
+    const m = box.find(save.box, id);
+    if (!m) return { ok: false, reason: "없는 아이" };
+    if (m.fav) delete m.fav;
+    else m.fav = true;
+    writeSave();
+    refresh(true);
+    return { ok: true, fav: Boolean(m.fav) };
+  });
   ipcMain.handle("release", (_e, id) => {
     const m = box.find(save.box, id);
     if (!m) return { ok: false, reason: "없는 아이" };
     if (save.box.length <= 1) return { ok: false, reason: "마지막 한 마리는 놓아줄 수 없습니다" };
+    if (m.fav) return { ok: false, reason: "즐겨찾기한 아이는 놓아줄 수 없습니다. ♥ 를 먼저 풀어 주세요" };
     if (m.hold === "everstone") save.items = { ...(save.items || {}), everstone: stoneCount() + 1 }; // 돌은 가방으로
     save.box = save.box.filter((x) => x.id !== id);
     save.petIds = save.petIds.filter((x) => x !== id);

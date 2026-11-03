@@ -220,14 +220,57 @@ function renderHome(s) {
  */
 let openProfile = null; // 펼쳐 둔 개체 id
 
+/*
+ * 정렬 · 즐겨찾기만 보기. 고른 정렬은 이 PC 에 기억한다 — 못 읽으면 기본(받은 순).
+ * 즐겨찾기한 아이는 어느 정렬에서나 위로 모은다. 아끼는 아이를 매번 찾게 하지 않으려는 기능이다
+ */
+const BOX_LS = "ptb.boxSort";
+const boxView = (() => {
+  try { return JSON.parse(localStorage.getItem(BOX_LS)) || {}; } catch { return {}; }
+})();
+const saveBoxView = () => { try { localStorage.setItem(BOX_LS, JSON.stringify(boxView)); } catch {} };
+const lvOf = (m) => (m.profile ? m.profile.level : -1); // 알은 맨 뒤
+const BOX_SORT = {
+  got: () => 0, // 박스 순서 그대로(받은 순)
+  new: (a, b) => b._i - a._i,
+  lv: (a, b) => lvOf(b) - lvOf(a) || b.grown - a.grown,
+  star: (a, b) => b.stars - a.stars || lvOf(b) - lvOf(a),
+  grow: (a, b) => b.grown - a.grown,
+  name: (a, b) => (a.stageKey === "egg") - (b.stageKey === "egg") || a.name.localeCompare(b.name, "ko"),
+  dex: (a, b) => (a.dex || 1e9) - (b.dex || 1e9),
+};
+$("boxSort").value = BOX_SORT[boxView.sort] ? boxView.sort : "got";
+$("boxFavOnly").classList.toggle("on", Boolean(boxView.favOnly));
+$("boxSort").addEventListener("change", () => {
+  boxView.sort = $("boxSort").value;
+  saveBoxView();
+  if (lastStats) renderBox(lastStats);
+});
+$("boxFavOnly").addEventListener("click", () => {
+  boxView.favOnly = !boxView.favOnly;
+  $("boxFavOnly").classList.toggle("on", boxView.favOnly);
+  saveBoxView();
+  if (lastStats) renderBox(lastStats);
+});
+
 function renderBox(s) {
-  const list = s.box || [];
-  $("boxCount").textContent = list.length + "마리";
+  const all = s.box || [];
+  const favN = all.filter((m) => m.fav).length;
+  $("boxCount").textContent = all.length + "마리";
+  $("boxFavN").textContent = favN ? `♥ ${favN}마리` : "";
+  const cmp = BOX_SORT[$("boxSort").value] || BOX_SORT.got;
+  const list = all
+    .map((m, i) => ({ ...m, _i: i }))
+    .filter((m) => !boxView.favOnly || m.fav)
+    .sort((a, b) => b.fav - a.fav || cmp(a, b) || a._i - b._i);
   // 이미 다 떠 있으면 모두 띄우기, 숨겨 두었으면 모두 내리기는 누를 게 없다.
   // 아무도 안 골랐어도 키우는 아이는 떠 있으니(petTargets) 내리기는 "보이는가"로만 정한다
   $("petAllOn").disabled = !list.length || (s.petVisible !== false && list.every((m) => m.isPet));
   $("petAllOff").disabled = s.petVisible === false;
-  if (!list.length) return void ($("boxList").innerHTML = '<div class="note">아직 없습니다.</div>');
+  if (!list.length)
+    return void ($("boxList").innerHTML = `<div class="note">${
+      boxView.favOnly && all.length ? "즐겨찾기한 아이가 없습니다. 그림 왼쪽 위의 ♥ 를 누르면 즐겨찾기합니다." : "아직 없습니다."
+    }</div>`);
 
   $("boxList").innerHTML = list
     .map((m) => {
@@ -244,8 +287,8 @@ function renderBox(s) {
       const p = m.profile;
       const lv = p ? `Lv.${p.level} · ` : "";
       return `
-        <div class="bx ${m.active ? "act" : ""}" data-id="${m.id}">
-          <div class="pic">${m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50, m.single)}</div>
+        <div class="bx ${m.active ? "act" : ""} ${m.fav ? "fv" : ""}" data-id="${m.id}">
+          <div class="pic"><button class="fav ${m.fav ? "on" : ""}" data-fav="${m.id}" title="${m.fav ? "즐겨찾기 풀기" : "즐겨찾기 — 위쪽에 모으고, 놓아주기 · 팔기를 막습니다"}">${m.fav ? "♥" : "♡"}</button>${m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50, m.single)}</div>
           <div class="info" title="눌러서 상세 보기">
             <div class="nm">${m.name}${m.shiny ? " ★" : ""}${tags}</div>
             <div class="sub">${lv}${"★".repeat(m.stars)} ${m.stage}${m.nature ? " · " + m.nature : ""}</div>
@@ -255,7 +298,7 @@ function renderBox(s) {
           <div class="acts">
             <button data-act="active" ${m.active ? "disabled" : ""}>${m.active ? "키우는 중" : "키우기"}</button>
             <button data-act="pet" class="${m.isPet ? "on" : ""}">${m.isPet ? "내리기" : "띄우기"}</button>
-            <button data-act="release" class="del">놓아주기</button>
+            <button data-act="release" class="del" ${m.fav ? 'disabled title="즐겨찾기한 아이는 놓아줄 수 없습니다"' : ""}>놓아주기</button>
           </div>
         </div>
         ${openProfile === m.id ? profileHtml(p, m, s.berries, s.stones) : ""}`;
@@ -366,6 +409,13 @@ $("boxList").addEventListener("click", async (e) => {
     const id = info.closest(".bx").dataset.id;
     openProfile = openProfile === id ? null : id;
     if (lastStats) renderBox(lastStats);
+    return;
+  }
+
+  const fv = e.target.closest("button[data-fav]");
+  if (fv) {
+    const r = await window.ptb.boxFav(fv.dataset.fav);
+    if (!r || !r.ok) toast((r && r.reason) || "바꾸지 못했습니다", "bad");
     return;
   }
 
