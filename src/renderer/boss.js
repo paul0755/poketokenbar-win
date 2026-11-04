@@ -190,7 +190,10 @@
     $("bsGo").disabled = playing || rd.done || rd.triesLeft <= 0 || !m;
     $("bsGo").textContent = playing ? "싸우는 중…" : rd.done ? "이번 주 끝" : rd.triesLeft <= 0 ? "내일 다시" : "⚔️ 도전";
     $("bsChoose").hidden = !choosing;
-    if (choosing) $("bsChooseN").textContent = `${choosing.used.length} / ${choosing.limit}마리 나감`;
+    if (choosing) {
+      const a = choosing.auto && mons.find((x) => x.id === choosing.auto);
+      $("bsChooseN").textContent = `${choosing.used.length} / ${choosing.limit}마리 나감` + (a ? ` · 곧 ${a.name}이(가) 나갑니다` : "");
+    }
   }
 
   function renderShelf() {
@@ -267,6 +270,7 @@
       if (choosing.used.includes(id)) return toast("이번 도전에 이미 나갔던 아이입니다", "bad");
       const c = choosing;
       choosing = null;
+      clearTimeout(c.timer);
       c.resolve(id);
       return;
     }
@@ -313,14 +317,30 @@
 
   /* ---------------- 도전 · 재생 ---------------- */
 
-  /** 내 아이가 쓰러졌다 — 선반에서 다음 아이를 고르거나 그만할 때까지 기다린다 */
-  function waitChoice(r) {
+  /**
+   * 내 아이가 쓰러졌다 — 다음 아이를 저절로 내보낸다. 아직 안 나간 아이 중 레벨(같으면 별)이 높은 순.
+   * 예전에는 고를 때까지 판이 멈췄다 — 여섯 마리를 다 쓰려면 매번 눌러야 했다.
+   * 잠깐(AUTO_MS) 기다리는 동안 선반에서 다른 아이를 누르면 그 아이가, 그만하기를 누르면 거기서 끝난다.
+   * 건너뛰는 중이면 기다리지 않는다.
+   */
+  const AUTO_MS = 1600;
+  const nextUp = (used) =>
+    myMons()
+      .filter((m) => !used.includes(m.id))
+      .sort((a, b) => b.profile.level - a.profile.level || (b.stars || 0) - (a.stars || 0))[0] || null;
+  function waitChoice(r, skip = []) {
     return new Promise((resolve) => {
-      fast = false;
-      choosing = { resolve, used: r.used, limit: r.limit };
+      const auto = nextUp([...r.used, ...skip]);
+      const c = { resolve, used: r.used, limit: r.limit, auto: auto && auto.id, timer: null };
+      choosing = c;
       renderPick();
       renderShelf();
-      $("bsChoose").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      if (!auto) return void $("bsChoose").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      c.timer = setTimeout(() => {
+        if (choosing !== c) return;
+        choosing = null;
+        resolve(auto.id);
+      }, fast ? 0 : AUTO_MS);
     });
   }
 
@@ -342,15 +362,16 @@
       renderShelf();
       const scene = setupScene(r);
       await playSeg(scene, r);
+      const skip = []; // 메인이 내보내지 못한 아이 — 저절로 다시 고르지 않는다
       while (r.need) {
-        const id = await waitChoice(r);
+        const id = await waitChoice(r, skip);
         renderPick();
         renderShelf();
         const n = await window.ptb.raidNext(id);
         if (!n || !n.ok) {
           toast((n && n.reason) || "내보내지 못했습니다", "bad");
           if (n && n.over) return; // 이미 끝난 도전 — 다시 부를 것 없다
-          if (n && /이미 나갔던|골라 주세요/.test(n.reason || "")) continue; // 다시 고른다
+          if (n && /이미 나갔던|골라 주세요/.test(n.reason || "")) { skip.push(id); continue; } // 다시 고른다
           r = await window.ptb.raidNext(null); // 그만한다
           if (!r || !r.ok) return;
         } else r = n;
@@ -375,6 +396,7 @@
     if (!choosing) return;
     const c = choosing;
     choosing = null;
+    clearTimeout(c.timer);
     c.resolve(null);
   };
 
@@ -532,7 +554,7 @@
         await wait(ev.who == null ? 300 : 160);
       }
     }
-    if (r.need) logLine(`내 포켓몬이 쓰러졌다! 다음 포켓몬을 골라 주세요 (${r.used.length} / ${r.limit}마리 나감)`, "rw");
+    if (r.need) logLine(`내 포켓몬이 쓰러졌다! (${r.used.length} / ${r.limit}마리 나감)`, "rw");
   }
 
   /** 끝 — 이번 판에 누가 얼마나(주인마다) */
