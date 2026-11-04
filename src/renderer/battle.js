@@ -1,6 +1,6 @@
 "use strict";
 /**
- * 온라인 탭 — 결투(실시간 배틀) · 교환(코드 받기). 방 탭처럼 안에서 둘로 나눈다.
+ * 배틀 탭 — 체육관(gym.js) · 결투(실시간 배틀) · 교환(코드 받기). 방 탭처럼 안에서 나눈다.
  *
  * 처음엔 "결투" 탭 한 줄에 연습 결투 · 친선 배틀(코드) · 실시간 배틀 · 교환 받기 · 가방을 다 늘어놓았다.
  * 무엇부터 봐야 할지 몰랐다 — 친구와 하는 것만 남겼다. 연습 결투는 바탕화면에서 펫을 끌어 놓으면 되고,
@@ -37,12 +37,14 @@
 
   /* ---------------- 결투 · 교환 나누기 ---------------- */
 
-  const HINT = { battle: "친구와 같은 결투를 동시에", trade: "예전 교환 코드 받기" };
+  const HINT = { gym: "관장 8명 · 배지 8개", battle: "친구와 같은 결투를 동시에", trade: "예전 교환 코드 받기" };
   function setView(v) {
     for (const x of $("olSwitch").querySelectorAll("button")) x.classList.toggle("on", x.dataset.view === v);
+    $("olGym").hidden = v !== "gym";
     $("olBattle").hidden = v !== "battle";
     $("olTrade").hidden = v !== "trade";
     $("olHint").textContent = HINT[v] || "";
+    if (v === "gym" && window.ptbGymOpen) window.ptbGymOpen();
   }
   $("olSwitch").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-view]");
@@ -394,11 +396,12 @@
     const box = $("side" + k);
     box.querySelector(".nm").textContent = f.label || f.name;
     box.querySelector(".lv").textContent = "Lv." + f.level;
-    box.querySelector(".st").textContent = "";
+    // 체육관에서 이어 나온 아이는 깎인 체력 · 상태이상을 들고 온다
+    box.querySelector(".st").textContent = AIL_SHORT[f.status] || "";
     // 상대 아이는 내 박스에 없다 — 메인이 그림 주소를 같이 준다
     setImg($("body" + k).querySelector("img"), i, f, m);
     $("body" + k).className = "fbody";
-    setHp(i, f.maxHp, f.maxHp, true);
+    setHp(i, f.hp ?? f.maxHp, f.maxHp, true);
   }
 
   function setHp(i, hp, max, instant) {
@@ -465,7 +468,14 @@
     el.hidden = false;
   }
 
-  async function play(r, { title = "결투", skip = true } = {}) {
+  /**
+   * 결투 하나를 재생한다.
+   *   intro — 시작 대사들(없으면 "…이 승부를 걸어왔다!" "가랏, …!")
+   *   end   — true 면 늘 하던 끝(이겼다/졌다 + foot), 객체면 { cls, html, say } 로 직접, false 면
+   *           이어지는 판이 있다(체육관) — 끝내지 않고 기록 · 건너뛰기도 그대로 둔다
+   *   first — false 면 이어지는 판이다. 기록을 비우지 않는다
+   */
+  async function play(r, { title = "결투", skip = true, intro = null, end = true, foot = "친구와의 결투는 보상이 없습니다.", first = true } = {}) {
     const byId = Object.fromEntries((last ? last.box : []).map((m) => [m.id, m]));
     cur = r.fighters;
     r.fighters.forEach((f, i) => setSide(i, byId[f.id], f));
@@ -474,18 +484,22 @@
     $("btlResult").hidden = true;
     $("btlClose").hidden = true;
     $("btlSkip").hidden = !skip;
-    $("btlLog").innerHTML = "";
-    $("btlShow").scrollIntoView({ behavior: "smooth", block: "start" });
+    if (first) {
+      $("btlLog").innerHTML = "";
+      $("btlShow").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     ensureStages();
     // 들어오는 장면을 다시 틀려면 클래스를 뗐다 붙인다
     const scene = $("arena");
     scene.classList.remove("enter");
     void scene.offsetWidth;
     scene.classList.add("enter");
-    say(`${josa(r.fighters[1].label || r.fighters[1].name, "이", "가")} 승부를 걸어왔다!`);
-    await sleep(1100);
-    say(`가랏, ${r.fighters[0].name}!`);
-    await sleep(800);
+    const opening = intro || [`${josa(r.fighters[1].label || r.fighters[1].name, "이", "가")} 승부를 걸어왔다!`, `가랏, ${r.fighters[0].name}!`];
+    for (const [n, t] of opening.entries()) {
+      say(t);
+      if (!first) line(t, "sys", true);
+      await sleep(n === opening.length - 1 ? 800 : 1100);
+    }
 
     try {
       for (const ev of r.log) {
@@ -517,15 +531,41 @@
           await sleep(ev.side < 0 ? 300 : 500);
         }
       }
-      showResult(r);
-      say(r.winner == null ? "승부가 나지 않았다!" : r.winner === 0 ? `${r.fighters[0].name}의 승리!` : `${josa(r.fighters[0].name, "은", "는")} 지고 말았다…`);
-      line("친구와의 결투는 보상이 없습니다.", "sys", true);
+      if (end === true) {
+        showResult(r);
+        say(r.winner == null ? "승부가 나지 않았다!" : r.winner === 0 ? `${r.fighters[0].name}의 승리!` : `${josa(r.fighters[0].name, "은", "는")} 지고 말았다…`);
+        if (foot) line(foot, "sys", true);
+      } else if (end) {
+        const el = $("btlResult");
+        el.className = "btlresult " + (end.cls || "");
+        el.innerHTML = end.html;
+        el.hidden = false;
+        say(end.say || "");
+        if (foot) line(foot, "sys", true);
+      } else {
+        await sleep(600);
+      }
     } finally {
-      fast = false;
-      $("btlSkip").hidden = true;
-      $("btlClose").hidden = false;
+      if (end) {
+        fast = false;
+        $("btlSkip").hidden = true;
+        $("btlClose").hidden = false;
+      }
     }
   }
+
+  /** 체육관(gym.js)이 같은 무대를 쓴다 — 재생과, 결투 중인지(실시간 배틀과 겹치지 않게) */
+  window.ptbArena = {
+    play,
+    josa,
+    busy: () => playing,
+    hold(on) {
+      playing = on;
+      fast = false;
+      liveUi();
+    },
+    show: () => setView("gym"),
+  };
 
   // 결과는 이미 정해져 있다. 남은 장면을 건너뛸 뿐이다
   $("btlSkip").onclick = () => (fast = true);

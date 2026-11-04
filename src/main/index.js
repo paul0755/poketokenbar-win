@@ -17,6 +17,7 @@ const raidbattle = require("./raidbattle");
 const room = require("./room");
 const HALL = require("./hall.json"); // 길드 홀 꾸미기 카탈로그 — 서버와 같은 파일
 const burning = require("./burning");
+const gym = require("./gym");
 const BERRIES = require("./berries.json");
 
 /**
@@ -302,6 +303,112 @@ async function friendBattle(code, opts = {}) {
   writeSave();
   refresh(true);
   return { ok: true, friendly: true, winner, turns: r.turns, fighters, log, reward: null, rewardsLeft: battleRewardsLeft() };
+}
+
+/* ---------------- 체육관 (gym.js) ---------------- */
+
+/**
+ * 한 주에 질 수 있는 횟수. 이기면 줄지 않는다 — 강하게 키운 사람이 한 주에 여러 개를 따는 건 막지 않고,
+ * 운으로 될 때까지 누르는 것만 막는다. 월요일에 다시 찬다(전설의 알 · 마스터볼과 같은 주).
+ */
+const GYM_TRIES = 5;
+const GYM_CANDY = 5; // 배지를 처음 땄을 때 사탕
+
+const gymTriesLeft = () => (save.gymWeek === localMonday() ? Math.max(0, GYM_TRIES - (save.gymLoss || 0)) : GYM_TRIES);
+/** n 번째 체육관이 열렸나 — 앞 체육관의 배지가 있어야 한다 */
+const gymOpen = (n) => n === 0 || (save.badges || []).includes(gym.GYMS[n - 1].id);
+
+async function spriteUrl(desc, kind = "anim") {
+  const p = await poke.spriteWithFallback(desc, CACHE, kind);
+  return p ? pathToFileURL(p).href : null;
+}
+
+/** 체육관 목록 — 배지 케이스 · 관장 카드 · 관장 팀 그림 */
+async function gymList() {
+  const badges = save.badges || [];
+  const gyms = await Promise.all(
+    gym.GYMS.map(async (g, n) => ({
+      id: g.id, n, name: g.name, title: g.title, type: g.type, typeName: g.typeName, badge: g.badge, intro: g.intro,
+      got: badges.includes(g.id),
+      open: gymOpen(n),
+      team: await Promise.all(
+        g.team.map(async (t, k) => {
+          const { mon, grown } = gym.leaderMon(g, k);
+          const d = poke.describe(grown, mon.line, {});
+          return { name: d.name, lv: t.lv, url: await spriteUrl(d) };
+        }),
+      ),
+    })),
+  );
+  return { gyms, tries: gymTriesLeft(), max: GYM_TRIES, badges: badges.length, legend: Boolean(save.gymLegend), candy: GYM_CANDY };
+}
+
+/**
+ * 도전. ids 는 내 아이 1~3마리, 고른 순서대로 나간다. 계산은 여기서 끝내고 화면에는 판마다의 결투만 넘긴다.
+ * 이미 딴 체육관도 다시 도전할 수 있다(보상은 없다). 지면 이번 주 횟수가 하나 준다.
+ */
+async function gymChallenge(gymId, ids) {
+  const n = gym.GYMS.findIndex((g) => g.id === gymId);
+  const g = gym.GYMS[n];
+  if (!g) return { ok: false, reason: "없는 체육관입니다" };
+  if (!gymOpen(n)) return { ok: false, reason: `${gym.GYMS[n - 1].badge}가 있어야 도전할 수 있습니다` };
+  if (gymTriesLeft() <= 0) return { ok: false, reason: "이번 주 도전 횟수를 다 썼습니다. 월요일에 다시 찹니다" };
+  const pick = [...new Set(Array.isArray(ids) ? ids : [])].slice(0, 3).map((id) => box.find(save.box, id));
+  if (!pick.length || pick.some((m) => !m)) return { ok: false, reason: "함께 싸울 아이를 골라 주세요" };
+  const mine = pick.map((m) => ({ m, mon: box.withLv(m, growthSpeed()), grown: box.effOf(m, growthSpeed()) }));
+  if (mine.some((x) => !poke.stageFor(x.grown))) return { ok: false, reason: "알은 싸울 수 없습니다" };
+
+  const res = gym.challenge(mine, g);
+  if (!res) return { ok: false, reason: "결투를 시작하지 못했습니다" };
+
+  // 그림 — 내 쪽은 뒷모습도. 판마다 다시 받지 않게 아이마다 한 번씩
+  const foe = g.team.map((_, k) => gym.leaderMon(g, k));
+  const look = async (x, back) => {
+    const d = poke.describe(x.grown, x.mon.line, { shiny: x.mon.shiny });
+    return { url: await spriteUrl(d), backUrl: back ? await spriteUrl(d, "back") : null };
+  };
+  const [myArt, foeArt] = await Promise.all([Promise.all(mine.map((x) => look(x, true))), Promise.all(foe.map((x) => look(x, false)))]);
+  let prev = [null, null];
+  const rounds = res.rounds.map(({ a, b, r }) => {
+    // 이어서 나온 쪽은 깎인 체력 · 상태이상을 들고 들어온다 — 화면도 그 체력에서 시작한다
+    const st = [prev[0] && prev[0].a === a ? prev[0].status : null, prev[1] && prev[1].b === b ? prev[1].status : null];
+    const fighters = [
+      { ...r.fighters[0], ...myArt[a], status: st[0], label: r.fighters[0].name },
+      { ...r.fighters[1], ...foeArt[b], status: st[1], label: `${g.name}의 ${r.fighters[1].name}` },
+    ];
+    prev = [{ a, status: r.end[0].status }, { b, status: r.end[1].status }];
+    return { a, b, winner: r.winner, turns: r.turns, fighters, log: r.log };
+  });
+
+  let reward = null;
+  if (res.win) {
+    save.badges = save.badges || [];
+    if (!save.badges.includes(g.id)) {
+      save.badges.push(g.id);
+      save.candyBonus = (save.candyBonus ?? 0) + GYM_CANDY;
+      reward = { badge: g.badge, candy: GYM_CANDY, count: save.badges.length };
+      // 배지 8개 — 전설의 알 하나. 키우던 아이는 그대로 둔다(상점 알과 달리 바로 바꾸지 않는다)
+      if (save.badges.length >= gym.GYMS.length && !save.gymLegend) {
+        const line = poke.rollLegend();
+        const egg = box.make(line, poke.rollNature(), poke.rollShiny(Boolean(save.charm)));
+        save.box.push(egg);
+        if (!save.seen.includes(line)) save.seen.push(line);
+        save.gymLegend = true;
+        reward.legend = true;
+      }
+    }
+  } else {
+    if (save.gymWeek !== localMonday()) { save.gymWeek = localMonday(); save.gymLoss = 0; }
+    save.gymLoss = (save.gymLoss || 0) + 1;
+  }
+  writeSave();
+  refresh(true);
+  return {
+    ok: true, win: res.win, reward, tries: gymTriesLeft(), max: GYM_TRIES,
+    gym: { id: g.id, name: g.name, title: g.title, badge: g.badge, intro: g.intro, win: g.win, lose: g.lose, size: g.team.length },
+    mine: mine.map((x) => x.m.id),
+    rounds,
+  };
 }
 
 /* ---------------- 교환 (friend.js encodeTrade) ---------------- */
@@ -1622,7 +1729,13 @@ let save = {
   bornAt: 0,
   candySpent: 0, // 지금까지 쓴 사탕
   phioneSplit: true, // 피오네 · 마나피를 나눈 뒤의 세이브인가(0.13.4) — 새 세이브는 처음부터 나뉘어 있다
+  wildMidFix: true, // 0.13.1 에 2차 진화로 잡은 아이를 되돌려 받았나(0.13.6) — 새 세이브는 해당 없음
   candyBonus: 0, // 졸업·한도 달성으로 받은 보너스 사탕
+  candyExtra: 0, // 사탕 타임으로 더 쳐 준 토큰 — 사탕을 셀 때만 얹는다
+  badges: [], // 딴 체육관 배지(gyms.json 의 id) — 딴 순서대로
+  gymWeek: null, // 체육관에서 진 횟수를 센 주(그 주 월요일)
+  gymLoss: 0, // 이번 주에 진 횟수 — GYM_TRIES 까지
+  gymLegend: false, // 배지 8개 보상(전설의 알)을 받았나
   charm: false, // 반짝이는 부적 보유
   shiny: false, // 지금 키우는 개체가 이로치인가
   seen: [], // 한 번이라도 받아본 라인 (도감 진행도)
@@ -1697,7 +1810,7 @@ let save = {
   tradeReceived: [],
   /**
    * 온라인 기능(실시간 배틀). 이 앱이 처음으로 밖으로 무언가를 보내는 기능이라 기본은 꺼짐.
-   * 켜면 온라인 탭의 실시간 배틀이 중계 서버(server/)에 붙는다. 보내는 건 팀 코드와 이름뿐 —
+   * 켜면 배틀 탭의 실시간 배틀이 중계 서버(server/)에 붙는다. 보내는 건 팀 코드와 이름뿐 —
    * 토큰 기록은 보내지 않는다. relay 가 비어 있으면 DEFAULT_RELAY 를 쓴다.
    */
   online: { enabled: false, relay: "" },
@@ -1798,6 +1911,7 @@ function loadSave() {
       // 지금 키우던 개체가 갑자기 알로 돌아가면 진행을 빼앗는 셈이다.
       if (typeof loaded.bornAt !== "number") save.bornAt = 0;
       if (!loaded.phioneSplit) save.phioneSplit = false; // 옛 세이브 — 아래에서 한 번 옮긴다
+      if (!loaded.wildMidFix) save.wildMidFix = false; // 옛 세이브 — 아래에서 한 번 살핀다
     } catch (e) {
       // 파일은 있는데 깨졌다. 덮어쓰지 않고 따로 치워 둔 뒤 멈춘다.
       loadFailed = true;
@@ -1817,13 +1931,33 @@ function loadSave() {
   // 새로 잡은 아이는 mid 성장량으로 넣었다. 잘못 알아들은 것이었다: 니드런은 니드런으로 나오고 잡혀야 한다.
   // "알에서 부화를 기다리는 것처럼" 보이던 건 단계 이름("부화") 탓이었다 — 이제 첫 모습은 "1차 진화"다.
   // 한 번만, 더한 만큼을 도로 뺀다(그 사이 키운 만큼은 그대로 남는다)
+  //
+  // 다만 0.13.1 을 쓰는 동안 새로 잡은 아이는 바탕화면에 2차 진화(니드리노)로 나왔고 그 모습으로 잡혔다 —
+  // 그 아이까지 첫 모습으로 내리면 "니드리노를 잡았는데 니드런이 들어왔다"가 된다(0.13.2 ~ 0.13.5 가 그랬다).
+  // 둘은 세이브만으로는 구별되지 않는다(같은 성장량 · 같은 표시). 날마다 남기는 백업으로 가린다(caughtIn0131)
+  const STEP = poke.STAGES[2].at - poke.STAGES[1].at;
+  const mid0131 = save.wildMidFix === false || save.box.some((m) => m && m.wildMid) ? caughtIn0131() : null;
   const wildLines = new Set();
+  const touched = new Set(); // 여기서 다룬 아이 — 아래 "돌려주기"가 한 번 더 더하지 않게
   for (const m of save.box) {
     if (!m || !m.wildMid) continue;
-    m.fed = Math.max(0, (m.fed || 0) - (poke.STAGES[2].at - poke.STAGES[1].at));
     delete m.wildMid;
+    touched.add(m);
+    if (mid0131 && mid0131(m, true)) continue; // 2차 진화로 잡은 아이 — 그 모습 그대로 둔다
+    m.fed = Math.max(0, (m.fed || 0) - STEP);
     m.maxStage = poke.stageFor(box.effOf(m, growthSpeed())); // 다시 진화하면 알림이 뜨게
     wildLines.add(m.line);
+  }
+  // 이미 0.13.2 ~ 0.13.5 가 첫 모습으로 내려 버린 아이 — 내린 만큼 돌려준다. 한 번만
+  if (save.wildMidFix === false) {
+    for (const m of save.box) {
+      if (!m || !m.wild || touched.has(m) || !mid0131 || !mid0131(m, false)) continue;
+      m.fed = (m.fed || 0) + STEP;
+      const st = poke.stageFor(box.effOf(m, growthSpeed()));
+      m.maxStage = Math.max(m.maxStage ?? 0, st); // 켤 때 "진화했다" 알림이 뜨지 않게
+      save.maxStage[m.line] = Math.max(save.maxStage[m.line] ?? -1, st);
+    }
+    save.wildMidFix = true;
   }
   /*
    * 0.13.1 은 잡을 때 도감에도 2차 진화(니드리노)를 "만남"으로 적었다. 되돌린 라인마다 박스에서
@@ -1854,6 +1988,45 @@ function loadSave() {
     }
     save.phioneSplit = true;
   }
+}
+
+/**
+ * 0.13.1 을 쓰는 동안 2차 진화 모습으로 잡은 야생 아이인가 — 백업(하루 하나, 7일)으로 가린다.
+ *
+ *   - 0.13.1 이 나온 날(UTC 2026-10-29) 이후에 잡혔고
+ *   - 0.13.1 이전 백업(어느 아이에게도 wildMid 가 없던 때)에는 없었고
+ *   - (이미 첫 모습으로 내려간 아이는) 0.13.1 때 백업에 wildMid 로 남아 있다
+ *
+ * 0.13.1 이 나오기 전에 잡은 아이는 0.13.0 이 첫 모습으로 넣었고, 0.13.1 이 한 칸 올렸던 것뿐이다 — 그 아이는 첫 모습이 맞다.
+ * 백업이 7일 치라 0.13.1 때 백업이 이미 지워졌으면 이미 내려간 아이는 찾지 못한다(그대로 둔다).
+ * 돌려주는 함수(m, nowMid) — nowMid 는 아직 wildMid 가 붙어 있는(0.13.1 에서 바로 올라온) 아이
+ */
+const RELEASED_0131 = "2026-10-29";
+function caughtIn0131() {
+  const old = new Set(); // 0.13.1 전 백업에 있던 야생 아이
+  const mid = new Set(); // 0.13.1 때 백업에 wildMid 로 있던 아이
+  let names = [];
+  try {
+    names = fs.readdirSync(BACKUPS).filter((n) => /^save-\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort(); // 이름 순 = 날짜 순
+  } catch {}
+  let after = false;
+  for (const n of names) {
+    let s;
+    try {
+      const raw = fs.readFileSync(path.join(BACKUPS, n), "utf8");
+      s = JSON.parse(raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw);
+    } catch {
+      continue;
+    }
+    const wild = (Array.isArray(s.box) ? s.box : []).filter((m) => m && m.wild && m.id);
+    if (wild.some((m) => m.wildMid)) after = true;
+    for (const m of wild) {
+      if (!after) old.add(m.id);
+      else if (m.wildMid) mid.add(m.id);
+    }
+  }
+  return (m, nowMid) =>
+    String(m.caughtAt || "") >= RELEASED_0131 && !old.has(m.id) && (nowMid || mid.has(m.id));
 }
 
 function writeSave() {
@@ -1908,7 +2081,9 @@ const priceOf = (cost) => Math.max(1, Math.round((cost * (save.pricePct ?? 100))
 
 /** 이상한사탕 현황 */
 function candy(total = lastTotal) {
-  const fromTokens = Math.floor(total / CANDY_PER);
+  // 사탕 타임에 쓴 몫은 더 쳐 준 만큼(candyExtra) 토큰에 얹어 센다
+  const counted = total + (save.candyExtra ?? 0);
+  const fromTokens = Math.floor(counted / CANDY_PER);
   const earned = fromTokens + (save.candyBonus ?? 0);
   return {
     earned,
@@ -1916,7 +2091,8 @@ function candy(total = lastTotal) {
     left: Math.max(0, earned - (save.candySpent ?? 0)),
     per: CANDY_PER,
     // 다음 사탕까지 얼마나 남았나
-    toNext: CANDY_PER - (total % CANDY_PER),
+    toNext: CANDY_PER - (counted % CANDY_PER),
+    time: burning.status(new Date(), burning.CANDY_TIME),
   };
 }
 
@@ -2089,7 +2265,13 @@ async function buildStats() {
 
   // 늘어난 토큰은 키우는 아이에게만 적립된다.
   const burn = burnCfg();
-  if (box.accrue(save, u.total, (from, to) => ({ share: burning.share(u.events, from, to, burn), mult: burn.mult }))) writeSave();
+  const sweet = burning.CANDY_TIME;
+  const fed = (from, to) => ({
+    share: burning.share(u.events, from, to, burn),
+    mult: burn.mult,
+    candy: burning.share(u.events, from, to, sweet) * (sweet.mult - 1),
+  });
+  if (box.accrue(save, u.total, fed)) writeSave();
   guildUsage = weekUsage(u, burn);
 
   const act = box.active(save);
@@ -2718,6 +2900,9 @@ function resetProgress() {
   save.lastTotal = lastTotal; // 지금부터 알로 다시 시작
   save.candySpent = 0;
   save.candyBonus = 0;
+  save.candyExtra = 0;
+  save.badges = []; // 체육관도 처음부터
+  save.gymLegend = false;
   save.charm = false;
   save.items = {}; // 사탕으로 산 것은 같이 비운다 — 변하지않는돌·미니룸
   save.room = room.fresh();
@@ -4009,6 +4194,8 @@ app.whenReady().then(async () => {
   // 실시간 배틀 — 고른 아이로 코드를 만들고(방 안에서 바꿔도 된다), 그 코드로 싸운다
   ipcMain.handle("live-team", (_e, id) => liveRegister(id));
   ipcMain.handle("live-battle", (_e, code) => friendBattle(code, { live: true }));
+  ipcMain.handle("gym-list", () => gymList());
+  ipcMain.handle("gym-challenge", (_e, id, ids) => gymChallenge(id, ids));
   ipcMain.handle("trade-send", (_e, id) => tradeSend(id));
   ipcMain.handle("trade-inspect", (_e, code) => tradeInspect(code));
   ipcMain.handle("trade-receive", (_e, code) => tradeReceive(code));

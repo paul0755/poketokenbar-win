@@ -82,6 +82,8 @@ contextBridge.exposeInMainWorld("ptb", {
   friendBattle: (code) => ipcRenderer.invoke("friend-battle", code),
   liveTeam: (id) => ipcRenderer.invoke("live-team", id),
   liveBattle: (code) => ipcRenderer.invoke("live-battle", code),
+  gymList: () => ipcRenderer.invoke("gym-list"),
+  gymChallenge: (id, ids) => ipcRenderer.invoke("gym-challenge", id, ids),
   // 교환 — 보내기(박스에서 빠짐) · 받기 전 보기 · 받기
   tradeSend: (id) => ipcRenderer.invoke("trade-send", id),
   tradeInspect: (code) => ipcRenderer.invoke("trade-inspect", code),

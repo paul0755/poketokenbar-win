@@ -141,8 +141,10 @@ const BASE_ALLOW = 50_000_000;
 const ALLOW_PER_HOUR = 60_000_000;
 
 /**
- * burn(from, to) — 그 사이 늘어난 토큰 중 버닝타임 몫과 배수 { share, mult } (burning.js).
+ * burn(from, to) — 그 사이 늘어난 토큰 중 버닝타임 몫과 배수 { share, mult, candy } (burning.js).
  * 버닝 몫은 나무열매처럼 bonus 로 더 쳐 준다.
+ * candy 는 사탕 타임으로 더 쳐 줄 비율 — 사탕을 셀 때만 쓰는 토큰(candyExtra)으로 쌓는다.
+ * 키우는 아이가 없어도 쌓인다.
  */
 function accrue(save, total, burn = null) {
   const prev = save.lastTotal;
@@ -159,12 +161,14 @@ function accrue(save, total, burn = null) {
     // 기준점만 옮기고 넘어간다. 다음부터는 평소대로 적립된다.
     return 0;
   }
+  const b = burn ? burn(typeof prevAt === "number" ? prevAt : now - 60_000, now) : null;
+  const sweet = b && b.candy ? Math.round(delta * b.candy) : 0;
+  if (sweet > 0) save.candyExtra = (save.candyExtra || 0) + sweet;
   const a = active(save);
   if (a) {
     a.raw = (a.raw || 0) + delta;
-    if (burn) {
-      const { share, mult } = burn(typeof prevAt === "number" ? prevAt : now - 60_000, now);
-      const hot = Math.round(delta * share * (mult - 1));
+    if (b) {
+      const hot = Math.round(delta * b.share * (b.mult - 1));
       if (hot > 0) a.bonus = (a.bonus || 0) + hot;
     }
     // 나무열매가 남아 있으면 그만큼 한 번 더 쳐 준다

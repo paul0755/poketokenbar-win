@@ -25,6 +25,21 @@ const DEFAULT = {
 };
 const MULTS = [2, 3, 4];
 
+/**
+ * 사탕 타임 — 이 시간에 쓴 토큰은 사탕을 셀 때 1.5배로 친다. 모두에게 같은 고정 시간이다.
+ * 버닝타임은 각자 고칠 수 있어 화폐(사탕)에 붙이면 하루 종일 버닝으로 잡는 쪽이 이긴다.
+ * 그래서 성장 버닝과 떼어 두고, 배수도 낮게 묶어 상한 없이 둔다.
+ */
+const CANDY_TIME = {
+  enabled: true,
+  mult: 1.5,
+  weekdays: false,
+  spans: [
+    { name: "낮", on: true, from: 10, to: 16 },
+    { name: "밤", on: true, from: 18, to: 0 },
+  ],
+};
+
 const isHour = (h) => Number.isInteger(h) && h >= 0 && h <= 23;
 
 /** 세이브·설정 창에서 온 값을 바로잡는다. 모르는 값은 기본으로 */
@@ -94,4 +109,4 @@ function status(now, b) {
   return { enabled: true, on, mult: b.mult, until: on ? edge : null, next: on ? null : edge };
 }
 
-module.exports = { DEFAULT, MULTS, normalize, multAt, share, status };
+module.exports = { DEFAULT, MULTS, CANDY_TIME, normalize, multAt, share, status };

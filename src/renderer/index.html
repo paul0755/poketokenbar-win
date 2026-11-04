@@ -88,6 +88,11 @@
     animation: burnpulse 1.6s ease-in-out infinite;
   }
   @keyframes burnpulse { 50% { box-shadow: 0 0 16px #ff7a18aa; } }
+  .burn.sweet.on {
+    color: #3b0a2a; background: linear-gradient(90deg, #f472b6, #fbcfe8); box-shadow: 0 0 10px #f472b666;
+    animation: sweetpulse 1.6s ease-in-out infinite;
+  }
+  @keyframes sweetpulse { 50% { box-shadow: 0 0 16px #f472b6aa; } }
   .traits { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .chip { font-size: 10px; padding: 2px 7px; border-radius: 99px; background: var(--card); border: 1px solid var(--line); color: var(--muted); }
   .chip b { color: var(--text); font-weight: 600; }
@@ -396,6 +401,7 @@
 <link rel="stylesheet" href="room.css" />
 <link rel="stylesheet" href="mall.css" />
 <link rel="stylesheet" href="online.css" />
+<link rel="stylesheet" href="gym.css" />
 <link rel="stylesheet" href="boss.css" />
 
 <nav>
@@ -404,7 +410,7 @@
   <button data-tab="box">박스</button>
   <button data-tab="room">방</button>
   <button data-tab="boss">보스</button>
-  <button data-tab="battle">온라인</button>
+  <button data-tab="battle">배틀</button>
   <button data-tab="dex">도감</button>
   <span class="sp"></span>
   <button class="ico" id="gear" title="설정">⚙</button>
@@ -424,6 +430,7 @@
         <div class="bar"><i id="monBar" style="width:0%"></i></div>
         <div class="goal" id="monGoal">&nbsp;</div>
         <div class="burn" id="monBurn" hidden></div>
+        <div class="burn sweet" id="monSweet" hidden></div>
         <div class="quip" id="monQuip"></div>
         <div class="traits" id="monTraits"></div>
       </div>
@@ -702,11 +709,12 @@
   </section>
 
   <section id="tab-battle" hidden>
-    <!-- 온라인 — 친구와 실시간 결투 · 교환 코드 받기. 방 탭처럼 안에서 나눈다(online.css) -->
+    <!-- 배틀 — 체육관 · 친구와 실시간 결투 · 교환 코드 받기. 방 탭처럼 안에서 나눈다(online.css · gym.css) -->
     <div class="rm-switch" id="olSwitch">
-      <button data-view="battle" class="on">⚔️ 결투</button>
+      <button data-view="gym" class="on">🏟️ 체육관</button>
+      <button data-view="battle">⚔️ 결투</button>
       <button data-view="trade">🔁 교환</button>
-      <span class="c" id="olHint">친구와 같은 결투를 동시에</span>
+      <span class="c" id="olHint">관장 8명 · 배지 8개</span>
     </div>
 
     <!-- 결투 화면. 실시간 배틀도, 길드원과의 결투도 여기서 재생한다 -->
@@ -738,7 +746,25 @@
       <details class="btllogwrap"><summary>전체 기록</summary><div class="btllog" id="btlLog"></div></details>
     </div>
 
-    <div id="olBattle">
+    <!-- 체육관 — 관장 8명에게 차례로 도전해 배지를 모은다(gym.js) -->
+    <div id="olGym">
+      <div class="gycase">
+        <div class="gycap"><b>배지 케이스</b><span id="gyCount"></span><span class="gytries" id="gyTries"></span></div>
+        <div class="gybadges" id="gyBadges"></div>
+      </div>
+      <div class="gycard" id="gyCard"></div>
+      <div class="gypick">
+        <div class="gycap"><b>함께 싸울 아이</b><span>최대 3마리 · 고른 순서대로 나갑니다</span></div>
+        <div class="gyslots" id="gySlots"></div>
+        <div class="fpgrid gygrid" id="gyGrid"></div>
+      </div>
+      <div class="gynote" id="gyNote"></div>
+      <button id="gyGo" class="olbtn wide">🏟️ 도전하기</button>
+      <div class="note oltip">레벨은 맞추지 않습니다 — 관장의 레벨만큼 키워서 오세요. 한 마리가 쓰러지면 다음 아이가 나오고, 이긴 아이는 깎인 체력 그대로 다음 상대와 싸웁니다.
+        지면 이번 주 도전 횟수가 하나 줄고(이기면 그대로), 월요일에 다시 찹니다. 배지를 처음 따면 🍬, 8개를 다 모으면 전설의 알.</div>
+    </div>
+
+    <div id="olBattle" hidden>
       <div class="olhero">
         <div class="olt">📡 실시간 배틀</div>
         <div class="ols">방을 만들어 6자리 코드를 친구에게 알려 주세요. 둘 다 <b>준비</b>를 누르면 같은 결투가 두 화면에서 동시에 시작합니다.
@@ -820,6 +846,8 @@
 <script src="moves.js"></script>
 <script src="raidfx.js"></script>
 <script src="battle.js"></script>
+<script src="gymart.js"></script>
+<script src="gym.js"></script>
 <script src="room.js"></script>
 <script src="guild.js"></script>
 <script src="boss.js"></script>

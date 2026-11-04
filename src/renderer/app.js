@@ -82,6 +82,20 @@ function renderBurn(b) {
     : `🔥 다음 버닝타임 ${whenLabel(b.next)}부터 ×${b.mult}`;
 }
 
+/** 사탕 타임 — 모두 같은 고정 시간(10~16 · 18~24시), 사탕만 ×1.5 */
+const sweetLabel = (t) =>
+  t.on
+    ? `🍬 사탕 타임 ×${t.mult}${t.until ? " — " + whenLabel(t.until) + "까지" : ""}`
+    : `🍬 다음 사탕 타임 ${whenLabel(t.next)}부터 ×${t.mult}`;
+
+function renderSweet(t) {
+  const el = $("monSweet");
+  if (!t || (!t.on && !t.next)) return void (el.hidden = true);
+  el.hidden = false;
+  el.className = "burn sweet" + (t.on ? " on" : "");
+  el.textContent = sweetLabel(t);
+}
+
 function renderHome(s) {
   const { mon, usage } = s;
 
@@ -108,6 +122,7 @@ function renderHome(s) {
     : p.next ? `${p.next}까지 <b>${fmt(p.remaining)}</b>` : "졸업했습니다";
   $("monQuip").textContent = quipFor(mon, usage.today);
   renderBurn(s.burning);
+  renderSweet(s.candy && s.candy.time);
 
   const t = [];
   // 레벨·타입은 홈에서도 보여야 한다. 박스를 열어야만 보이면
@@ -677,6 +692,7 @@ window.ptb.onShop((s) => {
   $("wallet").textContent = "🍬 " + s.candy.left;
   $("walletSub").innerHTML =
     `${fmt(s.candy.per)} 쓸 때마다 1개 · 다음까지 <b>${fmt(s.candy.toNext)}</b><br>` +
+    (s.candy.time ? `${sweetLabel(s.candy.time)} (매일 10~16 · 18~24시)<br>` : "") +
     `졸업하면 5개 추가 (받은 것 ${s.candy.earned} · 쓴 것 ${s.candy.spent})`;
 
   $("items").innerHTML = s.items

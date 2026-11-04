@@ -360,7 +360,8 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
       const { amount, e } = damage(me, foe, mv, rng, crit);
       lastE = e;
       if (e === 0) break;
-      dealt += amount;
+      // 흡수 · 반동은 실제로 깎은 만큼만 — Lv.100 이 Lv.6 을 이판사판태클로 치고 반동으로 같이 쓰러지던 것
+      dealt += Math.min(amount, foe.hp);
       hitCount++;
       setHp(j, foe.hp - amount, crit ? "급소에 맞았다!" : "");
     }

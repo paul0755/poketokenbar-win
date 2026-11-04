@@ -1,0 +1,92 @@
+/* ---------- 체육관 — gym.js · gymart.js ---------- */
+
+.gycap { display: flex; align-items: baseline; gap: 7px; margin: 0 0 6px 2px; font-size: 11.5px; }
+.gycap span { font-size: 10px; color: var(--muted); }
+.gycap .gytries { margin-left: auto; font-weight: 700; color: var(--accent); }
+.gycap .gytries.out { color: var(--red); }
+
+/* 배지 케이스 — 8칸. 딴 배지만 색이 든다. 누르면 그 체육관을 본다 */
+.gycase {
+  padding: 10px 11px 11px; border-radius: 12px; border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 205, 40, .07), transparent 70%), var(--card);
+}
+.gybadges { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.gybadges button {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 0 3px;
+  border-radius: 9px; border: 1px solid transparent; background: rgba(0, 0, 0, .18); cursor: pointer; font: inherit; color: var(--dim);
+}
+.gybadges button span { font-size: 9px; font-weight: 700; }
+.gybadges button.got span { color: var(--text); }
+.gybadges button.got svg { filter: drop-shadow(0 0 5px rgba(255, 220, 120, .35)); }
+.gybadges button.lock { opacity: .55; }
+.gybadges button.on { border-color: var(--accent); background: rgba(255, 205, 40, .08); }
+.gybadges button:hover { border-color: var(--line); }
+.gybadges button.on:hover { border-color: var(--accent); }
+
+/* 관장 카드 — 초상 · 이름 · 대사 · 관장의 팀 */
+.gycard {
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin-top: 10px; padding: 12px;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--card);
+}
+.gycard.t-grass { background: linear-gradient(135deg, rgba(99, 183, 92, .16), transparent 65%), var(--card); }
+.gycard.t-water { background: linear-gradient(135deg, rgba(74, 144, 217, .18), transparent 65%), var(--card); }
+.gycard.t-fire { background: linear-gradient(135deg, rgba(232, 112, 58, .18), transparent 65%), var(--card); }
+.gycard.t-electric { background: linear-gradient(135deg, rgba(224, 198, 58, .18), transparent 65%), var(--card); }
+.gycard.t-psychic { background: linear-gradient(135deg, rgba(224, 107, 139, .18), transparent 65%), var(--card); }
+.gycard.t-ghost { background: linear-gradient(135deg, rgba(115, 87, 151, .24), transparent 65%), var(--card); }
+.gycard.t-rock { background: linear-gradient(135deg, rgba(182, 161, 54, .18), transparent 65%), var(--card); }
+.gycard.t-dragon { background: linear-gradient(135deg, rgba(111, 53, 252, .2), transparent 65%), var(--card); }
+.gycard.lock .gyportrait { filter: grayscale(.85) brightness(.7); }
+.gyportrait { grid-row: span 1; line-height: 0; }
+.gyportrait svg { border-radius: 50%; box-shadow: 0 4px 14px rgba(0, 0, 0, .35); }
+.gyinfo { min-width: 0; }
+.gyno { font-size: 10px; color: var(--muted); }
+.gyno .ty { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 99px; }
+.gyname { margin-top: 2px; font-size: 13px; }
+.gyname b { font-size: 16px; font-weight: 900; }
+.gyname small { margin-left: 6px; font-size: 10.5px; color: var(--muted); }
+.gysay {
+  position: relative; margin-top: 6px; padding: 6px 9px; border-radius: 9px; font-size: 10.5px; line-height: 1.5;
+  background: rgba(255, 255, 255, .06); color: var(--text);
+}
+.gystate { display: inline-block; margin-top: 7px; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 700; color: var(--green); background: rgba(74, 222, 128, .1); }
+.gystate.got { color: #14151a; background: linear-gradient(90deg, #ffd54a, #ffb020); }
+.gystate.lock { color: var(--muted); background: rgba(255, 255, 255, .06); }
+
+.gyteam { grid-column: 1 / -1; margin-top: 4px; }
+.gycap2 { font-size: 9.5px; font-weight: 700; color: var(--dim); margin: 0 0 4px 2px; }
+.gymons { display: flex; gap: 5px; }
+.gymon {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; padding: 4px 2px 5px;
+  border-radius: 9px; background: rgba(0, 0, 0, .2);
+}
+.gymon img { width: 50px; height: 50px; object-fit: contain; image-rendering: pixelated; }
+.gymon .n { font-size: 10px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gymon .l { font-size: 9px; color: var(--muted); }
+.gycard.lock .gymon img { filter: brightness(0) opacity(.45); }
+
+/* 내 팀 — 3칸 + 박스 그림 목록 */
+.gypick { margin-top: 10px; padding: 10px 11px 11px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); }
+.gyslots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 8px; }
+.gyslot {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 74px;
+  padding: 4px 2px 5px; border-radius: 10px; border: 1px dashed var(--line); background: transparent; color: var(--text); font: inherit;
+}
+button.gyslot { cursor: pointer; border-style: solid; border-color: var(--accent); background: var(--card); }
+button.gyslot:hover { filter: brightness(1.1); }
+.gyslot i, .gygrid .ord {
+  position: absolute; top: 4px; left: 5px; font-style: normal; font-size: 9px; font-weight: 900;
+  min-width: 14px; height: 14px; line-height: 14px; border-radius: 99px; text-align: center; color: #14151a; background: var(--accent);
+}
+.gyslot:not(.on) i { background: var(--line); color: var(--muted); }
+.gyslot img { width: 46px; height: 46px; object-fit: contain; image-rendering: pixelated; }
+.gyslot .n { font-size: 10px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gyslot .n.dim { color: var(--dim); font-weight: 600; }
+.gyslot .l { font-size: 9px; color: var(--muted); }
+.gygrid { max-height: 190px; }
+.gygrid button { position: relative; }
+
+.gynote { min-height: 14px; margin-top: 8px; font-size: 10.5px; color: var(--muted); text-align: center; }
+.gynote.warn { color: var(--orange); }
+.gynote.bad { color: var(--red); }
+#olGym .oltip { margin-top: 10px; }
