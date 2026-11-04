@@ -1,4 +1,18 @@
 {
+  "marks": [
+    { "id": "star", "name": "별" },
+    { "id": "ball", "name": "몬스터볼" },
+    { "id": "flame", "name": "불꽃" },
+    { "id": "drop", "name": "물방울" },
+    { "id": "leaf", "name": "잎" },
+    { "id": "bolt", "name": "번개" },
+    { "id": "crown", "name": "왕관" },
+    { "id": "moon", "name": "달" },
+    { "id": "sword", "name": "검" },
+    { "id": "wing", "name": "날개" },
+    { "id": "paw", "name": "발자국" },
+    { "id": "heart", "name": "하트" }
+  ],
   "items": [
     { "id": "flowers", "name": "꽃 화단", "icon": "🌷", "coins": 200, "desc": "입구 양옆 꽃밭" },
     { "id": "banners", "name": "길드 깃발 추가", "icon": "🚩", "coins": 300, "desc": "벽 깃발 2개 → 4개" },
@@ -8,7 +22,14 @@
     { "id": "trophies", "name": "우승 트로피 진열장", "icon": "🏆", "coins": 1000, "desc": "길드가 목표 🥇를 이룬 만큼 트로피" },
     { "id": "goldCarpet", "name": "레드카펫 금테", "icon": "🟥", "coins": 1200, "desc": "융단 테두리가 금실로" },
     { "id": "mascot", "name": "길드 마스코트 석상", "icon": "🗿", "coins": 1500, "desc": "지난주 1위의 대표 포켓몬을 돌로" },
+    { "id": "lanterns", "name": "등불 줄", "icon": "🏮", "coins": 300, "desc": "천장 아래 등불 줄, 밤엔 붉게 빛난다" },
+    { "id": "bookshelf", "name": "길드 서재", "icon": "📚", "coins": 400, "desc": "오른쪽 벽 앞에 책장과 지구본" },
+    { "id": "sofa", "name": "라운지 소파", "icon": "🛋️", "coins": 500, "desc": "분수 옆에 길드 색 소파" },
+    { "id": "piano", "name": "그랜드 피아노", "icon": "🎹", "coins": 900, "desc": "왼쪽에 뚜껑을 연 검은 피아노" },
+    { "id": "aquarium", "name": "벽 수족관", "icon": "🐠", "coins": 1100, "desc": "간판 아래 벽에 물고기 넷이 사는 수조" },
     { "id": "castle", "name": "홀 배경: 성", "icon": "🏰", "coins": 2000, "desc": "성벽 · 스테인드글라스 · 대리석", "theme": true },
+    { "id": "sakura", "name": "홀 배경: 벚꽃 정원", "icon": "🌸", "coins": 2500, "desc": "벚나무 · 나무 울타리 · 꽃잎 흩날리는 잔디", "theme": true },
+    { "id": "snu", "name": "홀 배경: 서울대 캠퍼스", "icon": "🎓", "coins": 50, "desc": "관악산 아래 정문 · 학교 건물 · 벽돌 광장", "theme": true },
     { "id": "temple", "name": "홀 배경: 하늘 신전", "icon": "☁️", "coins": 3000, "desc": "구름 위 흰 기둥 · 금줄 대리석", "theme": true }
   ]
 }

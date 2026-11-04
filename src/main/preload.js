@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld("ptb", {
   guildListing: (a) => ipcRenderer.invoke("guild-listing", a),
   hallDonate: (a) => ipcRenderer.invoke("hall-donate", a),
   hallTheme: (theme) => ipcRenderer.invoke("hall-theme", theme),
+  hallMark: (mark) => ipcRenderer.invoke("hall-mark", mark),
   // 코인 지갑 · 상점에 팔기 · 길드 몰
   walletInfo: () => ipcRenderer.invoke("wallet-info"),
   walletCheckin: () => ipcRenderer.invoke("wallet-checkin"),

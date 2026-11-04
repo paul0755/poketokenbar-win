@@ -43,7 +43,7 @@ export default {
       const r = ok ? await directoryCall(env, "rank?week=" + week) : { ok: false, reason: "주가 맞지 않습니다. PC 시계를 확인해 주세요" };
       return new Response(JSON.stringify(r), { status: r.ok ? 200 : ok ? 503 : 400, headers: { "content-type": "application/json; charset=utf-8" } });
     }
-    const g = /^\/guild(?:\/([A-HJ-NP-Z2-9]{8}))?(?:\/(join|update|leave|kick|disband|listing|market(?:\/(?:list|buy|cancel))?|hall\/(?:donate|theme)|raid\/(?:start|hit)))?$/.exec(url.pathname);
+    const g = /^\/guild(?:\/([A-HJ-NP-Z2-9]{8}))?(?:\/(join|update|leave|kick|disband|listing|market(?:\/(?:list|buy|cancel))?|hall\/(?:donate|theme|mark)|raid\/(?:start|hit)))?$/.exec(url.pathname);
     if (g) return guildRoute(request, env, g[1], g[2]);
     const w = /^\/wallet(?:\/(w[0-9a-f]{12}))?(?:\/(checkin|exchange|sell|buy|candy|redeem|swap))?$/.exec(url.pathname);
     if (w) return walletRoute(request, env, w[1], w[2]);

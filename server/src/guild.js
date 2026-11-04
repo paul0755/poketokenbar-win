@@ -54,6 +54,7 @@
  * 홀 배경(theme)이 다 모이면 처음 것은 바로 바르고, 그다음부터는 길드장이 고른다.
  *   POST /guild/ABCD2345/hall/donate  { memberId, key, walletId, walletKey, item, amount }
  *   POST /guild/ABCD2345/hall/theme   { memberId, key, theme }   (길드장, "stone" 은 기본 돌 홀)
+ *   POST /guild/ABCD2345/hall/mark    { memberId, key, mark }    (길드장 — 깃발의 길드 마크, hall.json marks)
  *
  * ── 코인 꾸미기 ──
  * 코인으로 산 배경·가구(wallet.js buy)는 산 사람 방에만 보여야 한다. 방 사진을 받을 때 지갑의
@@ -81,6 +82,7 @@ import { directoryCall } from "./directory.js";
 import { raidView, raidAction } from "./raid.js";
 
 const HALL_ITEMS = new Map(HALL.items.map((it) => [it.id, it]));
+const HALL_MARKS = new Set((HALL.marks || []).map((m) => m.id));
 
 // 전설 석상에 깎을 수 있는 도감 번호 — 전설 · 환상만
 const LEGEND_DEX = new Set(LINES.filter((l) => l.single && l.legendary).map((l) => l.ids[1]));
@@ -288,7 +290,7 @@ export class Guild {
     for (const [item, byMember] of Object.entries(h.donors || {})) {
       donors[item] = Object.values(byMember).sort((a, b) => b.coins - a.coins).map(({ trainer, coins }) => ({ trainer, coins }));
     }
-    return { funds: h.funds, owned: h.owned, theme: h.theme, donors };
+    return { funds: h.funds, owned: h.owned, theme: h.theme, mark: h.mark || null, donors };
   }
 
   /**
@@ -326,6 +328,7 @@ export class Guild {
       leader: lead ? lead.snap.trainer : "",
       active: list.filter((m) => now - m.updated < 7 * DAY_MS).length, // 이번 주(7일) 안에 방을 올린 사람
       hall: h.owned.length,
+      mark: h.mark || null,
       at: Math.max(...list.map((m) => m.updated)),
       weeks,
     });
@@ -561,6 +564,17 @@ export class Guild {
       if (theme !== "stone" && !h.owned.includes(theme)) return fail("아직 모금이 다 되지 않은 배경입니다");
       h.theme = theme === "stone" ? null : theme;
       await this.store.put("hall", h);
+      return json({ ok: true, hall: this.publicHall(h) });
+    }
+
+    if (action === "hall/mark") {
+      if (meta.leader !== me.id) return fail("길드장만 길드 마크를 바꿀 수 있습니다", 403);
+      const mark = str(body.mark, 16);
+      if (!HALL_MARKS.has(mark)) return fail("없는 마크입니다");
+      const h = await this.hall();
+      h.mark = mark === "star" ? null : mark;
+      await this.store.put("hall", h);
+      await this.publish(meta, true); // 길드 목록의 마크도 바로
       return json({ ok: true, hall: this.publicHall(h) });
     }
 

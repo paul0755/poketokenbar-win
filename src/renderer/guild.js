@@ -169,7 +169,7 @@
     if (g && g.gone) $("gdGoneMsg").textContent = g.gone;
     if (online && !g && !$("gdTrainer").value) $("gdTrainer").value = (s.friend && s.friend.trainer) || "";
     if (online && g && !g.gone) {
-      $("gdTitle").textContent = g.name;
+      if (!guild || guild.code !== g.code) $("gdTitle").textContent = g.name; // 불러온 뒤에는 마크와 함께 renderGuild 가 그린다
       $("gdCopy").textContent = "GLD-" + g.code;
       if (fetch || !guild) load();
     }
@@ -196,9 +196,13 @@
     }
   }
 
+  /** 길드 마크 작은 그림 — 길드 이름 앞에 붙인다(홀 깃발과 같은 그림) */
+  const markImg = (mark, code) =>
+    window.ptbRoom && window.ptbRoom.markIcon ? `<img class="gmark" src="${window.ptbRoom.markIcon(mark || "star", code)}" alt="">` : "";
+
   function renderGuild() {
     const g = guild;
-    $("gdTitle").textContent = g.name;
+    $("gdTitle").innerHTML = markImg(g.hall && g.hall.mark, g.code) + esc(g.name);
     $("gdCount").textContent = `${g.members.length}/${g.max}명${g.leader ? " · 길드장" : ""}`;
     const rk = ranking(g);
     // 끝난 주들 — 지난주 칭호는 한 주 동안 이름표에 달고 다닌다
@@ -229,6 +233,7 @@
         hall: {
           owned: g.hall.owned,
           theme: g.hall.theme,
+          mark: g.hall.mark || null,
           // 트로피 진열장 — 목표 🥇를 이룬 주의 수
           golds: (g.weeks || []).filter((w) => w.goal && w.goal.reached >= 3).length,
           // 마스코트 석상 — 지난주 1위의 대표 포켓몬(그 사람 방의 첫 아이)
@@ -303,12 +308,23 @@
     const h = g.hall;
     const items = g.hallItems || [];
     const themes = items.filter((it) => it.theme && h.owned.includes(it.id));
+    // 다 모인 장식은 위에 한 줄로 접고, 모금 중인 것만 카드로 — 많이 모인 순, 같으면 싼 순
+    const owned = items.filter((it) => h.owned.includes(it.id));
+    const ratio = (it) => (h.funds[it.id] || 0) / it.coins;
+    const open = items.filter((it) => !h.owned.includes(it.id)).sort((a, b) => ratio(b) - ratio(a) || a.coins - b.coins);
     const pick = (id, name) => `<button data-theme="${id}" class="${(h.theme || "stone") === id ? "on" : ""}" ${g.leader ? "" : "disabled"}>${name}</button>`;
+    const marks = g.hallMarks || [];
+    const curMark = h.mark || "star";
+    const markRow = marks.length && window.ptbRoom.markIcon
+      ? `<div class="marks"><span class="sub">🚩 길드 마크${g.leader ? "" : " · 길드장이 고릅니다"}</span>${marks.map((m) => `<button data-mark="${m.id}" class="${m.id === curMark ? "on" : ""}" title="${esc(m.name)}" ${g.leader ? "" : "disabled"}><img src="${window.ptbRoom.markIcon(m.id, g.code)}" alt="${esc(m.name)}"></button>`).join("")}</div>`
+      : "";
     $("gdHall").innerHTML = `<div class="hd"><b>🏗️ 홀 꾸미기</b><span>길드원이 함께 모금 · 다 모이면 홀에 놓인다 · 내 코인 <b>🪙${g.coins == null ? "–" : g.coins}</b></span></div>
+      ${markRow}
       ${themes.length ? `<div class="themes">${pick("stone", "🪨 돌 홀")}${themes.map((t) => pick(t.id, `${t.icon} ${t.name.replace("홀 배경: ", "")}`)).join("")}${g.leader ? "" : '<span class="sub">홀 배경은 길드장이 고릅니다</span>'}</div>` : ""}
-      <div class="fund">${items.map((it) => {
+      ${owned.length ? `<div class="owned"><span class="sub">완성 ${owned.length} / ${items.length}</span>${owned.map((it) => `<span class="chip" title="${esc(it.desc)}">${it.icon} ${esc(it.name.replace("홀 배경: ", ""))}</span>`).join("")}</div>` : ""}
+      <div class="fund">${open.map((it) => {
         const have = h.funds[it.id] || 0;
-        const done = h.owned.includes(it.id);
+        const done = false;
         const who = (h.donors[it.id] || []).map((d) => `${esc(d.trainer)} ${d.coins}`).join(" · ");
         return `<div class="it${done ? " done" : ""}" data-item="${it.id}">
           <div class="nm">${it.icon} ${esc(it.name)}<span>🪙${it.coins}</span></div>
@@ -327,6 +343,11 @@
     if (!b || b.disabled || !guild) return;
     if (b.dataset.theme) {
       if (done(await window.ptb.hallTheme(b.dataset.theme))) load();
+      return;
+    }
+    if (b.dataset.mark) {
+      if (b.classList.contains("on")) return;
+      if (done(await window.ptb.hallMark(b.dataset.mark))) load();
       return;
     }
     const card = b.closest("[data-item]");
@@ -424,7 +445,7 @@
         : `<button class="mini2 off" data-later title="지금 길드를 나간 뒤 들어갈 수 있습니다">${full ? "꽉 참" : "들어가기"}</button>`;
       return `<div class="g${full && !me ? " full" : ""}${me ? " mine" : ""}" data-code="${esc(x.code)}" data-name="${esc(x.name)}">
         <div class="tx">
-          <div class="nm">${esc(x.name)}${me ? '<i class="tag">내 길드</i>' : ""}<span>👥 ${x.members}/${x.max}</span></div>
+          <div class="nm">${markImg(x.mark, x.code)}${esc(x.name)}${me ? '<i class="tag">내 길드</i>' : ""}<span>👥 ${x.members}/${x.max}</span></div>
           ${x.intro ? `<div class="in">${esc(x.intro)}</div>` : ""}
           <div class="mt">${x.active ? `<span class="hot">이번 주 ${x.active}명 활동</span> · ` : ""}길드장 ${esc(x.leader || "–")}${x.hall ? ` · 🏗️ 홀 장식 ${x.hall}` : ""} · ${ago(x.at)} 움직임</div>
         </div>

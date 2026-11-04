@@ -12,7 +12,7 @@
  * 코인 보상은 없다 — 보여 주기만 한다.
  *
  * 길드(guild.js)만 이 객체를 부른다(env.DIRECTORY) — 밖에서는 보기(GET /guilds, /guilds/rank)만 된다.
- *   POST /put     { code, name, intro, members, max, leader, active, hall, at, weeks }  — 올리기 · 고치기
+ *   POST /put     { code, name, intro, members, max, leader, active, hall, mark, at, weeks }  — 올리기 · 고치기
  *   POST /remove  { code }                                                              — 내리기
  *   GET  /list                                                                          → { guilds[] }
  *   GET  /rank?week=2026-10-26                                                          → { week, prev, guilds[] }
@@ -41,7 +41,7 @@ export class Directory {
         // 자리가 남은 길드 먼저, 그다음 이번 주 활동한 인원, 최근에 움직인 순
         .sort((a, b) => (a.members >= a.max) - (b.members >= b.max) || b.active - a.active || b.at - a.at)
         .slice(0, SHOW)
-        .map(({ code, name, intro, members, max, leader, active, hall, at }) => ({ code, name, intro, members, max, leader, active, hall, at }));
+        .map(({ code, name, intro, members, max, leader, active, hall, mark, at }) => ({ code, name, intro, members, max, leader, active, hall, mark: mark || null, at }));
       return json({ ok: true, guilds, total: all.length, now });
     }
     if (request.method === "GET" && action === "rank") {

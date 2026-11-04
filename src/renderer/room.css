@@ -198,6 +198,17 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .gd-goal .foot b { color: var(--text); }
 .gd-goal .warn { color: #ffb347; }
 /* 홀 꾸미기 — 모금함 */
+.gmark { width: 15px; height: 17px; margin-right: 5px; vertical-align: -3px; image-rendering: pixelated; border-radius: 2px; }
+.gd-hall .marks { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 8px; }
+.gd-hall .marks .sub { margin-right: 4px; font-size: 10px; color: var(--muted); font-weight: 700; }
+.gd-hall .marks button { padding: 2px; border-radius: 6px; border: 2px solid transparent; background: none; cursor: pointer; line-height: 0; }
+.gd-hall .marks button img { width: 20px; height: 22px; image-rendering: pixelated; }
+.gd-hall .marks button.on { border-color: var(--accent); }
+.gd-hall .marks button:disabled { cursor: default; opacity: .55; }
+.gd-hall .marks button.on:disabled { opacity: 1; }
+.gd-hall .owned { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 8px; }
+.gd-hall .owned .sub { margin-right: 4px; font-size: 10px; color: #4ee39a; font-weight: 700; }
+.gd-hall .owned .chip { font-size: 10px; padding: 2px 7px; border-radius: 99px; background: rgba(78, 227, 154, .1); border: 1px solid #4ee39a44; color: var(--text); }
 .gd-hall .fund { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
 .gd-hall .it { background: var(--card2); border: 1px solid var(--line); border-radius: 9px; padding: 7px 8px; font-size: 11px; }
 .gd-hall .it.done { border-color: #4ee39a66; }

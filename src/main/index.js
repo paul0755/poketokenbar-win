@@ -964,7 +964,7 @@ async function guildView() {
     ok: true, code: r.code, name: r.name, max: r.max, leader, members, weeks: r.weeks || [], thisWeek: week, medal, now: r.now,
     listed: Boolean(r.listed), intro: r.intro || "",
     goal: (r.goals || {})[week] || null, goalCoins, lastGoal, goalNew,
-    hall: r.hall || { funds: {}, owned: [], theme: null, donors: {} }, hallItems: HALL.items,
+    hall: r.hall || { funds: {}, owned: [], theme: null, donors: {} }, hallItems: HALL.items, hallMarks: HALL.marks,
     walletOk: Boolean(me && me.walletOk), hasWallet: Boolean(save.wallet), coins: coinCache ? coinCache.balance : null,
     raid: r.raid ? await raidOut(r.raid) : null,
     rep: (guildRepMon() || {}).id || null, repPicked: Boolean(guildRepPicked()), // 길드 대표 포켓몬
@@ -1009,6 +1009,16 @@ async function hallTheme(theme) {
   const r = await guildCall(`/${g.code}/hall/theme`, { memberId: g.memberId, key: g.key, theme });
   if (!r.ok) return r;
   return { ok: true, hall: r.hall, message: "홀 배경을 바꿨습니다" };
+}
+
+/** 길드 마크 고르기 — 길드장만. 홀 깃발에 찍힌다 */
+async function hallMark(mark) {
+  const g = save.guild;
+  if (!g || g.gone) return { ok: false, reason: "길드에 들어가 있지 않습니다" };
+  if (!HALL.marks.some((m) => m.id === mark)) return { ok: false, reason: "없는 마크입니다" };
+  const r = await guildCall(`/${g.code}/hall/mark`, { memberId: g.memberId, key: g.key, mark });
+  if (!r.ok) return r;
+  return { ok: true, hall: r.hall, message: "길드 마크를 바꿨습니다" };
 }
 
 /** 길드원과 결투 — 내 대표 팀 코드 vs 그 사람이 올려 둔 코드. Lv.50, 보상 없음 */
@@ -4165,6 +4175,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("guild-listing", (_e, a) => guildListing(a));
   ipcMain.handle("hall-donate", (_e, a) => hallDonate(a));
   ipcMain.handle("hall-theme", (_e, theme) => hallTheme(theme));
+  ipcMain.handle("hall-mark", (_e, mark) => hallMark(mark));
   // 코인 지갑 · 상점에 팔기 · 길드 몰
   ipcMain.handle("wallet-info", () => walletInfo());
   ipcMain.handle("wallet-checkin", () => walletCheckin());

@@ -852,7 +852,34 @@
     }
   }
 
-  function banner(g, x, col) {
+  /**
+   * 길드 마크(9×9) — 깃발의 흰 방패 위에 길드 색으로 찍는다. 길드장이 고른다(hall.json marks).
+   * 처음엔 별 하나뿐이라 길드마다 깃발이 색만 달랐다.
+   */
+  const MARKS = {
+    star: ["....#....", "....#....", "...###...", "#########", ".#######.", "..#####..", "..##.##..", ".##...##.", ".#.....#."],
+    ball: ["..#####..", ".#.....#.", "#.......#", "#...#...#", "####.####", "#...#...#", "#.......#", ".#.....#.", "..#####.."],
+    flame: ["....#....", "...##....", "...###...", "..####.#.", "..######.", ".###.###.", ".##...##.", ".##...##.", "..#####.."],
+    drop: ["....#....", "....#....", "...###...", "..#####..", ".#######.", ".####.##.", ".###.###.", "..#####..", "...###..."],
+    leaf: [".......##", ".....####", "...######", "..######.", ".###.##..", ".##.##...", ".#.##....", ".##......", "#........"],
+    bolt: ["....####.", "...####..", "..####...", ".#######.", "...####..", "..####...", ".####....", ".##......", ".#......."],
+    crown: ["#...#...#", "##.###.##", "#########", "#########", "#.#.#.#.#", "#########", ".........", "#########", "#########"],
+    moon: ["..#####..", ".###.....", "###......", "###......", "###......", "###......", "###......", ".###.....", "..#####.."],
+    sword: ["........#", ".......##", "......##.", ".....##..", "#...##...", ".#.##....", "..##.....", ".#.##....", "#...#...."],
+    wing: ["#........", "##.......", "###......", "####.....", "#.###....", "##.###...", ".##.###..", "..##.###.", "....#####"],
+    paw: ["..##.##..", "..##.##..", "#.......#", "##.....##", "...###...", "..#####..", ".#######.", ".#######.", "..##.##.."],
+    heart: [".##...##.", "####.####", "#########", "#########", ".#######.", "..#####..", "...###...", "....#....", "........."],
+  };
+  function drawMark(g, x0, y0, id, c) {
+    (MARKS[id] || MARKS.star).forEach((row, j) => { for (let i = 0; i < row.length; i++) if (row[i] === "#") R(g, x0 + i, y0 + j, 1, 1, c); });
+  }
+  /** 방패 하나(14×16)에 마크 — 깃발과 길드 화면의 마크 고르기 단추가 같이 쓴다 */
+  function shield(g, x, y, id, c) {
+    for (let i = 0; i < 16; i++) { const w = i < 10 ? 14 : 14 - (i - 9) * 2; R(g, x + 7 - (w >> 1), y + i, w, 1, i === 0 ? "#fff" : "#f5f5f5"); }
+    drawMark(g, x + 3, y + 2, id, c);
+  }
+
+  function banner(g, x, col, mark) {
     const [c, hi, dk] = col;
     R(g, x - 3, 12, 32, 3, "#c9a227"); R(g, x - 3, 12, 32, 1, "#ffe28a"); // 봉
     for (let y = 15; y < 72; y++) {
@@ -861,10 +888,8 @@
       R(g, x + inset, y, 1, 1, dk); R(g, x + 25 - inset, y, 1, 1, dk);
     }
     R(g, x + 2, 17, 22, 1, hi);
-    // 문장 — 방패에 별
-    for (let i = 0; i < 16; i++) { const w = i < 10 ? 14 : 14 - (i - 9) * 2; R(g, x + 13 - (w >> 1), 26 + i, w, 1, i === 0 ? "#fff" : "#f5f5f5"); }
-    for (let i = 0; i < 7; i++) R(g, x + 13 - Math.floor(i / 2), 29 + i, 1 + Math.floor(i / 2) * 2, 1, c);
-    R(g, x + 9, 32, 9, 1, c);
+    // 문장 — 방패에 길드 마크
+    shield(g, x + 6, 26, mark, c);
   }
 
   function torch(g, x, night) {
@@ -989,6 +1014,106 @@
     else { box(g, 12, 28, 16, 25, "#8a8a8a", "#5f5f5f", "#a0a0a0", "#767676"); R(g, 15, 34, 4, 3, "#767676"); }
   } };
 
+  /** 등불 줄 — 깃발과 샹들리에 사이 천장 아래로 늘어진 줄에 등불 넷씩. 밤이면 둘레가 붉게 밝다 */
+  function lanterns(g, night) {
+    for (const [x0, x1] of [[58, 87], [233, 262]]) {
+      const sag = (x) => 12 + Math.round(6 * Math.sin(((x - x0) / (x1 - x0)) * Math.PI));
+      for (let x = x0; x <= x1; x++) R(g, x, sag(x), 1, 1, "#3e2723");
+      for (let i = 0; i < 4; i++) {
+        const x = x0 + 4 + Math.round(((x1 - x0 - 8) * i) / 3);
+        const y = sag(x) + 1;
+        if (night) for (let r = 10; r > 3; r -= 3) { g.fillStyle = "rgba(255, 120, 80, .1)"; g.beginPath(); g.ellipse(x, y + 6, r, r, 0, 0, Math.PI * 2); g.fill(); }
+        R(g, x, y, 1, 2, "#3e2723");
+        R(g, x - 2, y + 2, 5, 1, "#c9a227");
+        oval(g, x, y + 6, 3, 4, i % 2 ? "#ff8a3d" : "#e53935");
+        R(g, x - 1, y + 4, 1, 4, i % 2 ? "#ffc27a" : "#ff7a6e");
+        R(g, x - 2, y + 10, 5, 1, "#c9a227");
+        R(g, x, y + 11, 1, 2, "#ffd54f");
+      }
+    }
+  }
+
+  /** 벽 수족관(44×34) — 간판 아래 벽. 물풀 · 모래 · 물고기 넷 · 거품 */
+  function aquarium(g) {
+    const x = 138, y = 58, w = 44, h = 34;
+    box(g, x, y, w, h, "#3d8fd1", "#263238", "#90caf9", "#1e5f94");
+    R(g, x + 2, y + 2, w - 4, 3, "#7cc4f5"); // 수면
+    dither(g, x + 2, y + 5, w - 4, h - 12, "#ffffff10");
+    R(g, x + 2, y + h - 7, w - 4, 5, "#e8d39a"); dither(g, x + 2, y + h - 7, w - 4, 5, "#c9b27a");
+    for (const [px, ph] of [[x + 5, 14], [x + 9, 9], [x + 36, 12], [x + 39, 7]]) for (let j = 0; j < ph; j++) R(g, px + (j % 4 < 2 ? 0 : 1), y + h - 7 - j, 1, 1, j % 3 ? "#43a047" : "#66bb6a");
+    const fish = [[x + 14, y + 11, "#ff8a3d", 1], [x + 26, y + 17, "#ffd54f", -1], [x + 18, y + 22, "#ef5350", 1], [x + 31, y + 9, "#b388ff", -1]];
+    for (const [fx, fy, c, d] of fish) {
+      R(g, fx, fy, 5, 3, c); R(g, fx + 1, fy - 1, 3, 1, c); R(g, fx + 1, fy + 3, 3, 1, c);
+      R(g, d > 0 ? fx - 2 : fx + 5, fy, 2, 3, c); R(g, d > 0 ? fx + 3 : fx + 1, fy + 1, 1, 1, "#1a1a1a");
+    }
+    for (const [bx, by] of [[x + 12, y + 7], [x + 13, y + 5], [x + 29, y + 13], [x + 30, y + 10]]) R(g, bx, by, 1, 1, "#e3f6ff");
+    R(g, x - 2, y + h, w + 4, 3, "#5d4037"); R(g, x - 2, y + h, w + 4, 1, "#8d6e63"); // 받침
+  }
+
+  /** 길드 서재(30×50) — 오른쪽 벽 앞 책장, 맨 위에 지구본 */
+  const SHELF = { w: 30, h: 50, draw(g) {
+    box(g, 0, 10, 30, 40, "#6d4c41", "#3e2723", "#8d6e63", "#4e342e");
+    const r = seeded(44);
+    const cols = ["#c62828", "#1565c0", "#2e7d32", "#f9a825", "#6a1b9a", "#ef6c00", "#00838f"];
+    for (const sy of [14, 26, 38]) {
+      R(g, 2, sy + 10, 26, 2, "#4e342e");
+      for (let bx = 3; bx < 27;) {
+        const bw = 2 + Math.floor(r() * 2), bh = 6 + Math.floor(r() * 4);
+        if (bx + bw > 27) break;
+        R(g, bx, sy + 10 - bh, bw, bh, cols[Math.floor(r() * cols.length)]); R(g, bx, sy + 10 - bh, bw, 1, "#ffffff44");
+        bx += bw + (r() < 0.2 ? 1 : 0);
+      }
+    }
+    oval(g, 15, 5, 5, 5, "#1e88e5"); R(g, 12, 3, 3, 2, "#43a047"); R(g, 16, 6, 3, 2, "#43a047"); R(g, 13, 2, 1, 1, "#bbdefb");
+    R(g, 14, 10, 3, 1, "#c9a227"); R(g, 9, 0, 1, 10, "#c9a227");
+  } };
+
+  /** 그랜드 피아노(52×38) — 왼쪽 바닥. 뚜껑을 연 검은 피아노와 의자 */
+  const PIANO = { w: 52, h: 38, draw(g) {
+    oval(g, 26, 35, 24, 3, "#00000040");
+    R(g, 6, 22, 2, 13, "#111"); R(g, 38, 22, 2, 13, "#111"); R(g, 22, 24, 2, 11, "#111"); // 다리
+    oval(g, 26, 18, 22, 7, "#1b1b1f"); R(g, 4, 14, 44, 8, "#1b1b1f"); R(g, 5, 14, 42, 1, "#3a3a44");
+    for (let i = 0; i < 26; i++) R(g, 9 + i, 3 + Math.floor(i * 0.42), 1, 12 - Math.floor(i * 0.42), "#26262c"); // 열린 뚜껑
+    R(g, 8, 2, 2, 13, "#2a2a30"); R(g, 9, 3, 26, 1, "#4a4a55"); // 받침 · 뚜껑 끝 반짝
+    R(g, 6, 20, 40, 3, "#f5f5f5"); for (let k = 7; k < 46; k += 3) R(g, k, 20, 1, 2, "#1b1b1f"); // 건반
+    box(g, 16, 28, 18, 6, "#5d4037", "#3e2723", "#8d6e63"); R(g, 18, 34, 2, 4, "#3e2723"); R(g, 30, 34, 2, 4, "#3e2723"); // 의자
+  } };
+
+  /** 라운지 소파(38×26) — 오른쪽 바닥. 길드 색 천, 쿠션 둘 */
+  const SOFA = { w: 38, h: 26, draw(g, col) {
+    const [c, hi, dk] = col || ["#8e3b46", "#b55462", "#5e2530"];
+    oval(g, 19, 24, 18, 2, "#00000040");
+    box(g, 2, 4, 34, 10, c, dk, hi); // 등받이
+    box(g, 0, 10, 6, 12, c, dk, hi); box(g, 32, 10, 6, 12, c, dk, hi); // 팔걸이
+    box(g, 5, 13, 28, 8, c, dk, hi); R(g, 19, 14, 1, 6, dk);
+    R(g, 3, 22, 2, 3, "#3e2723"); R(g, 33, 22, 2, 3, "#3e2723");
+    box(g, 8, 7, 8, 6, "#fff3c4", "#c9a227"); box(g, 22, 7, 8, 6, "#fff3c4", "#c9a227");
+  } };
+
+  /**
+   * 서울대 정문 — 굵은 철골 셋(ㅅ · ㄷ · ㄱ 을 닮은 문). gx 가운데, base 땅, k 크기, c 색(steel · lite · dark)
+   * lite 는 왼쪽 면(빛 받는 쪽) — 노을이면 주황 테두리가 된다
+   */
+  function snuGate(g, gx, base, k, c) {
+    const beam = (x0, y0, x1, y1, t) => {
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
+      for (let i = 0; i <= n; i++) {
+        const x = Math.round(x0 + ((x1 - x0) * i) / n), y = Math.round(y0 + ((y1 - y0) * i) / n);
+        R(g, x, y, t, t, c.steel); R(g, x, y, 1, t, c.lite); R(g, x + t - 1, y, 1, t, c.dark);
+      }
+    };
+    const u = (v) => Math.round(v * k);
+    const top = base - u(62), t = Math.max(4, u(5));
+    const L = gx - u(26);
+    beam(L - u(4), base - t, L + u(12), top, t); // ㅅ 왼다리
+    beam(L + u(10), top + u(22), L + u(22), base - t, t - 1); // ㅅ 오른다리
+    beam(L + u(10), top, L + u(42), top, t); // 위 들보
+    beam(L + u(36), top, L + u(36), base - t, t); // ㄷ 세로
+    beam(L + u(36), top + u(20), L + u(54), top + u(20), t - 1); // ㄷ 가운데
+    beam(L + u(36), base - u(14), L + u(54), base - u(14), t - 1); // ㄷ 아래
+    for (const x of [L - u(6), L + u(18), L + u(33)]) { R(g, x, base - 3, u(12), 3, c.dark); R(g, x, base - 3, u(12), 1, c.lite); }
+  }
+
   /* ---- 홀 배경 (모금으로 산다) ---- */
   const HALL_THEMES = {
     // 성 — 큰 돌벽, 간판 아래 스테인드글라스 둘, 대리석 체크 바닥
@@ -1019,6 +1144,73 @@
         for (let y = FLOOR, r = 0; y < AH; y += 10, r++) for (let x = 0, c = r % 2; x < AW; x += 20, c ^= 1) {
           R(g, x, y, 20, 10, c ? "#d9d4cc" : "#b8b2a8"); R(g, x, y, 20, 1, "#e9e5de");
         }
+      },
+    },
+    // 벚꽃 정원 — 봄 하늘, 먼 산, 벚나무와 나무 울타리, 꽃잎 흩날리는 잔디. 바깥이라 걸레받이 없이
+    sakura: {
+      outdoor: true,
+      wall(g) {
+        ["#a7d8f5", "#bfe3f7", "#d6ecf8", "#fbe3ec"].forEach((c, i) => R(g, 0, i * 31, AW, 31, c));
+        for (let x = 0; x < AW; x++) { const h = 18 + Math.round(10 * Math.sin(x / 37) + 6 * Math.sin(x / 13)); R(g, x, FLOOR - 26 - h, 1, h, "#9cc9b0"); }
+        const r = seeded(21);
+        for (const x of [16, 74, 246, 300]) {
+          R(g, x - 2, 44, 5, FLOOR - 44, "#6d4c41"); R(g, x - 2, 44, 1, FLOOR - 44, "#8d6e63");
+          R(g, x - 8, 60, 7, 2, "#6d4c41"); R(g, x + 3, 54, 8, 2, "#6d4c41");
+          for (let i = 0; i < 14; i++) oval(g, x - 18 + Math.floor(r() * 36), 30 + Math.floor(r() * 30), 6 + Math.floor(r() * 4), 5, r() < 0.5 ? "#f8bbd0" : "#f48fb1");
+          for (let i = 0; i < 12; i++) R(g, x - 18 + Math.floor(r() * 36), 26 + Math.floor(r() * 36), 1, 1, "#ffffff");
+        }
+        for (let x = 0; x < AW; x += 12) { R(g, x, FLOOR - 22, 3, 22, "#c8a27a"); R(g, x, FLOOR - 24, 3, 2, "#a1806a"); }
+        R(g, 0, FLOOR - 16, AW, 2, "#b08c66"); R(g, 0, FLOOR - 8, AW, 2, "#b08c66");
+        R(g, 0, 0, AW, 6, "#f8bbd0"); dither(g, 0, 6, AW, 3, "#f8bbd0");
+      },
+      floor(g) {
+        R(g, 0, FLOOR, AW, AH - FLOOR, "#8fcf7a");
+        dither(g, 0, FLOOR, AW, AH - FLOOR, "#7fc06b");
+        const r = seeded(8);
+        for (let i = 0; i < 70; i++) { const x = Math.floor(r() * AW), y = FLOOR + 4 + Math.floor(r() * (AH - FLOOR - 6)); R(g, x, y, 2, 1, r() < 0.5 ? "#f8bbd0" : "#ffffff"); }
+        for (let i = 0; i < 30; i++) { const x = Math.floor(r() * AW), y = FLOOR + 4 + Math.floor(r() * (AH - FLOOR - 6)); R(g, x, y, 1, 2, "#5fae4f"); }
+      },
+    },
+    // 서울대 캠퍼스 — 노을. 보랏빛에서 주황으로 지는 하늘, 지는 해를 등진 정문(ㅅ·ㄷ·ㄱ 철골 문) 실루엣, 불 켜진 학교
+    snu: {
+      outdoor: true,
+      wall(g) {
+        const sky = ["#2b2d6e", "#4a3482", "#7a3f8c", "#b04c84", "#e0647a", "#f6906a", "#fbbd78", "#fde0a0"];
+        sky.forEach((c, i) => { R(g, 0, i * 14, AW, 14, c); if (i) dither(g, 0, i * 14, AW, 2, sky[i - 1]); });
+        const r = seeded(91);
+        for (let i = 0; i < 22; i++) R(g, Math.floor(r() * AW), Math.floor(r() * 30), 1, 1, "#ffffffaa");
+        for (let k = 34; k > 14; k -= 5) { g.fillStyle = "rgba(255, 220, 150, .12)"; g.beginPath(); g.ellipse(160, 94, k, k, 0, 0, Math.PI * 2); g.fill(); }
+        oval(g, 160, 94, 15, 15, "#ffe7ad"); oval(g, 160, 94, 12, 12, "#fff3d0");
+        for (let x = 0; x < AW; x++) {
+          const far = 30 + Math.round(14 * Math.sin(x / 43 + 2) + 7 * Math.sin(x / 15) + (Math.abs(x - 110) < 34 ? (34 - Math.abs(x - 110)) * 0.8 : 0));
+          R(g, x, FLOOR - 16 - far, 1, far, "#8a4f86");
+          const near = 18 + Math.round(8 * Math.sin(x / 27 + 1) + 4 * Math.sin(x / 9));
+          R(g, x, FLOOR - 14 - near, 1, near, "#5a3566");
+        }
+        // 학교 건물 — 그림자 덩어리에 불 켜진 창
+        const bld = (x, y, w, h) => {
+          R(g, x, y, w, FLOOR - y, "#2e2442"); R(g, x, y, w, 1, "#4b3a63");
+          for (let yy = y + 4; yy < FLOOR - 6; yy += 5) for (let xx = x + 3; xx < x + w - 3; xx += 4) if (r() < 0.45) R(g, xx, yy, 2, 2, r() < 0.7 ? "#ffd27a" : "#ffeab8");
+        };
+        bld(40, 78, 40, 46); bld(76, 90, 26, 34); bld(210, 72, 22, 52); bld(256, 84, 44, 40); bld(292, 96, 28, 28);
+        for (const x of [24, 118, 202, 300]) { // 가로등 — 둘레가 밝다
+          for (let k = 12; k > 3; k -= 3) { g.fillStyle = "rgba(255, 210, 120, .14)"; g.beginPath(); g.ellipse(x + 1, FLOOR - 33, k, k, 0, 0, Math.PI * 2); g.fill(); }
+          R(g, x, FLOOR - 32, 2, 32, "#1f1a2e"); R(g, x - 2, FLOOR - 35, 6, 3, "#1f1a2e"); R(g, x - 1, FLOOR - 32, 4, 1, "#fff0c0");
+        }
+        snuGate(g, 160, FLOOR, 1.35, { steel: "#1f1a2e", lite: "#ff9a6a", dark: "#140f1f" });
+      },
+      floor(g) {
+        R(g, 0, FLOOR, AW, AH - FLOOR, "#6a4256");
+        for (let y = FLOOR + 4, row = 0; y < AH; row++) {
+          const h = 3 + Math.floor((y - FLOOR) / 16), bw = 8 + Math.floor((y - FLOOR) / 6);
+          R(g, 0, y, AW, 1, "#4e2f42");
+          for (let k = -14; k <= 14; k++) { const x = Math.round(160 + (k + (row % 2) * 0.5) * bw); if (x >= 0 && x < AW) R(g, x, y + 1, 1, h - 1, "#4e2f42"); }
+          y += h;
+        }
+        // 지는 해가 땅에 깔린 빛 · 앞으로 길게 드리운 그림자
+        for (let y = FLOOR; y < FLOOR + 20; y++) { g.fillStyle = `rgba(255, 170, 110, ${0.28 * (1 - (y - FLOOR) / 20)})`; g.fillRect(0, y, AW, 1); }
+        dither(g, 0, FLOOR, AW, 2, "#ffb07a66");
+        dither(g, 0, AH - 30, AW, 30, "#1f1a2e33");
       },
     },
     // 하늘 신전 — 하늘과 구름, 흰 기둥, 금줄 대리석
@@ -1054,12 +1246,14 @@
     const T = HALL_THEMES[hall.theme];
     const [base, g] = canvas(AW, AH);
     (T ? T.wall : hallWall)(g);
-    R(g, 0, FLOOR - 6, AW, 6, "#5f574e"); R(g, 0, FLOOR - 6, AW, 1, "#7a7268"); R(g, 0, FLOOR - 1, AW, 1, "#4a433b");
+    // 걸레받이 — 바깥 배경(outdoor)은 땅이 그대로 이어져서 두지 않는다
+    if (!(T && T.outdoor)) { R(g, 0, FLOOR - 6, AW, 6, "#5f574e"); R(g, 0, FLOOR - 6, AW, 1, "#7a7268"); R(g, 0, FLOOR - 1, AW, 1, "#4a433b"); }
     (T ? T.floor : hallFloor)(g);
     dither(g, 0, FLOOR, AW, 3, "#0000002e");
     carpet(g, col, has("goldCarpet")); // 길 — 입구에서 분수까지 깐 길드 색 융단
-    banner(g, 30, col); banner(g, 264, col);
-    if (has("banners")) { banner(g, 3, col); banner(g, 291, col); }
+    const mark = MARKS[hall.mark] ? hall.mark : "star";
+    banner(g, 30, col, mark); banner(g, 264, col, mark);
+    if (has("banners")) { banner(g, 3, col, mark); banner(g, 291, col, mark); }
     sign(g);
     // 전광판 — 이번 주 목표 진행(🥇 를 끝으로)
     const goal = d.goal;
@@ -1067,6 +1261,8 @@
     if (board) billboard(g, goal ? goal.total / goal.tiers[2] : 0, goal ? goal.tiers.slice(0, 2).map((t) => t / goal.tiers[2]) : []);
     else noticeBoard(g);
     torch(g, 84, night); torch(g, 232, night);
+    if (has("aquarium")) aquarium(g);
+    if (has("lanterns")) lanterns(g, night);
     if (has("chandelier")) { chandelier(g, 98, night); chandelier(g, 222, night); }
     if (has("trophies")) trophyCase(g, hall.golds || 0);
     if (per !== "day") { g.fillStyle = night ? "rgba(10, 14, 40, .3)" : "rgba(60, 20, 40, .1)"; g.fillRect(0, 0, AW, AH); }
@@ -1075,6 +1271,9 @@
     const item = (id, x, y, w, h) => html.push(`<canvas class="rm-f" data-h="${id}" width="${w}" height="${h}" style="left:${X(x)}%; top:${Y(y)}%; width:${X(w)}%; height:${Y(h)}%; z-index:${(y + h) * 10};"></canvas>`);
     for (const [id, f] of Object.entries(HALL)) item(id, f.x, f.y, f.w, f.h);
     if (has("mascot")) item("mascot", 210, 98, MASCOT.w, MASCOT.h);
+    if (has("bookshelf")) item("bookshelf", 286, 76, SHELF.w, SHELF.h);
+    if (has("piano")) item("piano", 40, 128, PIANO.w, PIANO.h);
+    if (has("sofa")) item("sofa", 251, 142, SOFA.w, SOFA.h);
     if (has("flowers")) { item("bedL", 44, 174, 58, 20); item("bedR", 218, 174, 58, 20); }
     html.push(`<i class="rm-spark" style="left:${X(158)}%; top:${Y(122)}%; z-index:1700"></i><i class="rm-spark b" style="left:${X(168)}%; top:${Y(130)}%; right:auto; z-index:1700"></i>`);
     html.push(`<span class="rm-txt sign" style="left:${X(160)}%; top:${Y(30)}%;">${esc(d.guildName || "길드")}</span>`);
@@ -1100,6 +1299,9 @@
       const id = c.dataset.h;
       if (id === "fountain" && has("goldFountain")) goldFountain(g2);
       else if (id === "bedL" || id === "bedR") flowerBed(g2, id === "bedL" ? 9 : 10);
+      else if (id === "bookshelf") SHELF.draw(g2);
+      else if (id === "piano") PIANO.draw(g2);
+      else if (id === "sofa") SOFA.draw(g2, col);
       else if (id === "mascot") {
         // 석상 그림이 늦게 오면 다시 그린다 — 방의 전설 석상과 같은 줄(id "statue")에 넣는다
         const k = { id: "statue", f: MASCOT, g: g2, dexId: hall.mascot || null };
@@ -1436,7 +1638,16 @@
   requestAnimationFrame(tick);
 
   // 길드 화면(guild.js)이 길드원의 방을 그릴 때 쓴다
-  window.ptbRoom = { create, FURN_IDS: [...Object.keys(FURN), ...Object.keys(COIN)] };
+  /** 길드 마크 단추 그림 — 길드 색 바탕에 방패와 마크(길드 화면이 쓴다) */
+  function markIcon(id, code) {
+    const [c, , dk] = guildColor(code);
+    const [cv, g] = canvas(20, 22);
+    R(g, 0, 0, 20, 22, c); R(g, 0, 21, 20, 1, dk);
+    shield(g, 3, 3, id, c);
+    return cv.toDataURL();
+  }
+
+  window.ptbRoom = { create, markIcon, MARK_IDS: Object.keys(MARKS), FURN_IDS: [...Object.keys(FURN), ...Object.keys(COIN)] };
 
   /* ================= 내 방 ================= */
 
