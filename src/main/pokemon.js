@@ -18,7 +18,7 @@ const STAGES = [
 ];
 // 이름은 알에서 깬 첫 모습부터 1차 · 2차 · 3차로 센다. 처음엔 부화 · 1차 진화 · 최종 진화였는데,
 // "부화"는 야생에서 잡은 첫 모습에도 붙어 알이 깨기를 기다리는 아이처럼 보였고 칸 이름이 들쭉날쭉했다.
-// 2단 라인은 2차에서 마지막 모습이 되고 3차는 같은 모습이다(키는 그대로 — 세이브 · 서버가 키로 센다)
+// 2단 라인은 2차에서 마지막 모습이 되고 3차 칸이 없다 — 2차 다음이 곧장 마스터(9억, 아래 stagesOf)
 
 /**
  * 진화 라인. ids/names는 STAGES와 같은 길이로 맞춘다.
@@ -32,6 +32,23 @@ const STAGES = [
  * 생성물을 커밋해두므로 앱 실행 시에는 네트워크를 타지 않는다.
  */
 const LINES = require("./lines.json");
+
+/**
+ * 2단 진화 라인(가디 → 윈디처럼 2차에서 마지막 모습이 되는 라인)은 3차 칸이 없다.
+ * 3차 칸에도 2차와 같은 종이 들어 있어서, 4억에서 모습은 그대로인데 "3차 진화"라고 하고
+ * 진화 알림까지 떴다. 이제 2차 다음이 곧장 마스터(졸업)이고, 마스터 문턱은 9억이다
+ * (3단 라인은 15억 그대로 — 진화가 한 번 적은 만큼 덜 키워도 되게 한 절충).
+ *
+ * 그래서 이 라인의 문턱표는 3차(final)와 마스터를 둘 다 9억에 둔다. stageFor 는 넘은 칸 중
+ * 마지막을 고르니 3차(3)로 머무는 일이 없다 — 2차(2)에서 바로 마스터(4)로 간다.
+ * 서버(server/src/wallet.js shopPrice)도 같은 셈을 한다.
+ */
+const TWO_STAGE_MASTER = 900_000_000;
+const STAGES_TWO = STAGES.map((s) => (s.key === "final" || s.key === "master" ? { ...s, at: TWO_STAGE_MASTER } : s));
+const isTwoStage = (L) => Boolean(L && !L.single && L.ids[1] !== L.ids[2] && L.ids[2] === L.ids[3] && L.ids[3] === L.ids[4]);
+const TWO = LINES.map(isTwoStage);
+/** 이 라인의 단계 문턱표. 라인을 모르면(알 · 1차만 볼 때) 기본표 */
+const stagesOf = (lineIndex) => (lineIndex != null && TWO[lineIndex % LINES.length] ? STAGES_TWO : STAGES);
 
 const NATURES = require("./natures.json");
 
@@ -177,9 +194,11 @@ function rollNature() {
   return Math.floor(Math.random() * NATURES.length);
 }
 
-function stageFor(total) {
+/** 성장량 → 단계 번호(0 알 ~ 4 마스터). 마스터 문턱이 라인마다 달라서 line 을 같이 준다 */
+function stageFor(total, lineIndex = null) {
+  const S = stagesOf(lineIndex);
   let i = 0;
-  for (let k = 0; k < STAGES.length; k++) if (total >= STAGES[k].at) i = k;
+  for (let k = 0; k < S.length; k++) if (total >= S[k].at) i = k;
   return i;
 }
 
@@ -192,11 +211,12 @@ function stageFor(total) {
  */
 function stoneCap(lineIndex, total) {
   const L = LINES[lineIndex % LINES.length];
-  const s = stageFor(total);
+  const S = stagesOf(lineIndex);
+  const s = stageFor(total, lineIndex);
   if (!L || s === 0) return null;
-  for (let k = s + 1; k < STAGES.length; k++) {
-    if (STAGES[k].key === "master") break;
-    if (L.ids[k] !== L.ids[s]) return STAGES[k].at - 1;
+  for (let k = s + 1; k < S.length; k++) {
+    if (S[k].key === "master") break;
+    if (L.ids[k] !== L.ids[s]) return S[k].at - 1;
   }
   return null;
 }
@@ -211,18 +231,22 @@ const RATE_COINS = [[30, 8], [45, 5], [90, 3], [150, 2], [Infinity, 1]];
 const STAGE_COINS = [0, 1, 1.5, 2, 3];
 function shopPrice(lineIndex, total, shiny) {
   const L = LINES[lineIndex];
-  const st = stageFor(total);
+  const st = stageFor(total, lineIndex);
   if (!L || !st) return 0;
   const base = L.single && L.legendary ? 15 : RATE_COINS.find(([max]) => (L.captureRate ?? 45) <= max)[1];
   return Math.max(1, Math.round(base * STAGE_COINS[st] * (shiny ? 3 : 1)));
 }
 
-/** 다음 단계까지 얼마나 남았나 (마스터면 next: null) */
-function progress(total) {
-  const i = stageFor(total);
-  const next = STAGES[i + 1];
-  if (!next) return { ratio: 1, remaining: 0, next: null };
-  const from = STAGES[i].at;
+/**
+ * 다음 단계까지 얼마나 남았나 (마스터면 next: null).
+ * 2단 라인은 3차 칸이 마스터와 같은 문턱이라 건너뛴다 — 2차 다음 목표는 곧장 마스터
+ */
+function progress(total, lineIndex = null) {
+  const S = stagesOf(lineIndex);
+  const i = stageFor(total, lineIndex);
+  if (!S[i + 1]) return { ratio: 1, remaining: 0, next: null };
+  const next = S[stageFor(S[i + 1].at, lineIndex)];
+  const from = S[i].at;
   return {
     ratio: Math.min(1, (total - from) / (next.at - from)),
     remaining: next.at - total,
@@ -232,18 +256,19 @@ function progress(total) {
 
 function describe(total, lineIndex = 0, opts = {}) {
   const L = LINES[lineIndex % LINES.length];
-  const i = stageFor(total);
+  const S = stagesOf(lineIndex);
+  const i = stageFor(total, lineIndex);
   if (L.single) return describeSingle(L, total, i, opts);
   return {
     line: L.line,
     name: L.names[i],
     stageIndex: i,
-    stage: STAGES[i],
+    stage: S[i],
     dexId: L.ids[i],
-    isEgg: STAGES[i].key === "egg",
+    isEgg: S[i].key === "egg",
     // 마스터는 보상으로 이로치가 되고, 부화 때 이로치로 태어난 개체는 처음부터 이로치다
-    isShiny: STAGES[i].key === "master" || Boolean(opts.shiny),
-    progress: progress(total),
+    isShiny: S[i].key === "master" || Boolean(opts.shiny),
+    progress: progress(total, lineIndex),
   };
 }
 
@@ -287,25 +312,26 @@ function describeSingle(L, total, i, opts) {
  */
 function evolutionTree(lineIndex, total) {
   const L = LINES[lineIndex % LINES.length];
-  const now = stageFor(total);
+  const S = stagesOf(lineIndex);
+  const now = stageFor(total, lineIndex);
   const nodes = [];
 
-  for (let i = 1; i < STAGES.length; i++) {
+  for (let i = 1; i < S.length; i++) {
     const dexId = L.ids[i];
-    const isShiny = STAGES[i].key === "master";
+    const isShiny = S[i].key === "master";
     const prev = nodes[nodes.length - 1];
     if (prev && prev.dexId === dexId && !isShiny) {
       // 같은 종이 이어진다 — 노드를 늘리지 않고 도달 여부만 갱신한다
-      prev.reached = prev.reached || total >= STAGES[i].at;
+      prev.reached = prev.reached || total >= S[i].at;
       continue;
     }
     nodes.push({
       name: L.names[i],
       dexId,
       isShiny,
-      at: STAGES[i].at,
+      at: S[i].at,
       stageIndex: i,
-      reached: total >= STAGES[i].at,
+      reached: total >= S[i].at,
       current: i === now,
     });
   }
@@ -362,4 +388,4 @@ async function spriteWithFallback(mon, cacheDir, kind) {
   catch (e) { console.error("[sprite] 실패 " + mon.dexId + " " + kind + ": " + e.message); return null; }
 }
 
-module.exports = { STAGES, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollWild, rollLegend, isSingle, shopPrice, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };
+module.exports = { STAGES, TWO_STAGE_MASTER, stagesOf, isTwoStage, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollWild, rollLegend, isSingle, shopPrice, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };

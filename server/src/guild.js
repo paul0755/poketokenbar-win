@@ -79,7 +79,7 @@ import { WALLET_ID, walletCall, DECO_ITEMS, DECO_THEMES } from "./wallet.js";
 import LINES from "../../src/main/lines.json" with { type: "json" };
 import HALL from "../../src/main/hall.json" with { type: "json" };
 import { directoryCall } from "./directory.js";
-import { raidView, raidAction } from "./raid.js";
+import { raidView, raidAction, LINEUP } from "./raid.js";
 
 const HALL_ITEMS = new Map(HALL.items.map((it) => [it.id, it]));
 const HALL_MARKS = new Set((HALL.marks || []).map((m) => m.id));
@@ -169,7 +169,10 @@ export function cleanSnap(m) {
     stage: STAGES.includes(x && x.stage) ? x.stage : "baby",
     level: int(x && x.level, 1, 100) ?? 1,
   })).filter((x) => x.line != null && x.dexId != null && x.name);
-  const team = typeof m.team === "string" && m.team.length <= 600 && /^PTB1-[A-Za-z0-9_-]+-[0-9a-z]{5}$/.test(m.team) ? m.team : "";
+  const isCode = (c) => typeof c === "string" && c.length <= 600 && /^PTB1-[A-Za-z0-9_-]+-[0-9a-z]{5}$/.test(c);
+  const team = isCode(m.team) ? m.team : "";
+  // 레이드 후보 — 대표가 쓰러지면 차례로 나갈 아이들(raid.js partyOf). 대표 빼고 LINEUP - 1 마리까지
+  const bench = team ? (Array.isArray(m.bench) ? m.bench : []).filter(isCode).slice(0, LINEUP - 1) : [];
   const dex = m.dex && typeof m.dex === "object" ? m.dex : {};
   return {
     trainer,
@@ -183,6 +186,7 @@ export function cleanSnap(m) {
     lastGrad: str(m.lastGrad, 20),
     wins: int(m.wins, 0, 10_000_000) ?? 0,
     team,
+    bench,
     walletId: typeof m.walletId === "string" && WALLET_ID.test(m.walletId) ? m.walletId : "", // 주간 코인 보상을 넣을 곳
     usage: cleanUsage(m.usage),
     weekTop: int(m.weekTop, 0, 10000) ?? 0, // 주간 1위를 몇 번 했나 — 방의 메달 액자
@@ -442,7 +446,7 @@ export class Guild {
       listed: Boolean(meta.listed),
       intro: meta.intro || "",
       max: MAX_MEMBERS,
-      members: list.map((m) => ({ id: m.id, snap: m.snap, joined: m.joined, updated: m.updated, walletOk: Boolean(m.wallet) })),
+      members: list.map((m) => ({ id: m.id, snap: { ...m.snap, bench: undefined }, joined: m.joined, updated: m.updated, walletOk: Boolean(m.wallet) })),
       weeks: await this.weeks(),
       goals: await this.goals(), // { 주: { tiers, total, reached } }
       goalCoins: GOAL_COINS,

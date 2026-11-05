@@ -32,7 +32,7 @@
  * 있다. 지갑은 한 주에 한 길드의 레이드 조각만 받는다(wallet.js shard, 409). 지갑이 아직 확인되지 않은
  * 사람의 조각은 PENDING_DAYS 동안 기다린다.
  *
- *   POST /guild/ABCD2345/raid/start   { memberId, key }        → { seed, start, line, stage, triesLeft, party: [{ id, trainer, team }] }
+ *   POST /guild/ABCD2345/raid/start   { memberId, key }        → { seed, start, line, stage, triesLeft, party: [{ id, trainer, team, bench }] }
  *   POST /guild/ABCD2345/raid/hit     { memberId, key, credit: { 길드원 번호: 천분율 } } → { dealt, cleared, raid }
  *   GET  /guild/ABCD2345 의 raid                                 → raidView
  */
@@ -88,11 +88,11 @@ async function current(g) {
   return st;
 }
 
-/** 함께 싸울 길드원 — 대표 팀 코드를 올린 다른 길드원 모두, 들어온 순서로 */
+/** 함께 싸울 길드원 — 대표 팀 코드를 올린 다른 길드원 모두, 들어온 순서로. 후보(bench)는 대표가 쓰러지면 차례로 나온다 */
 async function partyOf(g, meId, ids = null) {
   const list = (await g.members()).filter((m) => m.id !== meId && m.snap && m.snap.team).sort((a, b) => a.joined - b.joined || (a.id < b.id ? -1 : 1));
   const pick = ids ? ids.map((id) => list.find((m) => m.id === id)).filter(Boolean) : list;
-  return pick.map((m) => ({ id: m.id, trainer: m.snap.trainer, team: m.snap.team }));
+  return pick.map((m) => ({ id: m.id, trainer: m.snap.trainer, team: m.snap.team, bench: m.snap.bench || [] }));
 }
 
 /** 화면에 보일 레이드 */
@@ -177,13 +177,13 @@ export async function raidAction(g, action, me, body) {
   if (action === "hit") {
     const p = st.pend[me.id];
     if (!p) return fail("시작한 도전이 없습니다");
-    // credit — 길드원 번호마다 그 사람 포켓몬이 깎은 양. 나는 내보낸 아이 LINEUP 마리만큼, 다른 길드원은 대표 한 마리만큼까지
+    // credit — 길드원 번호마다 그 사람 포켓몬이 깎은 양. 누구든 LINEUP 마리만큼까지(나는 골라서, 다른 길드원은 대표 다음 후보가 저절로)
     const credit = body.credit && typeof body.credit === "object" ? body.credit : {};
     const party = new Set(p.party || []);
     const want = [];
     for (const [id, v] of Object.entries(credit)) {
       if ((id !== me.id && !party.has(id)) || !Number.isInteger(v) || v < 0) return fail("깎은 체력이 맞지 않습니다");
-      const cap = (id === me.id ? LINEUP : 1) * PER_MON * BAR;
+      const cap = LINEUP * PER_MON * BAR;
       if (v > 0) want.push([id, Math.min(v, cap)]);
     }
     delete st.pend[me.id];

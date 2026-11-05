@@ -9,6 +9,7 @@ const limits = require("./limits");
 const box = require("./box");
 const profile = require("./profile");
 const notify = require("./notify");
+const update = require("./update");
 const backup = require("./backup");
 const battle = require("./battle");
 const wild = require("./wild");
@@ -420,7 +421,7 @@ async function gymChallenge(gymId, ids) {
  */
 function tradeEvolves(line, grown) {
   const L = poke.LINES[line];
-  const st = poke.stageFor(grown);
+  const st = poke.stageFor(grown, line);
   return Boolean(L && L.trade && L.trade.includes(st) && poke.STAGES[st + 1]) ? st : -1;
 }
 
@@ -499,8 +500,8 @@ function tradeReceive(code) {
   let grown = d.grown;
   const evo = d.hold ? -1 : tradeEvolves(d.mon.line, grown);
   const before = poke.describe(grown, d.mon.line, { shiny: d.mon.shiny }).name;
-  if (evo >= 0) grown = Math.max(grown, poke.STAGES[evo + 1].at);
-  const st = poke.stageFor(grown);
+  if (evo >= 0) grown = Math.max(grown, poke.stagesOf(d.mon.line)[evo + 1].at);
+  const st = poke.stageFor(grown, d.mon.line);
   const { lvGrown, ...dm } = d.mon; // lvGrown 은 세이브에 넣지 않는다 — 아래에서 fed 로 옮긴다
   const m = {
     id: box.newId(),
@@ -618,9 +619,31 @@ function guildTeamCode() {
   if (!m || isEggMon(m)) return "";
   const grown = box.effOf(m, growthSpeed());
   const p = profile.build(box.withLv(m, growthSpeed()), grown);
-  const key = [m.id, poke.stageFor(grown), p ? p.level : 0, (m.tmMoves || []).length, m.nature, save.trainerName].join("|");
+  const key = [m.id, poke.stageFor(grown, m.line), p ? p.level : 0, (m.tmMoves || []).length, m.nature, save.trainerName].join("|");
   if (guildTeam.key !== key) guildTeam = { key, code: friend.encode(box.withLv(m, growthSpeed()), grown, save.trainerName) };
   return guildTeam.code;
+}
+
+/**
+ * 레이드 후보 — 남의 도전에서 대표 포켓몬이 쓰러지면 차례로 나갈 아이들(대표 빼고 RAID_LINEUP - 1 마리).
+ * 많이 자란 순서. 대표 코드처럼 아이 · 레벨이 그대로면 전에 만든 코드를 다시 쓴다.
+ */
+let guildBench = { key: "", codes: [] };
+function guildBenchCodes() {
+  const rep = guildRepMon();
+  const sp = growthSpeed();
+  const pick = save.box
+    .filter((m) => m && m !== rep && raidFighter(m.id))
+    .map((m) => ({ m, grown: box.effOf(m, sp) }))
+    .sort((a, b) => b.grown - a.grown)
+    .slice(0, RAID_LINEUP - 1);
+  const rows = pick.map(({ m, grown }) => {
+    const p = profile.build(box.withLv(m, sp), grown);
+    return { m, grown, key: [m.id, poke.stageFor(grown, m.line), p ? p.level : 0, (m.tmMoves || []).length, m.nature].join("|") };
+  });
+  const key = rows.map((x) => x.key).join(",") + "|" + save.trainerName;
+  if (guildBench.key !== key) guildBench = { key, codes: rows.map(({ m, grown }) => friend.encode(box.withLv(m, sp), grown, save.trainerName)) };
+  return guildBench.codes;
 }
 
 const dexCount = () => ({
@@ -655,6 +678,7 @@ function guildSnap() {
     lastGrad: st.lastGrad || "",
     wins: st.wins,
     team: guildTeamCode(),
+    bench: guildBenchCodes(), // 레이드에서 대표가 쓰러지면 나갈 아이들
     // 공개를 끈 사람은 아예 보내지 않는다 — 서버에도 남지 않는다
     usage: save.guildShare !== false && guildUsage ? guildUsage : null,
     weekTop: (save.weekTop || []).length,
@@ -1120,6 +1144,7 @@ async function raidPack(L, seg) {
 
 /**
  * 보스에게 도전한다 — 내 아이 한 마리와 다른 길드원 모두의 대표 포켓몬이 한꺼번에 싸운다(raidbattle.js).
+ * 길드원의 대표가 쓰러지면 그 사람이 올려 둔 후보가 저절로 이어 나온다.
  * 내 아이가 쓰러지면 멈추고(need) 화면이 다음 아이를 고른다(raidNext). 깎은 칸은 포켓몬 주인마다 따로
  * 알린다. 화면은 보스 탭이 재생한다(boss.js).
  */
@@ -1135,7 +1160,12 @@ async function raidAttack(monId) {
   // 길드원의 코드가 말이 안 되면(고친 세이브 등) 그 아이만 빠진다
   for (const x of s.party || []) {
     const t = raidbattle.parseTeam(x.team);
-    if (t) allies.push({ mon: { id: "raid-" + x.id, ...t.mon }, grown: t.grown, owner: x.trainer || "", member: x.id });
+    if (!t) continue;
+    // 후보 — 대표가 쓰러지면 차례로 나온다(옛 버전 길드원은 없다)
+    const bench = (Array.isArray(x.bench) ? x.bench : []).slice(0, RAID_LINEUP - 1)
+      .map((c, k) => { const b = raidbattle.parseTeam(c); return b && { mon: { id: `raid-${x.id}-${k + 1}`, ...b.mon }, grown: b.grown }; })
+      .filter(Boolean);
+    allies.push({ mon: { id: "raid-" + x.id, ...t.mon }, grown: t.grown, owner: x.trainer || "", member: x.id, bench });
   }
   const b = raidbattle.start(allies, { mon: raidBoss(s.line), grown: RAID_BOSS_GROWN }, friend.rng(s.seed), { level: 50, bars: s.start / 1000 });
   if (!b) return { ok: false, reason: "결투를 시작하지 못했습니다" };
@@ -1358,8 +1388,8 @@ function addMon(p, { evolve = false } = {}) {
   let grown = p.grown;
   const evo = evolve && !p.hold ? tradeEvolves(p.line, grown) : -1;
   const before = poke.describe(grown, p.line, { shiny: p.shiny }).name;
-  if (evo >= 0) grown = Math.max(grown, poke.STAGES[evo + 1].at);
-  const st = poke.stageFor(grown);
+  if (evo >= 0) grown = Math.max(grown, poke.stagesOf(p.line)[evo + 1].at);
+  const st = poke.stageFor(grown, p.line);
   const m = {
     id: box.newId(),
     line: p.line, nature: p.nature, shiny: Boolean(p.shiny), ivs: p.ivs, gender: p.gender, ability: p.ability,
@@ -1740,12 +1770,15 @@ let save = {
   candySpent: 0, // 지금까지 쓴 사탕
   phioneSplit: true, // 피오네 · 마나피를 나눈 뒤의 세이브인가(0.13.4) — 새 세이브는 처음부터 나뉘어 있다
   wildMidFix: true, // 0.13.1 에 2차 진화로 잡은 아이를 되돌려 받았나(0.13.6) — 새 세이브는 해당 없음
+  twoStageMaster: true, // 2단 진화 라인의 마스터가 9억으로 내려온 뒤의 세이브인가(0.14.4) — 새 세이브는 해당 없음
   candyBonus: 0, // 졸업·한도 달성으로 받은 보너스 사탕
   candyExtra: 0, // 사탕 타임으로 더 쳐 준 토큰 — 사탕을 셀 때만 얹는다
   badges: [], // 딴 체육관 배지(gyms.json 의 id) — 딴 순서대로
   gymWeek: null, // 체육관에서 진 횟수를 센 주(그 주 월요일)
   gymLoss: 0, // 이번 주에 진 횟수 — GYM_TRIES 까지
   gymLegend: false, // 배지 8개 보상(전설의 알)을 받았나
+  updateSkip: null, // "이 버전은 그만 알리기"를 누른 새 버전 — 팝오버 띠만 접는다
+  updateNotified: null, // Windows 알림을 이미 보낸 새 버전 — 버전마다 한 번
   charm: false, // 반짝이는 부적 보유
   shiny: false, // 지금 키우는 개체가 이로치인가
   seen: [], // 한 번이라도 받아본 라인 (도감 진행도)
@@ -1890,6 +1923,9 @@ let rawAtLoad = null;
  */
 let loadFailed = false;
 
+/** 0.14.4 로 올리며 졸업한 2단 진화 아이들 — 켠 뒤 알림 한 번 */
+const twoStageGrads = [];
+
 function loadSave() {
   let raw = null;
   try {
@@ -1922,6 +1958,7 @@ function loadSave() {
       if (typeof loaded.bornAt !== "number") save.bornAt = 0;
       if (!loaded.phioneSplit) save.phioneSplit = false; // 옛 세이브 — 아래에서 한 번 옮긴다
       if (!loaded.wildMidFix) save.wildMidFix = false; // 옛 세이브 — 아래에서 한 번 살핀다
+      if (!loaded.twoStageMaster) save.twoStageMaster = false; // 옛 세이브 — 9억을 넘긴 2단 진화 아이를 아래에서 졸업시킨다
     } catch (e) {
       // 파일은 있는데 깨졌다. 덮어쓰지 않고 따로 치워 둔 뒤 멈춘다.
       loadFailed = true;
@@ -1955,7 +1992,7 @@ function loadSave() {
     touched.add(m);
     if (mid0131 && mid0131(m, true)) continue; // 2차 진화로 잡은 아이 — 그 모습 그대로 둔다
     m.fed = Math.max(0, (m.fed || 0) - STEP);
-    m.maxStage = poke.stageFor(box.effOf(m, growthSpeed())); // 다시 진화하면 알림이 뜨게
+    m.maxStage = poke.stageFor(box.effOf(m, growthSpeed()), m.line); // 다시 진화하면 알림이 뜨게
     wildLines.add(m.line);
   }
   // 이미 0.13.2 ~ 0.13.5 가 첫 모습으로 내려 버린 아이 — 내린 만큼 돌려준다. 한 번만
@@ -1963,11 +2000,22 @@ function loadSave() {
     for (const m of save.box) {
       if (!m || !m.wild || touched.has(m) || !mid0131 || !mid0131(m, false)) continue;
       m.fed = (m.fed || 0) + STEP;
-      const st = poke.stageFor(box.effOf(m, growthSpeed()));
+      const st = poke.stageFor(box.effOf(m, growthSpeed()), m.line);
       m.maxStage = Math.max(m.maxStage ?? 0, st); // 켤 때 "진화했다" 알림이 뜨지 않게
       save.maxStage[m.line] = Math.max(save.maxStage[m.line] ?? -1, st);
     }
     save.wildMidFix = true;
+  }
+  // 0.14.4 — 2단 진화 라인(가디 → 윈디 등)의 마스터가 15억에서 9억으로 내려왔다. 이미 9억을 넘긴 아이는
+  // 켜자마자 졸업시킨다(기록 · 사탕 5개). 키우는 아이만 졸업을 세던 것과 달리 박스의 아이도 한 번에. 한 번만
+  if (save.twoStageMaster !== true) {
+    for (const m of save.box) {
+      if (!m || m.graduatedAt || !poke.isTwoStage(poke.LINES[m.line])) continue;
+      const before = save.graduated.length;
+      checkGraduation(m, box.effOf(m, growthSpeed()));
+      if (save.graduated.length > before) twoStageGrads.push(save.graduated[save.graduated.length - 1].name);
+    }
+    save.twoStageMaster = true;
   }
   /*
    * 0.13.1 은 잡을 때 도감에도 2차 진화(니드리노)를 "만남"으로 적었다. 되돌린 라인마다 박스에서
@@ -2205,7 +2253,7 @@ function buy(itemId) {
  */
 function recordStage(m, grown) {
   if (!m) return;
-  const st = poke.stageFor(grown);
+  const st = poke.stageFor(grown, m.line);
   let dirty = false;
   if ((m.maxStage ?? -1) < st) { m.maxStage = st; dirty = true; }
   if ((save.maxStage[m.line] ?? -1) < st) { save.maxStage[m.line] = st; dirty = true; }
@@ -2214,7 +2262,7 @@ function recordStage(m, grown) {
 
 function checkGraduation(m, grown) {
   if (!m) return;
-  const idx = poke.stageFor(grown);
+  const idx = poke.stageFor(grown, m.line); // 2단 라인은 9억, 나머지는 15억
   if (poke.STAGES[idx].key !== "master") return;
   if (m.graduatedAt) return; // 이미 처리한 개체
 
@@ -2378,6 +2426,7 @@ async function buildStats() {
     petSize: save.petSize,
     moveLevel: save.moveLevel ?? "rare",
     candy: candy(u.total),
+    update: updateView(),
     charm: Boolean(save.charm),
     shiny: Boolean(act && act.shiny),
     tree: await buildTree(act, eff),
@@ -2474,6 +2523,50 @@ function pushPets(s) {
 }
 
 let prevSnap = null;
+
+/* ---------------- 새 버전 알림 (update.js) ---------------- */
+
+// 시험용 — 지금 버전을 낮춰 잡아 띠 · 알림을 볼 수 있게. 평소엔 package.json 의 버전
+const CUR_VERSION = (process.env.POKETOKENBAR_VERSION_AS || "").trim() || app.getVersion();
+const UPDATE_EVERY_MS = 6 * 3600_000;
+let updateInfo = null; // GitHub 의 가장 최근 릴리스 — 지금보다 새것일 때만
+let updateNote = null; // 알림을 잡아 둔다 — 놓치면 눌러도 아무 일이 없다
+
+const updateView = () =>
+  updateInfo ? { version: updateInfo.version, current: CUR_VERSION, skipped: save.updateSkip === updateInfo.version } : null;
+
+function openUpdate() {
+  if (updateInfo && update.safeUrl(updateInfo.url)) shell.openExternal(updateInfo.url);
+}
+
+function pushUpdate() {
+  if (!lastStats) return;
+  lastStats.update = updateView();
+  push(win, lastStats);
+}
+
+/** 새 버전이 있나 본다. 실패하면 조용히 넘어가고 다음 번에 다시 본다 */
+async function checkUpdate() {
+  const r = await update.latest(CUR_VERSION);
+  if (!r) return;
+  const fresh = update.newer(r.version, CUR_VERSION) ? r : null;
+  const changed = (fresh && fresh.version) !== (updateInfo && updateInfo.version);
+  updateInfo = fresh;
+  if (fresh && save.updateNotified !== fresh.version) {
+    save.updateNotified = fresh.version;
+    writeSave();
+    if (save.notifyEnabled && Notification.isSupported()) {
+      try {
+        updateNote = new Notification({ title: `🆕 PokeTokenBar ${fresh.version}`, body: `새 버전이 나왔습니다 (지금 ${CUR_VERSION}). 눌러서 받기`, silent: false });
+        updateNote.on("click", openUpdate);
+        updateNote.show();
+      } catch (e) {
+        console.error("[update]", e.message);
+      }
+    }
+  }
+  if (changed) pushUpdate();
+}
 
 /** 상태가 바뀐 순간에만 알린다. 자세한 판단은 notify.js가 한다. */
 function sendNotifications(s) {
@@ -2687,7 +2780,7 @@ async function buildDex() {
   for (const m of save.box) {
     if (!save.petIds.includes(m.id)) continue;
     const L = poke.LINES[m.line];
-    if (L) petDex.add(L.ids[poke.stageFor(box.effOf(m, growthSpeed()))]);
+    if (L) petDex.add(L.ids[poke.stageFor(box.effOf(m, growthSpeed()), m.line)]);
   }
 
   const list = dexSpecies();
@@ -3989,6 +4082,7 @@ function buildMenu() {
     click: () => setWanderLevel(key),
   });
   return Menu.buildFromTemplate([
+    ...(updateInfo ? [{ label: `🆕 새 버전 ${updateInfo.version} 받기`, click: openUpdate }, { type: "separator" }] : []),
     { label: save.petVisible ? "펫 숨기기" : "바탕화면에 펫 띄우기", click: () => togglePet() },
     {
       label: "펫 움직임",
@@ -4033,6 +4127,15 @@ if (!app.requestSingleInstanceLock()) {
 
 app.whenReady().then(async () => {
   loadSave();
+  if (twoStageGrads.length && Notification.isSupported()) {
+    // 9억 마스터 — 이미 넘긴 2단 진화 아이들이 한꺼번에 졸업했다
+    const names = twoStageGrads.slice(0, 3).join(" · ") + (twoStageGrads.length > 3 ? ` 외 ${twoStageGrads.length - 3}마리` : "");
+    setTimeout(() => {
+      try {
+        new Notification({ title: `🎓 ${twoStageGrads.length}마리 졸업`, body: `${names} — 2단 진화는 이제 9억이면 마스터입니다. 사탕 +${twoStageGrads.length * 5}`, silent: false }).show();
+      } catch {}
+    }, 4000);
+  }
 
   /*
    * 첫 알도, 0.1.x 세이브를 옮기는 것도 buildStats 에서 한다.
@@ -4045,6 +4148,9 @@ app.whenReady().then(async () => {
   tray.setToolTip("PokeTokenBar — 불러오는 중…");
 
   createWindow();
+  // 새 버전 — 켜고 조금 뒤(로그 읽기와 겹치지 않게) 한 번, 그 뒤 6시간마다
+  setTimeout(() => checkUpdate().catch((e) => console.error("[update]", e.message)), 15_000);
+  setInterval(() => checkUpdate().catch((e) => console.error("[update]", e.message)), UPDATE_EVERY_MS);
   tray.on("click", () => (win.isVisible() ? win.hide() : showNearTray()));
   tray.on("right-click", () => tray.popUpContextMenu(buildMenu()));
 
@@ -4244,6 +4350,14 @@ app.whenReady().then(async () => {
   ipcMain.on("set-settings", (_e, patch) => applySettings(patch || {}));
   ipcMain.on("close-settings", () => setWin && !setWin.isDestroyed() && setWin.close());
   ipcMain.on("open-data-folder", () => shell.openPath(app.getPath("userData")));
+  // 새 버전 — 받기(릴리스 페이지) · 이 버전은 그만 알리기
+  ipcMain.on("update-open", openUpdate);
+  ipcMain.on("update-skip", () => {
+    if (!updateInfo) return;
+    save.updateSkip = updateInfo.version;
+    writeSave();
+    pushUpdate();
+  });
 
   /**
    * 데이터 폴더를 바꾼다. 실행 파일 옆의 data-dir.txt 에 적어 두고

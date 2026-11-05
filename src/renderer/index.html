@@ -37,6 +37,20 @@
   nav .sp { flex: 1; }
   nav .ico { padding: 6px 9px; font-size: 13px; }
 
+  /* ---------- 새 버전 띠 ---------- */
+  .upd {
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin: 0 12px 8px; padding: 6px 6px 6px 11px;
+    border-radius: 10px; font-size: 11.5px; color: var(--text);
+    background: linear-gradient(90deg, #1f3b2a, #1d2c3d); border: 1px solid #3f7d5a;
+  }
+  .upd .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upd small { color: var(--muted); font-size: 10px; margin-left: 2px; }
+  .upd button { font: inherit; border: 0; border-radius: 7px; cursor: pointer; }
+  .upd .go { padding: 3px 11px; font-weight: 800; color: #0c1a10; background: #6ee7a0; }
+  .upd .go:hover { background: #8ff0b6; }
+  .upd .x { padding: 3px 7px; color: var(--muted); background: transparent; }
+  .upd .x:hover { color: var(--text); }
+
   /* ---------- 홈: 진화 트리 ---------- */
   .chain { display: flex; align-items: stretch; gap: 3px; }
   .node {
@@ -416,6 +430,11 @@
   <button class="ico" id="gear" title="설정">⚙</button>
   <button class="ico" id="close" title="닫기 (Esc)">✕</button>
 </nav>
+<div class="upd" id="upd" hidden>
+  <span class="t">🆕 <b id="updVer"></b>이 나왔습니다 <small id="updCur"></small></span>
+  <button class="go" id="updGo">받기</button>
+  <button class="x" id="updSkip" title="이 버전은 그만 알리기">✕</button>
+</div>
 
 <div class="scroll">
   <!-- ---------------- 홈 ---------------- -->

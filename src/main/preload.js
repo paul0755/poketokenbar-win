@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld("ptb", {
   togglePet: () => ipcRenderer.send("toggle-pet"),
   quit: () => ipcRenderer.send("quit"),
   hide: () => ipcRenderer.send("hide-popover"),
+  // 새 버전 — 릴리스 페이지 열기 · 이 버전은 그만 알리기
+  updateOpen: () => ipcRenderer.send("update-open"),
+  updateSkip: () => ipcRenderer.send("update-skip"),
 
   // 도감
   openDex: () => ipcRenderer.send("open-dex"),

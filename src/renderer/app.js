@@ -800,8 +800,23 @@ $("fGot").onclick = () => setDexFilter("got");
 
 /* ---------------- 연결 ---------------- */
 
+/** 새 버전 띠 — 받기를 누르면 릴리스 페이지가 열린다. ✕ 는 이 버전만 접는다(트레이 메뉴엔 남는다) */
+function renderUpdate(u) {
+  const show = Boolean(u && !u.skipped);
+  $("upd").hidden = !show;
+  if (!show) return;
+  $("updVer").textContent = "v" + u.version;
+  $("updCur").textContent = "지금 v" + u.current;
+}
+$("updGo").onclick = () => window.ptb.updateOpen();
+$("updSkip").onclick = () => {
+  $("upd").hidden = true;
+  window.ptb.updateSkip();
+};
+
 window.ptb.onStats((s) => {
   lastStats = s;
+  renderUpdate(s.update);
   renderHome(s);
   $("refreshNow").disabled = false;
 });

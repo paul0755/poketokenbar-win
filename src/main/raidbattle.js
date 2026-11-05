@@ -4,7 +4,8 @@
  *
  * 데미지 공식·상성·급소·랭크·상태이상은 battle.js 의 1:1 규칙 그대로다. 판만 여럿 대 하나로 넓힌다.
  *  - 길드원마다 한 마리씩 나온다. 도전한 사람(나)의 아이가 쓰러지면 그 턴이 끝난 뒤 판이 멈추고(step 의
- *    need), 내가 다른 아이를 골라 내보내면(swap) 이어서 싸운다. 다른 길드원은 지금 없어서 대표 한 마리뿐이다.
+ *    need), 내가 다른 아이를 골라 내보내면(swap) 이어서 싸운다. 다른 길드원은 지금 없어서 고를 수 없다 —
+ *    올려 둔 후보(bench)가 있으면 쓰러진 턴이 끝날 때 다음 후보가 그 자리에 저절로 나온다(올린 순서대로).
  *  - 보스의 체력은 "칸"으로 쌓여 있다. 한 칸은 1:1 에서 한 번 쓰러뜨릴 만큼(그 보스의 최대 HP)이다.
  *  - 보스는 한 턴에 기술 하나를 골라 서 있는 아이 모두에게 쓴다. 그래서 아이 하나하나는 1:1 과 비슷하게
  *    버티고, 여럿이 나오면 그만큼 더 깎는다(한 마리씩만 때리면 뒤에 선 아이들이 공짜로 오래 때린다).
@@ -113,7 +114,8 @@ function parseTeam(code) {
 
 /**
  * 판을 연다. step() 으로 한 토막씩 싸운다 — 내 아이가 쓰러지면 멈춘다.
- *   allies  [{ mon, grown, owner, member, me }]  — 함께 싸우는 아이들(member: 주인의 길드원 번호). 나는 0번
+ *   allies  [{ mon, grown, owner, member, me, bench }]  — 함께 싸우는 아이들(member: 주인의 길드원 번호). 나는 0번
+ *           bench: [{ mon, grown }] 다른 길드원의 후보 — 앞 아이가 쓰러지면 차례로 그 자리에 나온다
  *   boss    { mon, grown }
  *   opts    { level, bars }          — bars: 보스가 시작할 때 남은 칸(소수)
  *
@@ -124,7 +126,7 @@ function parseTeam(code) {
  *
  * 사건(ev)의 who 는 아이 번호(0..) 또는 "b"(보스), 판 전체 글이면 null.
  *   { t: "turn", n, text }
- *   { t: "enter", who, text }        내가 고른 다음 아이가 나왔다
+ *   { t: "enter", who, slot, text }  다음 아이가 나왔다(내가 골랐거나 길드원의 후보) — slot 자리에 선다
  *   { t: "move", who, move:{name,typeKey,damageClass,power}, text }
  *   { t: "hp",   who, hp, max, text }
  *   { t: "info", who, text, eff?, status?, transform? }
@@ -133,7 +135,10 @@ function parseTeam(code) {
 function start(allies, boss, rng, opts = {}) {
   const level = opts.level || 50;
   const team = allies.map((a) => ({ a, f: fighter(a.mon, a.grown, level) })).filter((x) => x.f);
+  team.forEach((x, i) => (x.slot = i)); // 자리 — 쓰러지면 다음 아이가 같은 자리에 선다
   const A = team.map((x) => x.f);
+  const cur = team.map((_, i) => i); // 자리마다 지금 나가 있는 아이 번호
+  const bench = team.map((x) => (!x.a.me && Array.isArray(x.a.bench) ? x.a.bench.slice() : [])); // 자리마다 남은 후보
   const B = fighter(boss.mon, boss.grown, level);
   if (!A.length || !B) return null;
   const bar = B.maxHp;
@@ -365,6 +370,27 @@ function start(allies, boss, rng, opts = {}) {
       if (f.hp <= 0 || B.hp <= 0 || (f.status !== "poison" && f.status !== "burn")) continue;
       setHp(i, f.hp - Math.max(1, Math.floor(f.maxHp / 8)), `${josa(nm(i), "은는")} ${f.status === "burn" ? "화상" : "독"} 데미지를 입었다!`);
     }
+    if (B.hp > 0 && turn < RAID_TURNS) relieve();
+  }
+
+  /** 쓰러진 길드원의 자리에 그 사람의 다음 후보를 내보낸다 — 턴이 끝날 때, 자리 순서대로 */
+  function relieve() {
+    for (let s = 0; s < cur.length; s++) {
+      if (A[cur[s]].hp > 0) continue;
+      while (bench[s].length) {
+        const nx = bench[s].shift();
+        const base = team[cur[s]].a;
+        const a = { mon: nx.mon, grown: nx.grown, owner: base.owner, member: base.member };
+        const f = fighter(a.mon, a.grown, level);
+        if (!f) continue;
+        team.push({ a, f, slot: s });
+        A.push(f);
+        dealtBy.push(0);
+        cur[s] = A.length - 1;
+        say({ t: "enter", who: cur[s], slot: s, text: `${a.owner ? a.owner + "의 " : ""}${josa(f.name, "이가")} 나왔다!` });
+        break;
+      }
+    }
   }
 
   /** 다음 토막 — 끝나거나 내 아이가 쓰러질 때까지 */
@@ -386,11 +412,12 @@ function start(allies, boss, rng, opts = {}) {
   function swap(a) {
     const f = fighter(a.mon, a.grown, level);
     if (!f || over) return false;
-    team.push({ a, f });
+    const slot = my >= 0 ? team[my].slot : 0;
+    team.push({ a, f, slot });
     A.push(f);
     dealtBy.push(0);
     my = A.length - 1;
-    say({ t: "enter", who: my, text: `가랏, ${f.name}!` });
+    say({ t: "enter", who: my, slot, text: `가랏, ${f.name}!` });
     return true;
   }
 
@@ -399,7 +426,7 @@ function start(allies, boss, rng, opts = {}) {
     turns: turn,
     defeated: B.hp <= 0,
     dealt: B.hp <= 0 ? per(pool) : Math.max(0, per(pool - B.hp)),
-    allies: A.map((f, i) => ({ id: f.id, name: f.name, owner: team[i].a.owner || "", member: team[i].a.member || null, me: Boolean(team[i].a.me), dexId: f.dexId, shiny: f.shiny, level: f.level, maxHp: f.maxHp, hp: f.maxHp, dealt: per(dealtBy[i]), left: A[i].hp })),
+    allies: A.map((f, i) => ({ id: f.id, name: f.name, owner: team[i].a.owner || "", member: team[i].a.member || null, me: Boolean(team[i].a.me), slot: team[i].slot, dexId: f.dexId, shiny: f.shiny, level: f.level, maxHp: f.maxHp, hp: f.maxHp, dealt: per(dealtBy[i]), left: A[i].hp })),
     boss: { id: B.id, name: B.name, dexId: B.dexId, level: B.level, bar, hp: pool, max: pool },
   });
 

@@ -168,7 +168,7 @@
     $("bsShards").innerHTML = shardsHtml();
     if (!shards && !shardsBusy) loadShards();
     $("bsFoot").innerHTML = `길드원마다 한 마리씩 — <b>내 아이 한 마리</b>와 <b>길드원 ${view.members.length}명의 대표 포켓몬</b>이 한꺼번에 싸웁니다.
-      내 아이가 쓰러지면 다음 아이를 골라 이어서 싸웁니다(한 도전에 ${view.lineup}마리까지, 10턴). Lv.50, 보스는 개체값이 모두 31입니다.
+      내 아이가 쓰러지면 다음 아이가 나가고(한 도전에 ${view.lineup}마리까지, 10턴), 길드원의 대표가 쓰러지면 그 사람의 다른 아이가 이어 나옵니다. Lv.50, 보스는 개체값이 모두 31입니다.
       깎은 칸은 그 포켓몬 주인의 기록입니다 — 내 대표 포켓몬(내 방의 첫 아이)도 남의 도전에서 함께 싸웁니다.
       한 단계를 쓰러뜨리면 그 단계에 조금이라도 깎은 길드원 모두 <b>${esc(rd.name)}의 조각</b> 1개(가장 많이 깎은 ${rd.topBonus}명은 2개).
       조각은 지갑에 들어가고 한 주에 한 길드에서만 받습니다${view.walletOk ? "" : ` · <span class="warn">내 지갑이 확인되면 들어갑니다</span>`}`;
@@ -450,24 +450,29 @@
   }
   const AIL = { paralysis: "마비", burn: "화상", poison: "독", sleep: "잠듦", freeze: "얼음", confusion: "혼란" };
 
-  /** 판을 차린다 — 아이들을 바닥에 고르게(앞줄부터). 뒤에 내보낸 내 아이는 내 자리(0번)에 선다 */
+  /**
+   * 판을 차린다 — 아이들을 바닥에 고르게(앞줄부터). 뒤에 나온 아이(내가 고른 다음 아이 · 길드원의 후보)는
+   * 쓰러진 아이의 자리(slot)에 선다 — 이 토막 안에 나오는 아이는 그 "나왔다" 때 세운다
+   */
   function setupScene(r) {
     clearInterval(idleTimer);
     for (const a of actors.values()) a.el.remove();
     actors.clear();
     $("bsLog").innerHTML = "";
-    const n = r.allies.length;
+    const later = new Set(r.log.filter((ev) => ev.t === "enter").map((ev) => ev.who));
+    const first = r.allies.filter((_, i) => !later.has(i));
+    const n = first.length;
     sizeActors(n);
     const cols = Math.max(1, Math.ceil(Math.sqrt(n * 1.6)));
     const rows = Math.ceil(n / cols);
-    const homes = r.allies.map((_, i) => {
+    const homes = first.map((_, i) => {
       const c = i % cols;
       const rw = Math.floor(i / cols);
       return [6 + (c + (rw % 2) * 0.5) * (46 / cols), 78 + (rows > 1 ? (rw / (rows - 1)) * 17 : 8)];
     });
     const B = r.boss;
     const scene = { team: [], homes, B, bossNow: B.hp, toMilli: (hp) => Math.round((hp / B.bar) * 1000) };
-    r.allies.forEach((f, i) => enter(scene, f, i));
+    r.allies.forEach((f, i) => { if (!later.has(i)) enter(scene, f, i); });
     bossHp(scene.toMilli(B.hp));
     return scene;
   }
@@ -477,7 +482,11 @@
     if (scene.team[i]) return scene.team[i];
     const a = { el: actorEl("p:" + i, f.url, `${f.me ? "나" : f.owner} · ${f.name}`, f.me), hp: f.maxHp, max: f.maxHp };
     actors.set("p:" + i, a); // 끝나면 같이 치운다
-    a.home = scene.homes[i] || scene.homes[0]; // 뒤에 나온 내 아이는 내 자리에
+    const slot = f.slot ?? i;
+    a.home = scene.homes[slot] || scene.homes[0]; // 뒤에 나온 아이는 쓰러진 아이의 자리에
+    // 그 자리에 쓰러져 있던 아이는 치운다
+    scene.team.forEach((x, k) => { if (x && k !== i && x.slot === slot) x.el.classList.add("gone"); });
+    a.slot = slot;
     put(a, ...a.home);
     scene.team[i] = a;
     return a;

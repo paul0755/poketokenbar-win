@@ -84,6 +84,9 @@ export const SELL_MAX = 10;
 export const SELL_COINS = 100;
 // 앱 pokemon.js 의 STAGES · RARITY 와 같아야 한다(값이 같게 보인다)
 const STAGE_AT = [0, 5_000_000, 80_000_000, 400_000_000, 1_500_000_000];
+// 2단 진화 라인(가디 → 윈디)은 3차 칸이 없고 9억이면 마스터 — 앱 pokemon.js stagesOf 와 같다(0.14.4)
+const STAGE_AT_TWO = [0, 5_000_000, 80_000_000, 900_000_000, 900_000_000];
+const isTwoStage = (L) => Boolean(L && !L.single && L.ids[1] !== L.ids[2] && L.ids[2] === L.ids[3] && L.ids[3] === L.ids[4]);
 const STAGE_MUL = [0, 1, 1.5, 2, 3];
 const STAR_COINS = [[30, 8], [45, 5], [90, 3], [150, 2], [Infinity, 1]]; // 포획률 이하 → 코인
 
@@ -91,8 +94,9 @@ const STAR_COINS = [[30, 8], [45, 5], [90, 3], [150, 2], [Infinity, 1]]; // 포�
 export function shopPrice(mon) {
   const L = LINES[mon.line];
   if (!L || !Number.isFinite(mon.grown) || mon.grown < STAGE_AT[1]) return 0; // 알은 안 산다
+  const at = isTwoStage(L) ? STAGE_AT_TWO : STAGE_AT;
   let st = 0;
-  for (let i = 0; i < STAGE_AT.length; i++) if (mon.grown >= STAGE_AT[i]) st = i;
+  for (let i = 0; i < at.length; i++) if (mon.grown >= at[i]) st = i;
   const base = L.single && L.legendary ? 15 : STAR_COINS.find(([max]) => (L.captureRate ?? 45) <= max)[1];
   return Math.max(1, Math.round(base * STAGE_MUL[st] * (mon.shiny ? 3 : 1)));
 }
