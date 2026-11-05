@@ -51,6 +51,38 @@
   .upd .x { padding: 3px 7px; color: var(--muted); background: transparent; }
   .upd .x:hover { color: var(--text); }
 
+  /* ---------- 📢 새 소식 ---------- */
+  .news-btn { position: relative; }
+  .news-btn .dot {
+    position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%;
+    background: #ff4f5e; box-shadow: 0 0 0 2px var(--bg, #14161c);
+  }
+  .newshead { display: flex; align-items: baseline; gap: 8px; margin: 2px 2px 10px; }
+  .newshead .t { font-size: 15px; font-weight: 800; }
+  .newshead .c { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .news-v { margin-bottom: 7px; background: var(--card); border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
+  .news-v.cur { border-color: #3f7d5a; }
+  .news-v summary {
+    display: flex; align-items: center; gap: 7px; padding: 9px 12px; cursor: pointer; list-style: none; font-size: 12.5px;
+  }
+  .news-v summary::-webkit-details-marker { display: none; }
+  .news-v summary::after { content: "▸"; margin-left: 6px; color: var(--muted); font-size: 10px; transition: transform .15s; }
+  .news-v[open] summary::after { transform: rotate(90deg); }
+  .news-v summary .tag { font-style: normal; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 99px; color: #0c1a10; background: #6ee7a0; }
+  .news-v summary .cnt { margin-left: auto; font-size: 10.5px; color: var(--muted); }
+  .news-v ul { margin: 0; padding: 0 12px 10px; list-style: none; }
+  .news-v li { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.45; }
+  .news-v li .k { flex-shrink: 0; font-style: normal; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 5px; }
+  .news-v li .k.add { color: #6ee7a0; background: rgba(110, 231, 160, .14); }
+  .news-v li .k.change { color: #7cb8ff; background: rgba(124, 184, 255, .14); }
+  .news-v li .k.remove { color: #ff8a8a; background: rgba(255, 138, 138, .14); }
+  .news-v li .d { color: var(--muted); }
+  /* 나누는 점 — 줄표 대신 작고 둥근 점 */
+  .news-v .sep {
+    display: inline-block; width: 3px; height: 3px; margin: 0 7px; border-radius: 50%;
+    background: var(--muted); opacity: .8; vertical-align: middle;
+  }
+
   /* ---------- 홈: 진화 트리 ---------- */
   .chain { display: flex; align-items: stretch; gap: 3px; }
   .node {
@@ -246,7 +278,8 @@
   /* 즐겨찾기 — 그림 왼쪽 위의 하트. 켜 두면 박스 위쪽에 모이고 놓아주기 · 팔기가 막힌다 */
   .bx .fav {
     position: absolute; top: -4px; left: -5px; z-index: 1; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
-    background: transparent; color: #4a4d58; font-size: 13px; line-height: 20px; cursor: pointer; transition: transform .12s, color .12s;
+    /* 빈 하트도 어두운 카드 · 그림 위에서 보이게 — 밝은 회색에 옅은 동그라미 */
+    background: rgba(20, 22, 30, .55); color: #b4b8c6; font-size: 13px; line-height: 20px; cursor: pointer; transition: transform .12s, color .12s;
   }
   .bx .fav:hover { color: #ff7aa2; transform: scale(1.15); }
   .bx .fav.on { color: #ff4f86; text-shadow: 0 0 6px rgba(255, 79, 134, .55); }
@@ -427,6 +460,7 @@
   <button data-tab="battle">배틀</button>
   <button data-tab="dex">도감</button>
   <span class="sp"></span>
+  <button class="ico news-btn" data-tab="news" title="새 소식 — 버전마다 바뀐 점">📢<i class="dot" id="newsDot" hidden></i></button>
   <button class="ico" id="gear" title="설정">⚙</button>
   <button class="ico" id="close" title="닫기 (Esc)">✕</button>
 </nav>
@@ -845,6 +879,12 @@
   </section>
 
   <!-- ---------------- 도감 ---------------- -->
+  <!-- 📢 새 소식 — 버전마다 바뀐 점(news.js) -->
+  <section id="tab-news" hidden>
+    <div class="newshead"><span class="t">📢 새 소식</span><span class="c" id="newsCur"></span></div>
+    <div id="newsList"></div>
+  </section>
+
   <section id="tab-dex" hidden>
     <div class="dexhead"><span class="t">도감</span><span class="c" id="dexCount"></span></div>
     <div class="tiers" id="dexTiers"></div>
@@ -861,6 +901,7 @@
 
 <script src="egg.js"></script>
 <script src="ballart.js"></script>
+<script src="news.js"></script>
 <script src="app.js"></script>
 <script src="moves.js"></script>
 <script src="raidfx.js"></script>

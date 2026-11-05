@@ -1779,6 +1779,7 @@ let save = {
   gymLegend: false, // 배지 8개 보상(전설의 알)을 받았나
   updateSkip: null, // "이 버전은 그만 알리기"를 누른 새 버전 — 팝오버 띠만 접는다
   updateNotified: null, // Windows 알림을 이미 보낸 새 버전 — 버전마다 한 번
+  newsSeen: null, // 📢 새 소식을 열어 본 버전 — 지금 버전과 다르면 📢 에 빨간 점
   charm: false, // 반짝이는 부적 보유
   shiny: false, // 지금 키우는 개체가 이로치인가
   seen: [], // 한 번이라도 받아본 라인 (도감 진행도)
@@ -2427,6 +2428,7 @@ async function buildStats() {
     moveLevel: save.moveLevel ?? "rare",
     candy: candy(u.total),
     update: updateView(),
+    news: { version: app.getVersion(), unread: save.newsSeen !== app.getVersion() },
     charm: Boolean(save.charm),
     shiny: Boolean(act && act.shiny),
     tree: await buildTree(act, eff),
@@ -4127,6 +4129,8 @@ if (!app.requestSingleInstanceLock()) {
 
 app.whenReady().then(async () => {
   loadSave();
+  // 처음 깐 사람에게는 새 소식 점을 붙이지 않는다 — 바뀐 걸 알려 줄 이전 버전이 없다
+  if (!hadSave) save.newsSeen = app.getVersion();
   if (twoStageGrads.length && Notification.isSupported()) {
     // 9억 마스터 — 이미 넘긴 2단 진화 아이들이 한꺼번에 졸업했다
     const names = twoStageGrads.slice(0, 3).join(" · ") + (twoStageGrads.length > 3 ? ` 외 ${twoStageGrads.length - 3}마리` : "");
@@ -4352,6 +4356,12 @@ app.whenReady().then(async () => {
   ipcMain.on("open-data-folder", () => shell.openPath(app.getPath("userData")));
   // 새 버전 — 받기(릴리스 페이지) · 이 버전은 그만 알리기
   ipcMain.on("update-open", openUpdate);
+  // 📢 새 소식을 열었다 — 이 버전은 읽은 것으로
+  ipcMain.on("news-seen", () => {
+    if (save.newsSeen === app.getVersion()) return;
+    save.newsSeen = app.getVersion();
+    writeSave();
+  });
   ipcMain.on("update-skip", () => {
     if (!updateInfo) return;
     save.updateSkip = updateInfo.version;

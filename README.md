@@ -218,6 +218,9 @@ GET https://api.github.com/repos/paul0755/poketokenbar-win/releases/latest
 **받기**를 누르면 릴리스 페이지가 열립니다. ✕ 는 그 버전만 접고, 트레이 우클릭 메뉴에는 "🆕 새 버전 받기"가 남습니다.
 자동으로 깔지는 않습니다
 
+**📢 새 소식** — 위 탭 줄 ⚙ 왼쪽의 📢 에서 버전마다 새로 생긴 기능을 짧게 봅니다(앱 안에 들어 있어 인터넷이 없어도 열림).
+업데이트한 뒤 아직 안 봤으면 📢 에 빨간 점이 붙고, 한 번 열면 사라집니다
+
 **설정**
 - **난이도** — 성장 속도 10~200%(높을수록 빨리 자람) · 상점 가격 10~200% ·
   버닝타임(배수 ×2~×4, 두 구간 시간, 평일만)
@@ -597,6 +600,7 @@ src/main/profile.js      레벨 · 개체값 · 능력치 · 기술
 src/main/pokemon.js      진화 단계 · 뽑기 · 진화 트리 · 스프라이트 캐시
 src/main/notify.js       알림 (상태 변화만 골라낸다)
 src/main/update.js       새 버전 알림 (GitHub 최신 릴리스와 비교)
+src/renderer/news.js     📢 새 소식 — 버전마다 바뀐 점(짧게, 기능 위주)
 src/main/index.js        트레이 · 팝오버 · 펫(여러 마리) · 배회 · 폴링
 src/main/preload.js      contextBridge (렌더러는 파일시스템에 안 닿음)
 src/renderer/            메인 창 · 펫 · 설정
