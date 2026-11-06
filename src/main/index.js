@@ -19,6 +19,7 @@ const room = require("./room");
 const HALL = require("./hall.json"); // 길드 홀 꾸미기 카탈로그 — 서버와 같은 파일
 const burning = require("./burning");
 const gym = require("./gym");
+const report = require("./report");
 const BERRIES = require("./berries.json");
 
 /**
@@ -230,7 +231,7 @@ function friendRegister(id, trainer) {
 async function friendInspect(code) {
   const d = friend.decode(code);
   if (d.error) return { ok: false, reason: d.error };
-  const desc = poke.describe(d.grown, d.mon.line, { shiny: d.mon.shiny });
+  const desc = poke.describe(d.grown, d.mon.line, poke.look(d.mon));
   const sp = await poke.spriteWithFallback(desc, CACHE, "anim");
   return {
     ok: true,
@@ -261,7 +262,7 @@ function liveRegister(id) {
   const grown = box.effOf(m, growthSpeed());
   if (!poke.stageFor(grown)) return { ok: false, reason: "알은 싸울 수 없습니다" };
   liveTeam = { code: friend.encode(box.withLv(m, growthSpeed()), grown, save.trainerName), monId: id };
-  return { ok: true, code: liveTeam.code, name: poke.describe(grown, m.line, { shiny: m.shiny }).name };
+  return { ok: true, code: liveTeam.code, name: poke.describe(grown, m.line, poke.look(m)).name };
 }
 
 async function friendBattle(code, opts = {}) {
@@ -290,7 +291,7 @@ async function friendBattle(code, opts = {}) {
 
   // 앞모습 · 뒷모습 둘 다 — 결투 화면은 내 아이를 뒤에서 본다. 메타몽이 변신하면 서로의 그림을 빌린다
   const sprite = async (x, kind) => {
-    const p = await poke.spriteWithFallback(poke.describe(x.grown, x.mon.line, { shiny: x.mon.shiny }), CACHE, kind);
+    const p = await poke.spriteWithFallback(poke.describe(x.grown, x.mon.line, poke.look(x.mon)), CACHE, kind);
     return p ? pathToFileURL(p).href : null;
   };
   const [urls, backs] = await Promise.all(["anim", "back"].map((kind) => Promise.all([mine, theirs].map((x) => sprite(x, kind)))));
@@ -365,7 +366,7 @@ async function gymChallenge(gymId, ids) {
   // 그림 — 내 쪽은 뒷모습도. 판마다 다시 받지 않게 아이마다 한 번씩
   const foe = g.team.map((_, k) => gym.leaderMon(g, k));
   const look = async (x, back) => {
-    const d = poke.describe(x.grown, x.mon.line, { shiny: x.mon.shiny });
+    const d = poke.describe(x.grown, x.mon.line, poke.look(x.mon));
     return { url: await spriteUrl(d), backUrl: back ? await spriteUrl(d, "back") : null };
   };
   const [myArt, foeArt] = await Promise.all([Promise.all(mine.map((x) => look(x, true))), Promise.all(foe.map((x) => look(x, false)))]);
@@ -437,7 +438,7 @@ async function tradeSend(id) {
   if (save.box.length <= 1) return { ok: false, reason: "마지막 한 마리는 보낼 수 없습니다" };
   const grown = box.effOf(m, growthSpeed());
   if (!poke.stageFor(grown)) return { ok: false, reason: "알은 보낼 수 없습니다" };
-  const name = poke.describe(grown, m.line, { shiny: m.shiny }).name;
+  const name = poke.describe(grown, m.line, poke.look(m)).name;
   const r = await dialog.showMessageBox(win && win.isVisible() ? win : null, {
     type: "question",
     buttons: ["보내기", "취소"],
@@ -447,7 +448,7 @@ async function tradeSend(id) {
     message: `${battle.josa(name, "을를")} 교환으로 보냅니다.`,
     detail:
       "박스에서 빠지고 교환 코드가 나옵니다. 그 코드를 친구에게 보내세요. 실수였다면 그 코드를 내가 다시 받으면 돌아옵니다." +
-      (m.hold === "everstone" ? "\n\n지니고 있는 변하지않는돌도 함께 갑니다." : ""),
+      (HOLD_NAMES[m.hold] ? `\n\n지니고 있는 ${HOLD_NAMES[m.hold]}도 함께 갑니다.` : ""),
   });
   if (r.response !== 0) return { ok: false };
 
@@ -468,7 +469,7 @@ async function tradeSend(id) {
 async function tradeInspect(code) {
   const d = friend.decodeTrade(code);
   if (d.error) return { ok: false, reason: d.error };
-  const desc = poke.describe(d.grown, d.mon.line, { shiny: d.mon.shiny });
+  const desc = poke.describe(d.grown, d.mon.line, poke.look(d.mon));
   const sp = await poke.spriteWithFallback(desc, CACHE, "anim");
   const evo = d.hold ? -1 : tradeEvolves(d.mon.line, d.grown);
   return {
@@ -481,6 +482,7 @@ async function tradeInspect(code) {
     url: sp ? pathToFileURL(sp).href : null,
     evolvesTo: evo >= 0 ? poke.LINES[d.mon.line].names[evo + 1] : null,
     stone: Boolean(d.hold),
+    shade: d.item === "shade",
     used: (save.tradeReceived || []).includes(d.nonce),
     mine: (save.tradeSent || []).some((x) => x.code === d.code),
   };
@@ -499,10 +501,10 @@ function tradeReceive(code) {
 
   let grown = d.grown;
   const evo = d.hold ? -1 : tradeEvolves(d.mon.line, grown);
-  const before = poke.describe(grown, d.mon.line, { shiny: d.mon.shiny }).name;
+  const before = poke.describe(grown, d.mon.line, poke.look(d.mon)).name;
   if (evo >= 0) grown = Math.max(grown, poke.stagesOf(d.mon.line)[evo + 1].at);
   const st = poke.stageFor(grown, d.mon.line);
-  const { lvGrown, ...dm } = d.mon; // lvGrown 은 세이브에 넣지 않는다 — 아래에서 fed 로 옮긴다
+  const { lvGrown, plain, ...dm } = d.mon; // lvGrown 은 세이브에 넣지 않는다 — 아래에서 fed 로 옮긴다. plain 은 hold 로
   const m = {
     id: box.newId(),
     ...dm,
@@ -523,6 +525,7 @@ function tradeReceive(code) {
     if (cap != null) Object.assign(m, { hold: "everstone", holdCap: cap, fed: Math.max(grown, lvGrown || 0) });
     else save.items = { ...(save.items || {}), everstone: stoneCount() + 1 };
   }
+  if (d.item === "shade") m.hold = "shade"; // 같이 온 빛가림돌 — 졸업해도 원래 색
   save.box.push(m);
   if (!save.seen.includes(m.line)) save.seen.push(m.line);
   save.maxStage[m.line] = Math.max(save.maxStage[m.line] ?? -1, st);
@@ -531,7 +534,7 @@ function tradeReceive(code) {
   refresh(true);
   pushDex();
 
-  const after = poke.describe(grown, m.line, { shiny: m.shiny }).name;
+  const after = poke.describe(grown, m.line, poke.look(m)).name;
   const mine = (save.tradeSent || []).some((x) => x.code === d.code);
   if (save.notifyEnabled && Notification.isSupported() && evo >= 0) {
     new Notification({ title: `${battle.josa(before, "이가")} 진화했다!`, body: `교환으로 ${after}(으)로 진화했습니다`, silent: false }).show();
@@ -547,7 +550,7 @@ function feedBerry(id, key) {
   const b = BERRIES.find((x) => x.k === key);
   if (!m || !b) return { ok: false, reason: "없는 아이나 열매입니다" };
   if (!((save.berries || {})[key] > 0)) return { ok: false, reason: b.n + "이(가) 없습니다" };
-  const name = poke.describe(box.effOf(m, growthSpeed()), m.line, { shiny: m.shiny }).name;
+  const name = poke.describe(box.effOf(m, growthSpeed()), m.line, poke.look(m)).name;
   const t = tasteOf(m);
   if (t.dislikes === b.f) return { ok: false, reason: `${name}은(는) ${FLAVOR_KO[b.f]}을 싫어해서 먹지 않았습니다` };
   if ((m.boost || 0) >= BOOST_CAP) return { ok: false, reason: `${name}은(는) 배가 불러서 더 먹지 못합니다` };
@@ -662,7 +665,7 @@ function guildSnap() {
     .filter(Boolean)
     .map((m) => {
       const e = box.effOf(m, growthSpeed());
-      const d = poke.describe(e, m.line, { shiny: m.shiny });
+      const d = poke.describe(e, m.line, poke.look(m));
       const p = profile.build(box.withLv(m, growthSpeed()), e);
       return { line: m.line, dexId: d.dexId, name: d.name, shiny: d.isShiny, stage: d.stage.key, level: p ? p.level : 1 };
     });
@@ -883,7 +886,7 @@ async function guildRep(id) {
   writeSave();
   refresh(true);
   const r = await guildPush(true).catch(() => null);
-  const name = (() => { const x = guildRepMon(); return x ? poke.describe(box.effOf(x, growthSpeed()), x.line, { shiny: x.shiny }).name : ""; })();
+  const name = (() => { const x = guildRepMon(); return x ? poke.describe(box.effOf(x, growthSpeed()), x.line, poke.look(x)).name : ""; })();
   const later = r && r.status === 429 ? " — 조금 뒤에 길드에 올라갑니다" : "";
   return { ok: true, message: m ? `길드 대표 포켓몬을 ${name}(으)로 정했습니다${later}` : `길드 대표 포켓몬은 방의 첫 아이(${name})입니다${later}` };
 }
@@ -1272,6 +1275,7 @@ async function walletInfo() {
   if (!r.ok) return r;
   decoFrom(r);
   const today = dayKey(new Date());
+  markCheckin(r.checkin === today);
   return {
     ok: true,
     id: save.wallet.id,
@@ -1293,7 +1297,21 @@ async function walletCheckin() {
   const e = await walletEnsure();
   if (!e.ok) return e;
   const r = await walletCall(`/${save.wallet.id}/checkin`, { key: save.wallet.key, day: dayKey(new Date()) });
+  // 이미 받았다는 답도 "오늘은 했다"로 적는다 — 다른 PC 에서 같은 지갑으로 출석했을 수 있다
+  markCheckin(r.ok || /이미 받았/.test(r.reason || ""));
   return r.ok ? { ok: true, message: `출석 코인 🪙${r.got}을 받았습니다 (🪙${r.balance})` } : r;
+}
+
+/**
+ * 오늘 출석했나를 세이브에 적어 둔다 — 홈의 출석 버튼이 갱신마다 서버에 묻지 않게.
+ * 날이 바뀌면 저절로 다시 눌 수 있는 상태가 된다(날짜를 견준다).
+ */
+function markCheckin(done) {
+  const today = dayKey(new Date());
+  if (!done || save.checkinDay === today) return;
+  save.checkinDay = today;
+  writeSave();
+  refresh(true);
 }
 
 /** 사탕 → 코인. 사탕은 내 세이브에서 빠진다(서버는 확인할 수 없어 하루 한도로 묶는다) */
@@ -1359,12 +1377,12 @@ async function shopSell(id) {
   if (!c.ok) return c;
   const m = c.m;
   const grown = box.effOf(m, growthSpeed());
-  const name = poke.describe(grown, m.line, { shiny: m.shiny }).name;
+  const name = poke.describe(grown, m.line, poke.look(m)).name;
   const e = await walletEnsure();
   if (!e.ok) return e;
   const r = await walletCall(`/${save.wallet.id}/sell`, { key: save.wallet.key, day: dayKey(new Date()), mon: { line: m.line, grown: Math.round(grown), shiny: Boolean(m.shiny) } });
   if (!r.ok) return r;
-  if (m.hold === "everstone") save.items = { ...(save.items || {}), everstone: stoneCount() + 1 }; // 돌은 가방으로
+  holdBack(m); // 지닌 도구는 가방으로
   removeMon(id);
   return { ok: true, message: `${battle.josa(name, "을를")} 상점에 팔았습니다 +🪙${r.got}${r.got < r.price ? " (오늘 한도까지)" : ""}` };
 }
@@ -1387,7 +1405,7 @@ function monPayload(m) {
 function addMon(p, { evolve = false } = {}) {
   let grown = p.grown;
   const evo = evolve && !p.hold ? tradeEvolves(p.line, grown) : -1;
-  const before = poke.describe(grown, p.line, { shiny: p.shiny }).name;
+  const before = poke.describe(grown, p.line, poke.look(p)).name;
   if (evo >= 0) grown = Math.max(grown, poke.stagesOf(p.line)[evo + 1].at);
   const st = poke.stageFor(grown, p.line);
   const m = {
@@ -1409,7 +1427,7 @@ function addMon(p, { evolve = false } = {}) {
   writeSave();
   refresh(true);
   pushDex();
-  const after = poke.describe(grown, m.line, { shiny: m.shiny }).name;
+  const after = poke.describe(grown, m.line, poke.look(m)).name;
   if (evo >= 0 && save.notifyEnabled && Notification.isSupported()) {
     new Notification({ title: `${battle.josa(before, "이가")} 진화했다!`, body: `몰에서 데려오자 ${after}(으)로 진화했습니다`, silent: false }).show();
   }
@@ -1442,7 +1460,7 @@ async function marketView() {
   const live = r.listings.filter((l) => !(l.wallet === save.wallet.id && (l.expired || l.state === "returned")));
   const listings = await Promise.all(live.map(async (l) => {
     const mon = l.mon;
-    const d = poke.describe(mon.grown, mon.line, { shiny: mon.shiny });
+    const d = poke.describe(mon.grown, mon.line, poke.look(mon));
     const p = profile.build({ ...mon, lvGrown: mon.lvGrown || undefined }, mon.grown);
     const bad = friend.validate(mon, mon.grown);
     const rr = poke.rarityOf(mon.line);
@@ -1456,7 +1474,7 @@ async function marketView() {
       url: await url(d, "still"), animUrl: await url(d, "anim"),
     };
   }));
-  const sales = (r.sales || []).slice(0, 15).map((s) => ({ ...s, name: poke.describe(s.grown, s.line, { shiny: s.shiny }).name }));
+  const sales = (r.sales || []).slice(0, 15).map((s) => ({ ...s, name: poke.describe(s.grown, s.line, poke.look(s)).name }));
   return { ok: true, listings, sales, fee: r.fee, max: r.max };
 }
 
@@ -1470,9 +1488,10 @@ async function marketList({ id, price } = {}) {
   const e = await walletEnsure();
   if (!e.ok) return e;
   const m = c.m;
-  const name = poke.describe(box.effOf(m, growthSpeed()), m.line, { shiny: m.shiny }).name;
+  const name = poke.describe(box.effOf(m, growthSpeed()), m.line, poke.look(m)).name;
   const r = await guildCall(`/${save.guild.code}/market/list`, { ...auth(), mon: monPayload(m), price });
   if (!r.ok) return r;
+  if (m.hold === "shade") holdBack(m); // 빛가림돌은 몰에 실리지 않는다 — 가방으로(변하지않는돌은 같이 간다)
   removeMon(id); // 서버가 맡았다
   return { ok: true, message: `${battle.josa(name, "을를")} 🪙${price}에 올렸습니다. 7일 안에 안 팔리면 돌아옵니다` };
 }
@@ -1685,35 +1704,65 @@ function roomSet(patch = {}) {
   return { ok: true };
 }
 
-/* ---------------- 변하지않는돌 ---------------- */
+/* ---------------- 지니는 도구 — 변하지않는돌 · 빛가림돌 ---------------- */
 
 const stoneCount = () => (save.items && save.items.everstone) || 0;
+const shadeCount = () => (save.items && save.items.shade) || 0;
+const HOLD_NAMES = { everstone: "변하지않는돌", shade: "빛가림돌" };
+
+/** 지닌 도구를 가방으로 돌려 놓는다(팔기 · 놓아주기 · 몰). 아이에게서 떼지는 않는다 — 곧 박스에서 빠진다 */
+function holdBack(m) {
+  if (!m || !HOLD_NAMES[m.hold]) return;
+  save.items = { ...(save.items || {}), [m.hold]: ((save.items || {})[m.hold] || 0) + 1 };
+}
 
 /**
- * 지니게 하거나 뺀다. 지니는 순간 "다음 진화 바로 앞"(pokemon.stoneCap)을 holdCap 으로
- * 적어 두고 성장을 거기서 멈춘다(box.effOf). 빼면 돌이 가방으로 돌아오고, 그동안 쌓인
- * 토큰만큼 바로 자란다 — 진화 알림은 평소처럼 refresh 가 띄운다.
+ * 도구를 지니게 하거나 뺀다. 한 마리에 하나.
+ *
+ * 변하지않는돌 — 지니는 순간 "다음 진화 바로 앞"(pokemon.stoneCap)을 holdCap 으로 적어 두고
+ * 성장을 거기서 멈춘다(box.effOf). 빼면 돌이 가방으로 돌아오고, 그동안 쌓인 토큰만큼 바로
+ * 자란다 — 진화 알림은 평소처럼 refresh 가 띄운다.
+ *
+ * 빛가림돌(shade) — 성장은 그대로. 마스터(졸업)가 돼도 이로치로 바뀌지 않을 뿐이다(pokemon.look).
+ * 졸업 기록 · 사탕 보상도 그대로다. 태어난 이로치는 가릴 수 없다.
  */
-function toggleStone(id) {
+function toggleStone(id, item = "everstone") {
   const m = box.find(save.box, id);
   if (!m) return { ok: false, reason: "없는 아이입니다" };
+  if (!HOLD_NAMES[item]) return { ok: false, reason: "모르는 도구입니다" };
   save.items = save.items || {};
-  const name = poke.describe(box.effOf(m, growthSpeed()), m.line, { shiny: m.shiny }).name;
+  const now = () => poke.describe(box.effOf(m, growthSpeed()), m.line, poke.look(m));
+  const before = now();
+  const name = before.name;
+  const itemName = HOLD_NAMES[item];
 
-  if (m.hold === "everstone") {
+  if (m.hold === item) {
     m.hold = null;
     m.holdCap = null;
-    save.items.everstone = stoneCount() + 1;
-    const after = poke.describe(box.effOf(m, growthSpeed()), m.line, { shiny: m.shiny }).name;
+    save.items[item] = (save.items[item] || 0) + 1;
+    const after = now();
     writeSave();
     refresh(true);
     pushShop();
-    return { ok: true, message: after !== name ? `변하지않는돌을 뺐다 — ${battle.josa(name, "이가")} ${after}(으)로 진화했다!` : `${name}에게서 변하지않는돌을 뺐습니다` };
+    if (item === "shade") return { ok: true, message: after.isShiny && !before.isShiny ? `빛가림돌을 뺐다 — ${battle.josa(name, "이가")} 이로치로 빛난다!` : `${name}에게서 빛가림돌을 뺐습니다` };
+    return { ok: true, message: after.name !== name ? `변하지않는돌을 뺐다 — ${battle.josa(name, "이가")} ${after.name}(으)로 진화했다!` : `${name}에게서 변하지않는돌을 뺐습니다` };
   }
 
-  if (!stoneCount()) return { ok: false, reason: "변하지않는돌이 없습니다. 상점에서 살 수 있습니다" };
+  if (HOLD_NAMES[m.hold]) return { ok: false, reason: `${battle.josa(name, "은는")} 이미 ${HOLD_NAMES[m.hold]}을 지니고 있습니다. 먼저 빼 주세요` };
+  if (!(save.items[item] || 0)) return { ok: false, reason: `${itemName}이 없습니다. 상점에서 살 수 있습니다` };
   const eff = box.effOf(m, growthSpeed());
   if (!poke.stageFor(eff)) return { ok: false, reason: "알에게는 지니게 할 수 없습니다" };
+
+  if (item === "shade") {
+    if (m.shiny) return { ok: false, reason: `${battle.josa(name, "은는")} 태어날 때부터 이로치라 빛가림돌로 가릴 수 없습니다` };
+    m.hold = "shade";
+    save.items.shade = shadeCount() - 1;
+    writeSave();
+    refresh(true);
+    pushShop();
+    return { ok: true, message: before.isShiny ? `${battle.josa(name, "이가")} 빛가림돌을 지녔다 — 원래 색으로 돌아왔다` : `${battle.josa(name, "이가")} 빛가림돌을 지녔다. 졸업해도 이로치로 바뀌지 않습니다` };
+  }
+
   const cap = poke.stoneCap(m.line, eff);
   if (cap == null) return { ok: false, reason: `${battle.josa(name, "은는")} 더 진화하지 않는 모습이라 돌이 필요 없습니다` };
   m.hold = "everstone";
@@ -1738,6 +1787,7 @@ const SHOP = [
   { id: "rare-candy", name: "이상한사탕", cost: 1, desc: "키우는 아이를 1000만 만큼 자라게 한다", icon: "🍬" },
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
   { id: "everstone", name: "변하지않는돌", cost: 3, desc: "지닌 아이는 진화하지 않는다. 박스 › 상세에서 지니게 하거나 뺀다. 빼면 돌아온다", icon: "🪨" },
+  { id: "shade", name: "빛가림돌", cost: 3, desc: "지닌 아이는 졸업(마스터)해도 이로치로 바뀌지 않는다. 태어난 이로치는 그대로. 박스 › 상세에서 지니게 하거나 뺀다", icon: "🌑" },
   { id: "tm", name: "기술머신", cost: 3, desc: "키우는 아이가 배울 수 있는 기술머신 기술 하나를 가르친다", icon: "💿" },
   { id: "great-ball", name: "슈퍼볼 3개", cost: 1, desc: "야생 포켓몬이 1.5배 잘 잡힌다", icon: "🔵", ball: "great" },
   { id: "ultra-ball", name: "하이퍼볼 3개", cost: 2, desc: "야생 포켓몬이 2배 잘 잡힌다", icon: "🟡", ball: "ultra" },
@@ -1780,6 +1830,10 @@ let save = {
   updateSkip: null, // "이 버전은 그만 알리기"를 누른 새 버전 — 팝오버 띠만 접는다
   updateNotified: null, // Windows 알림을 이미 보낸 새 버전 — 버전마다 한 번
   newsSeen: null, // 📢 새 소식을 열어 본 버전 — 지금 버전과 다르면 📢 에 빨간 점
+  week: null, // 📊 이번 주 — { key, start: { id: 성장량 }, last: { id: 성장량 } } (report.track)
+  weekLog: [], // 📊 지난 리포트 — 주가 바뀔 때 한 장씩(report.archive), 12주까지
+  reportSeen: null, // 마지막으로 열어 본 지난 리포트의 주 — 새 리포트가 나오면 홈 버튼에 점
+  checkinDay: null, // 출석 코인을 받은 날(내 PC 날짜) — 홈의 출석 버튼이 "출석 ✓" 가 된다
   charm: false, // 반짝이는 부적 보유
   shiny: false, // 지금 키우는 개체가 이로치인가
   seen: [], // 한 번이라도 받아본 라인 (도감 진행도)
@@ -1828,7 +1882,7 @@ let save = {
    * battleDay/battleRewards 는 하루 보상 횟수를 센다 (BATTLE_REWARDS_PER_DAY).
    */
   berries: {},
-  /** 가방의 도구. { everstone: 1 } — 지니게 하면 줄고, 빼면 돌아온다 */
+  /** 가방의 도구. { everstone: 1, shade: 1 } — 지니게 하면 줄고, 빼면 돌아온다 */
   items: {},
   battleDay: null,
   battleRewards: 0,
@@ -2201,7 +2255,7 @@ function buy(itemId) {
     const a = box.active(save);
     if (!a) { save.candySpent -= cost; return { ok: false, reason: "키우는 아이가 없습니다" }; }
     a.fed = (a.fed || 0) + CANDY_FEED;
-    msg = poke.describe(box.effOf(a, growthSpeed()), a.line, { shiny: a.shiny }).name + "이(가) 자랐습니다";
+    msg = poke.describe(box.effOf(a, growthSpeed()), a.line, poke.look(a)).name + "이(가) 자랐습니다";
     if (a.hold === "everstone" && box.effOf(a, growthSpeed(), true) > box.effOf(a, growthSpeed())) msg += " — 변하지않는돌 때문에 진화는 멈춰 있습니다";
   } else if (itemId === "tm") {
     const a = box.active(save);
@@ -2213,7 +2267,7 @@ function buy(itemId) {
     const id = pool[Math.floor(Math.random() * pool.length)];
     a.tmMoves = [...(a.tmMoves || []), id];
     const learned = profile.build(box.withLv(a, growthSpeed()), eff).tmMoves.find((m) => m.id === id);
-    msg = poke.describe(eff, a.line, { shiny: a.shiny }).name + "이(가) " + (learned ? learned.name : "새 기술") + "을(를) 배웠습니다";
+    msg = poke.describe(eff, a.line, poke.look(a)).name + "이(가) " + (learned ? learned.name : "새 기술") + "을(를) 배웠습니다";
   } else if (itemId === "great-ball" || itemId === "ultra-ball") {
     const key = itemId === "great-ball" ? "great" : "ultra";
     save.balls = save.balls || { great: 0, ultra: 0 };
@@ -2229,6 +2283,10 @@ function buy(itemId) {
     save.items = save.items || {};
     save.items.everstone = (save.items.everstone || 0) + 1;
     msg = "변하지않는돌을 샀습니다 (가진 수 " + save.items.everstone + ") — 박스 › 상세에서 지니게 하세요";
+  } else if (itemId === "shade") {
+    save.items = save.items || {};
+    save.items.shade = (save.items.shade || 0) + 1;
+    msg = "빛가림돌을 샀습니다 (가진 수 " + save.items.shade + ") — 박스 › 상세에서 지니게 하세요";
   } else if (itemId === "charm") { save.charm = true; msg = "이로치 확률이 2배가 됩니다"; }
   if (item.weekly) save[item.weekly] = localMonday(); // 한 주에 1개 — 이번 주 월요일을 적어 둔다
 
@@ -2267,7 +2325,7 @@ function checkGraduation(m, grown) {
   if (poke.STAGES[idx].key !== "master") return;
   if (m.graduatedAt) return; // 이미 처리한 개체
 
-  const mon = poke.describe(grown, m.line, { shiny: m.shiny });
+  const mon = poke.describe(grown, m.line, poke.look(m));
   const r = poke.rarityOf(m.line);
   m.graduatedAt = new Date().toISOString().slice(0, 10);
   save.graduated.push({
@@ -2332,6 +2390,7 @@ async function buildStats() {
   });
   if (box.accrue(save, u.total, fed)) writeSave();
   guildUsage = weekUsage(u, burn);
+  weekTick(u);
 
   const act = box.active(save);
   // 속도는 임계값을 고치는 대신 성장량에 곱해서 적용한다.
@@ -2340,7 +2399,7 @@ async function buildStats() {
   const grown = act ? act.raw || 0 : 0;
   recordStage(act, eff);
   checkGraduation(act, eff);
-  const mon = poke.describe(eff, act ? act.line : 0, { shiny: act && act.shiny });
+  const mon = poke.describe(eff, act ? act.line : 0, poke.look(act));
   // 트레이는 정적 PNG(nativeImage는 GIF를 움직이지 못한다), 화면은 애니메이션 GIF.
   const still = await poke.spriteWithFallback(mon, CACHE, "still");
   const anim = await poke.spriteWithFallback(mon, CACHE, "anim");
@@ -2351,7 +2410,7 @@ async function buildStats() {
   const boxList = await Promise.all(
     save.box.map(async (m) => {
       const e = box.effOf(m, growthSpeed());
-      const d = poke.describe(e, m.line, { shiny: m.shiny });
+      const d = poke.describe(e, m.line, poke.look(m));
       const p = await poke.spriteWithFallback(d, CACHE, "still");
       // 바탕화면 펫은 움직이는 쪽을 쓴다. 한 번 받으면 디스크에 남는다.
       const ap = await poke.spriteWithFallback(d, CACHE, "anim");
@@ -2379,9 +2438,10 @@ async function buildStats() {
         sellPrice: poke.shopPrice(m.line, e, m.shiny), // 상점에 팔면 받을 코인(서버가 다시 센다)
         // 변하지않는돌. evolveTo — 지금 빼면 무엇으로 진화하나(쌓인 토큰이 문턱을 넘었을 때만)
         stone: m.hold === "everstone",
+        shade: m.hold === "shade", // 빛가림돌 — 졸업해도 원래 색
         evolveTo: (() => {
           if (m.hold !== "everstone") return null;
-          const f = poke.describe(box.effOf(m, growthSpeed(), true), m.line, { shiny: m.shiny });
+          const f = poke.describe(box.effOf(m, growthSpeed(), true), m.line, poke.look(m));
           return f.name !== d.name ? f.name : null;
         })(),
         record: m.record || { w: 0, l: 0 },
@@ -2429,6 +2489,7 @@ async function buildStats() {
     candy: candy(u.total),
     update: updateView(),
     news: { version: app.getVersion(), unread: save.newsSeen !== app.getVersion() },
+    report: { unread: reportUnread() }, // 📊 아직 안 본 지난 주 리포트
     charm: Boolean(save.charm),
     shiny: Boolean(act && act.shiny),
     tree: await buildTree(act, eff),
@@ -2436,10 +2497,12 @@ async function buildStats() {
     box: boxList,
     berries: berryBag(),
     stones: stoneCount(),
+    shades: shadeCount(),
     room: roomState(),
     guild: save.guild ? { code: save.guild.code, name: save.guild.name, leader: Boolean(save.guild.leader), memberId: save.guild.memberId, gone: save.guild.gone || null, share: save.guildShare !== false } : null,
     burning: burning.status(new Date(), burn),
     online: onlineCfg(),
+    checkin: { done: save.checkinDay === dayKey(new Date()) }, // 홈의 🗓 출석 버튼
     friend: {
       team: save.friendTeam,
       trainer: save.trainerName || "",
@@ -2459,7 +2522,7 @@ async function buildStats() {
 
 /** 진화 트리에 쓸 작은 정적 스프라이트를 붙인다. 못 받으면 그림 없이 이름만 나온다. */
 async function buildTree(m, grown) {
-  const nodes = poke.evolutionTree(m ? m.line : 0, grown);
+  const nodes = poke.evolutionTree(m ? m.line : 0, grown, poke.look(m));
   return Promise.all(
     nodes.map(async (n) => {
       const p = await poke.spriteWithFallback(
@@ -2843,7 +2906,7 @@ function pushShop() {
       ...x,
       cost: priceOf(x.cost),
       owned: x.once ? Boolean(save.charm) : x.weekly ? save[x.weekly] === localMonday() : false,
-      have: x.id === "everstone" ? stoneCount() : x.ball ? ((save.balls || {})[x.ball] || 0) : undefined,
+      have: x.id === "everstone" ? stoneCount() : x.id === "shade" ? shadeCount() : x.ball ? ((save.balls || {})[x.ball] || 0) : undefined,
       afford: c.left >= priceOf(x.cost),
     })),
   });
@@ -2858,6 +2921,117 @@ function openTab(name) {
 }
 const openDex = () => openTab("dex");
 const openShop = () => openTab("shop");
+
+/* ---------------- 📊 주간 리포트 ---------------- */
+
+/** 버닝 · 사탕 타임을 시각마다 묻는 함수 — report.tokensOf 에 넘긴다 */
+const weekClock = () => {
+  const b = burnCfg();
+  return { burnAt: (t) => burning.multAt(t, b), sweetAt: (t) => burning.multAt(t, burning.CANDY_TIME) };
+};
+
+/**
+ * 그 주에 졸업한 아이 · 새로 들어온 아이. 날짜 문자열(YYYY-MM-DD)로 센다 — 졸업 · 잡은 날은
+ * 날짜만 남아 있어서 시각까지는 모른다.
+ */
+function weekBox(key) {
+  const end = report.dayKey(new Date(report.rangeOf(key).to));
+  const inWeek = (d) => typeof d === "string" && d >= key && d < end;
+  const grads = (save.graduated || []).filter((g) => inWeek(g.at)).map((g) => ({ name: g.name, dexId: g.dexId || null }));
+  const fresh = (save.box || []).filter((m) => inWeek(m.traded || m.caughtAt));
+  return { grads, newcomers: fresh.length };
+}
+
+/** 한 주를 카드 한 장 분량으로 — 토큰은 로그에서, 아이는 w(report.track 의 기록)에서 */
+function weekSummary(key, w) {
+  const t = report.tokensOf(lastUsage ? lastUsage.events : [], key, weekClock());
+  const grow = report.growthOf(w);
+  const top = grow.slice(0, 3).map(({ id, grown }) => {
+    const m = box.find(save.box, id);
+    if (!m) return { id, grown, name: "떠난 아이", dexId: null, shiny: false };
+    const d = poke.describe(box.effOf(m, growthSpeed()), m.line, poke.look(m));
+    return { id, grown, name: d.name, dexId: d.dexId || null, shiny: Boolean(d.isShiny) };
+  });
+  return { key, ...t, top, growTotal: grow.reduce((a, x) => a + x.grown, 0), tracked: Boolean(w), ...weekBox(key) };
+}
+
+/**
+ * 갱신마다 — 이번 주 성장량을 적고, 주가 바뀌었으면 지난 주를 리포트로 남긴다.
+ * 남길 때 알림을 한 번 띄운다(눌러서 열기). 처음 켠 주는 남길 지난 주가 없다.
+ */
+function weekTick(u) {
+  const effs = {};
+  for (const m of save.box || []) effs[m.id] = Math.round(box.effOf(m, growthSpeed()));
+  const r = report.track(save, effs);
+  if (r.ended) {
+    const e = weekSummary(r.ended.key, r.ended);
+    report.archive(save, e);
+    notifyWeek(e);
+  }
+  if (r.dirty) writeSave();
+}
+
+function notifyWeek(e) {
+  if (!save.notifyEnabled || !Notification.isSupported() || !e.total) return;
+  const bits = [`토큰 ${shortNum(e.total)}`];
+  if (e.top[0]) bits.push(`가장 많이 자란 아이 ${e.top[0].name}`);
+  if (e.grads.length) bits.push(`졸업 ${e.grads.length}마리`);
+  const n = new Notification({ title: "📊 지난 주 리포트가 나왔습니다", body: bits.join(" · "), silent: true });
+  n.on("click", () => openTab("report"));
+  n.show();
+}
+
+/** 알림용 짧은 수 — 1.2억 · 3,400만 */
+function shortNum(n) {
+  if (n >= 1e8) return (n / 1e8).toFixed(n >= 1e9 ? 0 : 1).replace(/\.0$/, "") + "억";
+  if (n >= 1e4) return Math.round(n / 1e4).toLocaleString("ko-KR") + "만";
+  return Math.round(n).toLocaleString("ko-KR");
+}
+
+/** 볼 수 있는 주 — 이번 주, 남긴 리포트들, 남기기 전이라도 로그가 있는 지난 주. 최근 것부터 */
+function weekKeys() {
+  const cur = report.weekKey();
+  const keys = new Set([cur, ...(save.weekLog || []).map((x) => x.key)]);
+  const prev = report.prevKey(cur);
+  if (!keys.has(prev) && report.tokensOf(lastUsage ? lastUsage.events : [], prev).total > 0) keys.add(prev);
+  return [...keys].filter((k) => k <= cur).sort().reverse();
+}
+
+/** 화면에 보낼 리포트 — key 가 없으면 이번 주. 지난 주와 견줄 토큰도 같이 */
+async function weekReport(key) {
+  const cur = report.weekKey();
+  const keys = weekKeys();
+  if (!key || !keys.includes(key)) key = cur;
+  const saved = (save.weekLog || []).find((x) => x.key === key);
+  const live = key === cur ? weekSummary(key, save.week && save.week.key === key ? save.week : null) : null;
+  const r = live || saved || weekSummary(key, null);
+  const pk = report.prevKey(key);
+  const ps = (save.weekLog || []).find((x) => x.key === pk);
+  const prevTotal = ps ? ps.total : report.tokensOf(lastUsage ? lastUsage.events : [], pk).total;
+  const url = async (dexId, shiny) => {
+    if (!dexId) return null;
+    const p = await poke.spriteWithFallback({ dexId, isShiny: shiny }, CACHE, "still").catch(() => null);
+    return p ? pathToFileURL(p).href : null;
+  };
+  const top = await Promise.all((r.top || []).map(async (x) => ({ ...x, url: await url(x.dexId, x.shiny) })));
+  const labels = Object.fromEntries(usage.SOURCES.map((x) => [x.id, x.label]));
+  const sources = Object.entries(r.sources || {}).map(([id, n]) => ({ id, label: labels[id] || id, n })).sort((a, b) => b.n - a.n);
+  const latest = (save.weekLog || []).length ? save.weekLog[save.weekLog.length - 1].key : null;
+  if (latest && save.reportSeen !== latest && key === latest) { save.reportSeen = latest; writeSave(); }
+  return {
+    ok: true, key, current: key === cur, keys, prevTotal,
+    today: key === cur ? (new Date().getDay() + 6) % 7 : 7, // 이번 주면 오늘이 몇 번째 날인가(월 0). 지난 주는 7
+    total: r.total, days: r.days, hours: r.hours, sources, burnShare: r.burnShare, sweetShare: r.sweetShare,
+    burning: burnCfg().enabled,
+    top, growTotal: r.growTotal, tracked: r.tracked, grads: r.grads || [], newcomers: r.newcomers || 0,
+  };
+}
+
+/** 홈 버튼의 점 — 아직 안 열어 본 지난 리포트가 있나 */
+const reportUnread = () => {
+  const log = save.weekLog || [];
+  return Boolean(log.length && save.reportSeen !== log[log.length - 1].key);
+};
 
 /* ---------------- 설정 ---------------- */
 
@@ -3693,7 +3867,7 @@ async function spawnWild() {
 
   const r = wild.roll(save.charm);
   // 첫 모습(니드런이면 니드런)으로 나온다. 잡으면 그 모습 그대로 박스에 들어간다
-  const d = poke.describe(WILD_GROWN, r.line, { shiny: r.shiny });
+  const d = poke.describe(WILD_GROWN, r.line, poke.look(r));
   const sprite = await poke.spriteWithFallback(d, CACHE, "anim");
   const isNew = (save.maxStage[r.line] ?? -1) < 1; // 이 종을 만난 적이 없다 — 놓치기 아까운 아이
 
@@ -4307,7 +4481,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("room-coins", () => roomCoins());
   ipcMain.handle("statue-image", (_e, dexId) => statueImage(dexId));
   ipcMain.handle("room-set", (_e, patch) => roomSet(patch || {}));
-  ipcMain.handle("toggle-stone", (_e, id) => toggleStone(id));
+  ipcMain.handle("toggle-stone", (_e, id, item) => toggleStone(id, item === "shade" ? "shade" : "everstone"));
   ipcMain.handle("feed-berry", (_e, { id, key } = {}) => feedBerry(id, key));
   ipcMain.handle("friend-register", (_e, { id, trainer } = {}) => friendRegister(id, trainer));
   ipcMain.handle("friend-inspect", (_e, code) => friendInspect(code));
@@ -4338,7 +4512,7 @@ app.whenReady().then(async () => {
     if (!m) return { ok: false, reason: "없는 아이" };
     if (save.box.length <= 1) return { ok: false, reason: "마지막 한 마리는 놓아줄 수 없습니다" };
     if (m.fav) return { ok: false, reason: "즐겨찾기한 아이는 놓아줄 수 없습니다. ♥ 를 먼저 풀어 주세요" };
-    if (m.hold === "everstone") save.items = { ...(save.items || {}), everstone: stoneCount() + 1 }; // 돌은 가방으로
+    holdBack(m); // 지닌 도구는 가방으로
     save.box = save.box.filter((x) => x.id !== id);
     save.petIds = save.petIds.filter((x) => x !== id);
     if (save.activeId === id) save.activeId = save.box[0].id;
@@ -4356,6 +4530,8 @@ app.whenReady().then(async () => {
   ipcMain.on("open-data-folder", () => shell.openPath(app.getPath("userData")));
   // 새 버전 — 받기(릴리스 페이지) · 이 버전은 그만 알리기
   ipcMain.on("update-open", openUpdate);
+  // 📊 주간 리포트 — key 가 없으면 이번 주
+  ipcMain.handle("week-report", (_e, key) => weekReport(typeof key === "string" ? key : null));
   // 📢 새 소식을 열었다 — 이 버전은 읽은 것으로
   ipcMain.on("news-seen", () => {
     if (save.newsSeen === app.getVersion()) return;

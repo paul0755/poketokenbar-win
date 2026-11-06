@@ -266,8 +266,9 @@ function describe(total, lineIndex = 0, opts = {}) {
     stage: S[i],
     dexId: L.ids[i],
     isEgg: S[i].key === "egg",
-    // 마스터는 보상으로 이로치가 되고, 부화 때 이로치로 태어난 개체는 처음부터 이로치다
-    isShiny: S[i].key === "master" || Boolean(opts.shiny),
+    // 마스터는 보상으로 이로치가 되고, 부화 때 이로치로 태어난 개체는 처음부터 이로치다.
+    // 빛가림돌을 지녔으면(opts.plain) 마스터가 돼도 원래 색 — 태어난 이로치는 그대로
+    isShiny: (S[i].key === "master" && !opts.plain) || Boolean(opts.shiny),
     progress: progress(total, lineIndex),
   };
 }
@@ -293,7 +294,7 @@ function describeSingle(L, total, i, opts) {
     stage: { ...STAGES[i], key: master ? "master" : egg ? "egg" : "final", label },
     dexId: L.ids[i],
     isEgg: i === 0,
-    isShiny: master || Boolean(opts.shiny),
+    isShiny: (master && !opts.plain) || Boolean(opts.shiny),
     single: true,
     progress: master
       ? { ratio: 1, remaining: 0, next: null }
@@ -310,7 +311,7 @@ function describeSingle(L, total, i, opts) {
  * 같은 그림이 두 번 나온다. 종이 바뀌는 지점만 노드로 만든다.
  * 마스터는 종이 같아도 이로치라 항상 따로 세운다.
  */
-function evolutionTree(lineIndex, total) {
+function evolutionTree(lineIndex, total, opts = {}) {
   const L = LINES[lineIndex % LINES.length];
   const S = stagesOf(lineIndex);
   const now = stageFor(total, lineIndex);
@@ -318,9 +319,9 @@ function evolutionTree(lineIndex, total) {
 
   for (let i = 1; i < S.length; i++) {
     const dexId = L.ids[i];
-    const isShiny = S[i].key === "master";
+    const isShiny = S[i].key === "master" && !opts.plain;
     const prev = nodes[nodes.length - 1];
-    if (prev && prev.dexId === dexId && !isShiny) {
+    if (prev && prev.dexId === dexId && S[i].key !== "master") { // 마스터는 빛가림돌로 같은 색이어도 따로 세운다
       // 같은 종이 이어진다 — 노드를 늘리지 않고 도달 여부만 갱신한다
       prev.reached = prev.reached || total >= S[i].at;
       continue;
@@ -388,4 +389,10 @@ async function spriteWithFallback(mon, cacheDir, kind) {
   catch (e) { console.error("[sprite] 실패 " + mon.dexId + " " + kind + ": " + e.message); return null; }
 }
 
-module.exports = { STAGES, TWO_STAGE_MASTER, stagesOf, isTwoStage, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollWild, rollLegend, isSingle, shopPrice, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };
+/**
+ * describe 에 넘길 모습 옵션 — 태어난 이로치인가, 빛가림돌을 지녀 마스터가 돼도 빛나지 않나.
+ * 박스의 아이는 hold 로, 코드로 받은 아이는 plain 으로 온다.
+ */
+const look = (m) => ({ shiny: Boolean(m && m.shiny), plain: Boolean(m && (m.plain || m.hold === "shade")) });
+
+module.exports = { look, STAGES, TWO_STAGE_MASTER, stagesOf, isTwoStage, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollWild, rollLegend, isSingle, shopPrice, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };

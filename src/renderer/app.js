@@ -31,7 +31,7 @@ function setTab(name) {
   for (const b of document.querySelectorAll("nav button[data-tab]")) {
     b.classList.toggle("on", b.dataset.tab === name);
   }
-  for (const id of ["home", "shop", "box", "room", "boss", "battle", "dex", "news"]) $("tab-" + id).hidden = id !== name;
+  for (const id of ["home", "shop", "box", "room", "boss", "battle", "dex", "news", "report"]) $("tab-" + id).hidden = id !== name;
   document.querySelector(".scroll").scrollTop = 0;
   // 열 때 최신 값을 받아온다. 상점·도감은 홈과 갱신 주기가 다르다.
   if (name === "shop") {
@@ -40,12 +40,40 @@ function setTab(name) {
   }
   if (name === "dex") window.ptb.requestDex();
   if (name === "news" && window.ptbNews) window.ptbNews.open(); // 📢 새 소식 — 열면 읽은 것으로
+  if (name === "report" && window.ptbReport) window.ptbReport.open(); // 📊 주간 리포트
   if (name === "boss" && window.ptbBoss) window.ptbBoss.open(); // 길드 레이드 — 열 때마다 다시 받는다
   if (name === "room") window.ptb.roomCoins(); // 코인 꾸미기 — 잔액 · 산 목록을 서버에서 다시
 }
 for (const b of document.querySelectorAll("nav button[data-tab]")) {
   b.onclick = () => setTab(b.dataset.tab);
 }
+$("openReport").onclick = () => setTab("report"); // 📊 주간 리포트 — 탭 줄에는 없고 홈에서 연다
+
+/** 🗓 출석 — 상점 › 길드 몰의 출석과 같은 것. 온라인을 켰을 때만 보인다(코인 지갑이 서버에 있다) */
+function renderCheckin(s) {
+  const b = $("homeCheckin");
+  b.hidden = !(s.online && s.online.enabled);
+  if (b.dataset.busy) return;
+  const done = Boolean(s.checkin && s.checkin.done);
+  b.disabled = done;
+  b.textContent = done ? "🗓 출석 ✓" : "🗓 출석";
+  b.title = done ? "오늘 출석 코인을 받았습니다. 내일 다시" : "출석 — 하루 한 번 코인 🪙10";
+}
+$("homeCheckin").onclick = async () => {
+  const b = $("homeCheckin");
+  if (b.disabled) return;
+  b.disabled = true;
+  b.dataset.busy = "1";
+  try {
+    const r = await window.ptb.walletCheckin();
+    toast(r.ok ? r.message : r.reason || "출석하지 못했습니다", r.ok ? "shiny" : "bad");
+    if (r.ok) { b.textContent = "🗓 출석 ✓"; return; }
+    b.disabled = false;
+  } finally {
+    delete b.dataset.busy;
+  }
+};
+$("rpClose").onclick = () => setTab("home");
 
 /* ---------------- 홈 ---------------- */
 
@@ -295,7 +323,8 @@ function renderBox(s) {
         (m.isPet ? '<span class="tag pet">바탕화면</span>' : "") +
         (m.graduated ? '<span class="tag gr">졸업</span>' : "") +
         (m.boost > 0 ? '<span class="tag bo">2배</span>' : "") +
-        (m.stone ? '<span class="tag st" title="변하지않는돌을 지니고 있다">🪨</span>' : "");
+        (m.stone ? '<span class="tag st" title="변하지않는돌을 지니고 있다">🪨</span>' : "") +
+        (m.shade ? '<span class="tag st" title="빛가림돌을 지니고 있다 — 졸업해도 원래 색">🌑</span>' : "");
       // 돌을 지녔으면 "진화까지 1" 이 영영 안 줄어든다 — 멈춰 있다고 말한다
       const goal = m.stone
         ? m.evolveTo ? `진화 멈춤 — 돌을 빼면 ${m.evolveTo}` : "변하지않는돌 — 진화 멈춤"
@@ -317,7 +346,7 @@ function renderBox(s) {
             <button data-act="release" class="del" ${m.fav ? 'disabled title="즐겨찾기한 아이는 놓아줄 수 없습니다"' : ""}>놓아주기</button>
           </div>
         </div>
-        ${openProfile === m.id ? profileHtml(p, m, s.berries, s.stones) : ""}`;
+        ${openProfile === m.id ? profileHtml(p, m, s.berries, s.stones, s.shades) : ""}`;
     })
     .join("");
 }
@@ -330,7 +359,7 @@ function renderBox(s) {
  * 개체값은 따로 적는다. 능력치가 낮은 게 레벨 탓인지 개체 탓인지
  * 구분이 안 되면 "개체값"을 보여주는 의미가 없다.
  */
-function profileHtml(p, m = {}, bag = [], stones = 0) {
+function profileHtml(p, m = {}, bag = [], stones = 0, shades = 0) {
   if (!p) return '<div class="prof"><div class="meta">이 종의 상세 정보가 없습니다.</div></div>';
 
   const types = (p.typeKeys || [])
@@ -382,14 +411,21 @@ function profileHtml(p, m = {}, bag = [], stones = 0) {
   const boost = m.boost > 0 ? `<div class="boost">토큰 경험치 2배 — ${fmt(m.boost)} 남음</div>` : "";
   const rec = m.record && (m.record.w || m.record.l) ? ` · 전적 ${m.record.w}승 ${m.record.l}패` : "";
 
-  // 지닌 물건 — 지금은 변하지않는돌 하나뿐이다
+  // 지닌 물건 — 변하지않는돌 · 빛가림돌 중 하나
+  const canShade = shades > 0 && !m.shiny; // 태어난 이로치는 가릴 수 없다
   const hold = m.stone
     ? `<div class="meta">🪨 <b>변하지않는돌</b>을 지니고 있어 진화하지 않습니다. 토큰은 그대로 쌓입니다.${
         m.evolveTo ? `<br>지금 빼면 바로 <b>${m.evolveTo}</b>(으)로 진화합니다.` : ""
       }</div><div class="feed"><button data-stone="${m.id}">돌 빼기</button></div>`
-    : stones > 0
-      ? `<div class="feed"><button data-stone="${m.id}">🪨 변하지않는돌 지니게 하기 (${stones}개)</button></div>`
-      : '<div class="meta">없음. 진화를 멈추고 싶으면 상점의 변하지않는돌을 지니게 하세요.</div>';
+    : m.shade
+      ? `<div class="meta">🌑 <b>빛가림돌</b>을 지니고 있어 졸업해도 이로치로 바뀌지 않습니다. 성장 · 졸업 보상은 그대로입니다.${
+          m.stageKey === "master" ? "<br>지금 빼면 이로치로 빛납니다." : ""
+        }</div><div class="feed"><button data-stone="${m.id}" data-item="shade">돌 빼기</button></div>`
+      : stones > 0 || canShade
+        ? `<div class="feed">${stones > 0 ? `<button data-stone="${m.id}">🪨 변하지않는돌 지니게 하기 (${stones}개)</button>` : ""}${
+            canShade ? `<button data-stone="${m.id}" data-item="shade">🌑 빛가림돌 지니게 하기 (${shades}개)</button>` : ""
+          }</div>`
+        : '<div class="meta">없음. 진화를 멈추려면 변하지않는돌, 졸업해도 원래 색으로 두려면 빛가림돌을 상점에서 사서 지니게 하세요.</div>';
 
   return `
     <div class="prof">
@@ -445,7 +481,7 @@ $("boxList").addEventListener("click", async (e) => {
   const sb = e.target.closest("button[data-stone]");
   if (sb) {
     sb.disabled = true;
-    const r = await window.ptb.toggleStone(sb.dataset.stone);
+    const r = await window.ptb.toggleStone(sb.dataset.stone, sb.dataset.item || "everstone");
     toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
     if (!r.ok) sb.disabled = false;
     return;
@@ -819,6 +855,8 @@ window.ptb.onStats((s) => {
   lastStats = s;
   renderUpdate(s.update);
   if (window.ptbNews) window.ptbNews.update(s.news);
+  if (window.ptbReport) window.ptbReport.update(s.report);
+  renderCheckin(s);
   renderHome(s);
   $("refreshNow").disabled = false;
 });

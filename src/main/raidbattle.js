@@ -103,9 +103,10 @@ function parseTeam(code) {
   }
   const [ver, , , , d] = arr || [];
   if (ver !== 1 || !Array.isArray(d)) return null;
-  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv] = d;
+  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv, plain] = d;
   const mon = { line, nature, shiny: Boolean(shiny), ivs, gender: GENDERS[g], ability, eggMoves, tmMoves };
   if (lv) mon.lvGrown = lv;
+  if (plain === 1) mon.plain = true;
   if (friend.validate(mon, grown)) return null;
   return { mon, grown };
 }

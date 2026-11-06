@@ -331,6 +331,7 @@
         r.trainer ? `${r.trainer}에게서` : "",
         r.ot && r.ot !== r.trainer ? `처음 키운 트레이너: ${r.ot}` : "",
         r.stone ? "🪨 변하지않는돌을 지니고 온다" : "",
+        r.shade ? "🌑 빛가림돌을 지니고 온다" : "",
       ].filter(Boolean).join(" · ");
       if (r.used) return tradeNote("이미 받은 코드입니다. 같은 코드는 한 번만 받을 수 있습니다.");
       if (r.mine) tradeNote("내가 보낸 코드입니다. 받으면 돌아옵니다.");

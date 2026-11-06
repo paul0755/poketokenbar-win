@@ -65,7 +65,7 @@ function fighter(mon, grown, level = null) {
   const st = level
     ? profile.statsOf(p.dexId, level, mon.ivs, mon.nature)
     : Object.fromEntries(p.stats.map((x) => [x.key, x.value]));
-  const d = poke.describe(grown, mon.line, { shiny: mon.shiny });
+  const d = poke.describe(grown, mon.line, poke.look(mon));
   return {
     id: mon.id,
     name: d.name,

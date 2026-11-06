@@ -75,6 +75,7 @@ function encode(mon, grown, trainer) {
         mon.tmMoves || [],
         Math.round(grown),
         lvOf(mon, grown), // 변하지않는돌을 지녀 모습이 멈춘 아이의 레벨용 성장량. 아니면 0
+        plainOf(mon), // 빛가림돌 — 마스터여도 원래 색. 옛 앱은 이 칸을 모르고 넘어간다(이로치로 보인다)
       ],
     ]),
   ).toString("base64url");
@@ -104,7 +105,7 @@ function encodeTrade(mon, grown, trainer) {
         Math.round(grown),
         String(mon.ot || trainer || "").slice(0, 16),
         mon.caughtAt || null,
-        mon.hold === "everstone" ? 1 : 0, // 지닌 변하지않는돌. 옛 앱은 이 칸을 모르고 넘어간다
+        HOLDS.indexOf(mon.hold) + 1, // 지닌 도구 — 1 변하지않는돌, 2 빛가림돌. 옛 앱은 1 만 알고 나머지는 넘어간다
         lvOf(mon, grown),
       ],
     ]),
@@ -131,7 +132,9 @@ function decodeTrade(code) {
   if (lv) mon.lvGrown = lv;
   const why = validate(mon, grown);
   if (why) return { error: "말이 안 되는 값이 들어 있습니다 — " + why };
-  return { code: s, trainer: String(trainer || ""), nonce, mon, grown, ot: String(ot || trainer || ""), caughtAt: caughtAt || null, hold: hold === 1 };
+  const item = HOLDS[hold - 1] || null;
+  if (item === "shade") mon.plain = true; // 받는 쪽이 모습을 그릴 때(이름 · 알림)
+  return { code: s, trainer: String(trainer || ""), nonce, mon, grown, ot: String(ot || trainer || ""), caughtAt: caughtAt || null, hold: item === "everstone", item };
 }
 
 /**
@@ -153,13 +156,19 @@ function decode(code) {
   if (data !== dataVersion()) {
     return { error: "앱 버전이 달라 같은 결투가 나오지 않습니다. 둘 다 최신 버전으로 맞춰 주세요.", versionMismatch: true };
   }
-  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv] = d;
+  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv, plain] = d;
   const mon = { line, nature, shiny: Boolean(shiny), ivs, gender: GENDERS[g], ability, eggMoves, tmMoves };
   if (lv) mon.lvGrown = lv;
+  if (plain === 1) mon.plain = true;
   const why = validate(mon, grown);
   if (why) return { error: "말이 안 되는 값이 들어 있습니다 — " + why };
   return { code: s, trainer: String(trainer || ""), nonce, mon: { id: "friend-" + nonce, ...mon }, grown };
 }
+
+/** 지닐 수 있는 도구 — 교환 코드에는 이 순서 + 1 로 싣는다(0 은 없음) */
+const HOLDS = ["everstone", "shade"];
+/** 빛가림돌을 지녀 마스터가 돼도 빛나지 않는 아이인가 */
+const plainOf = (mon) => (mon.plain || mon.hold === "shade" ? 1 : 0);
 
 /** 레벨용 성장량 — 모습보다 더 자랐을 때만 싣는다(돌을 지닌 아이). 아니면 0 */
 const lvOf = (mon, grown) => (mon.lvGrown > grown ? Math.round(mon.lvGrown) : 0);

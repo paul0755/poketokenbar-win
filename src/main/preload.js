@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("ptb", {
   updateOpen: () => ipcRenderer.send("update-open"),
   updateSkip: () => ipcRenderer.send("update-skip"),
   newsSeen: () => ipcRenderer.send("news-seen"),
+  weekReport: (key) => ipcRenderer.invoke("week-report", key),
 
   // 도감
   openDex: () => ipcRenderer.send("open-dex"),
@@ -42,7 +43,7 @@ contextBridge.exposeInMainWorld("ptb", {
   // 결투 · 나무열매. 결과(사건 목록·보상)를 받아야 하므로 invoke
   battle: (a) => ipcRenderer.invoke("battle", a),
   feedBerry: (a) => ipcRenderer.invoke("feed-berry", a),
-  toggleStone: (id) => ipcRenderer.invoke("toggle-stone", id),
+  toggleStone: (id, item) => ipcRenderer.invoke("toggle-stone", id, item),
   // 미니룸
   roomBuy: (a) => ipcRenderer.invoke("room-buy", a),
   roomCoins: () => ipcRenderer.invoke("room-coins"),
