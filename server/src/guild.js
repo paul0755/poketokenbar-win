@@ -190,6 +190,8 @@ export function cleanSnap(m) {
     walletId: typeof m.walletId === "string" && WALLET_ID.test(m.walletId) ? m.walletId : "", // 주간 코인 보상을 넣을 곳
     usage: cleanUsage(m.usage),
     weekTop: int(m.weekTop, 0, 10000) ?? 0, // 주간 1위를 몇 번 했나 — 방의 메달 액자
+    badges: int(m.badges, 0, 8) ?? 0, // 체육관 배지 수 — 방의 배지 진열장 · 길드원 목록
+    champ: int(m.champ, 0, 100000) ?? 0, // 챔피언 로드에서 챔피언이 된 횟수
   };
 }
 

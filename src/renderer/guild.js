@@ -266,7 +266,7 @@
         return `<div class="gd-m${sel && m.id === sel.id ? " on" : ""}" data-id="${esc(m.id)}">
           <div class="pic">${pic ? `<img src="${esc(pic)}" alt="">` : ""}</div>
           <div class="t"><b>${esc(m.trainer)}</b>${m.leader ? ' <span class="ld">길드장</span>' : ""}${m.me ? ' <span class="me">나</span>' : ""}
-            <span>도감 ${m.room.dex.seen} · 졸업 ${m.room.graduated} · ${m.room.wins}승 · ${ago(m.updated)}</span></div>
+            <span>도감 ${m.room.dex.seen} · 졸업 ${m.room.graduated} · ${m.room.wins}승${m.room.badges ? ` · 배지 ${m.room.badges}` : ""}${m.room.champ ? ` · 🏆${m.room.champ}` : ""} · ${ago(m.updated)}</span></div>
           <div class="acts">
             <button data-visit>방 구경</button>
             ${m.me ? "" : `<button data-battle ${m.canBattle ? "" : 'disabled title="아직 대표 포켓몬을 올리지 않았습니다"'}>결투</button>`}

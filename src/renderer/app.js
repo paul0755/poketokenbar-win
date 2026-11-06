@@ -42,6 +42,7 @@ function setTab(name) {
   if (name === "news" && window.ptbNews) window.ptbNews.open(); // 📢 새 소식 — 열면 읽은 것으로
   if (name === "report" && window.ptbReport) window.ptbReport.open(); // 📊 주간 리포트
   if (name === "boss" && window.ptbBoss) window.ptbBoss.open(); // 길드 레이드 — 열 때마다 다시 받는다
+  if (name === "battle" && window.ptbGymOpen) window.ptbGymOpen(); // 체육관 · 챔피언 로드 — 주가 바뀌었을 수 있다
   if (name === "room") window.ptb.roomCoins(); // 코인 꾸미기 — 잔액 · 산 목록을 서버에서 다시
 }
 for (const b of document.querySelectorAll("nav button[data-tab]")) {

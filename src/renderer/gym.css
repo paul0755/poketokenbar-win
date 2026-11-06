@@ -36,6 +36,42 @@
 .gycard.t-ghost { background: linear-gradient(135deg, rgba(115, 87, 151, .24), transparent 65%), var(--card); }
 .gycard.t-rock { background: linear-gradient(135deg, rgba(182, 161, 54, .18), transparent 65%), var(--card); }
 .gycard.t-dragon { background: linear-gradient(135deg, rgba(111, 53, 252, .2), transparent 65%), var(--card); }
+.gycard.t-champ { background: linear-gradient(135deg, rgba(255, 196, 64, .22), transparent 65%), var(--card); border-color: #6b5a1a; }
+
+/* 🏆 챔피언 로드 — 배지 케이스 아래 한 줄. 누르면 로드 카드 */
+.gyroad {
+  display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 7px; padding: 6px 9px; border-radius: 9px;
+  border: 1px solid transparent; background: rgba(0, 0, 0, .18); color: var(--text); font: inherit; cursor: pointer; text-align: left;
+}
+.gyroad:hover { border-color: var(--line); }
+.gyroad.on { border-color: var(--accent); background: rgba(255, 205, 40, .08); }
+.gyroad.lock { opacity: .55; }
+.gyroad b { font-size: 12px; }
+.gyroad .st { font-size: 10px; color: var(--muted); }
+.gyroad .rc { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--accent); }
+.gyroad svg { flex-shrink: 0; }
+
+/* 로드 카드 — 이번 주 관문 넷 */
+.rdsteps { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 2px; }
+.rdstep {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 2px 4px;
+  border-radius: 9px; background: rgba(0, 0, 0, .2); border: 1px solid transparent; font-size: 9.5px; color: var(--muted);
+}
+.rdstep svg { border-radius: 50%; }
+.rdstep b { font-size: 10.5px; color: var(--text); }
+.rdstep.now { border-color: var(--accent); }
+.rdstep.done svg { filter: saturate(.4) brightness(.8); }
+.rdstep.lock svg { filter: grayscale(1) brightness(.55); }
+.rdstep .ck {
+  position: absolute; top: 3px; right: 4px; font-style: normal; font-size: 9px; font-weight: 900; width: 14px; height: 14px; line-height: 14px;
+  border-radius: 99px; text-align: center; color: #14151a; background: var(--green);
+}
+.rdrec { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 10px; color: var(--muted); margin-top: 2px; }
+.rdrec b { color: var(--accent); }
+.rdhall { grid-column: 1 / -1; margin-top: 2px; }
+.rdhall .row { display: flex; align-items: center; gap: 3px; padding: 2px 0; font-size: 9.5px; color: var(--dim); }
+.rdhall .row span { width: 54px; flex-shrink: 0; }
+.rdhall img { width: 26px; height: 26px; object-fit: contain; image-rendering: pixelated; }
 .gycard.lock .gyportrait { filter: grayscale(.85) brightness(.7); }
 .gyportrait { grid-row: span 1; line-height: 0; }
 .gyportrait svg { border-radius: 50%; box-shadow: 0 4px 14px rgba(0, 0, 0, .35); }

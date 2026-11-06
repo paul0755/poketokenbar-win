@@ -375,6 +375,28 @@
     });
   }
 
+  /*
+   * 🏟️ 체육관 배지 진열장 — 결투 배지 진열장 아래, 포스터 앞까지(56 × 32).
+   * 캔버스에는 상자와 짙은 벨벳 · 배지 자리만 그린다. 배지는 체육관 탭과 같은 그림(gymart.js 의 SVG)을
+   * 위에 얹는다(render 의 rm-gyb) — 도트로 줄여 찍으면 배지 모양이 뭉개진다.
+   * 챔피언이 된 적이 있으면 상자 테가 금빛이 된다(위는 결투 배지 진열장이 붙어 있어 트로피 자리가 없다).
+   */
+  const GYB = { x: 136, y: 56, w: 56, h: 32 };
+  const GYM_IDS = ["sprout", "wave", "ember", "spark", "omen", "lantern", "bedrock", "scale"];
+  function drawGymBadges(g, champ) {
+    const { x, y, w, h } = GYB;
+    if (champ > 0) box(g, x, y, w, h, "#3a1420", "#7a5608", "#ffe07a", "#c49000"); // 금테
+    else box(g, x, y, w, h, "#3a1420", "#1a110e", "#6d4c41", "#2b1d19");
+    R(g, x + 2, y + 2, w - 4, h - 4, "#4a1a2a"); // 벨벳
+    dither(g, x + 2, y + 2, w - 4, h - 4, "#401624");
+    R(g, x + 2, y + 2, w - 4, 1, "#00000055"); // 위 그늘
+    R(g, x + 3, y + h / 2, w - 6, 1, "#2a0e18"); // 가운데 선반
+    for (let i = 0; i < 8; i++) {
+      const cx = x + 8 + (i % 4) * 13, cy = y + 9 + Math.floor(i / 4) * 14;
+      oval(g, cx, cy, 4, 4, "#33101c"); // 배지 꽂는 자리
+    }
+  }
+
   /** 길드 주간 1위 메달 액자 — 몇 번 했는지는 글자로 얹는다 */
   function drawMedal(g) {
     box(g, 100, 56, 32, 30, "#2a3a7a", "#3e2723", "#6d4c41", "#4e342e");
@@ -709,6 +731,7 @@
     if (on.has("poster")) wall.push([195, 17, 28, 38]);
     if (d.graduated > 0) wall.push([232, 34, 76, 32]);
     if (d.weekTop > 0) wall.push([100, 56, 32, 40]); // 아래 "주간 1위" 글자까지
+    if (d.badges > 0) wall.push([GYB.x, GYB.y, GYB.w, GYB.h + 8]); // 아래 "배지" 글자까지
     const floor = [...on].filter((id) => FURN[id]).map((id) => [...posOf(id, FURN[id]), FURN[id].w, FURN[id].h]);
     const out = {};
     for (const id of COIN_ORDER) {
@@ -798,7 +821,7 @@
 
   function render(Rm, d) {
     Rm.data = d;
-    const key = JSON.stringify([d.kind, d.code, d.guildName, d.count, d.notice, d.hall, d.goal && [d.goal.total, d.goal.tiers], d.weekTop, d.theme, d.furni, d.statue, d.pos, d.dex && d.dex.seen, d.dex && d.dex.total, d.wins, d.graduated, d.lastGrad, d.trainer, period(d.theme)]);
+    const key = JSON.stringify([d.kind, d.code, d.guildName, d.count, d.notice, d.hall, d.goal && [d.goal.total, d.goal.tiers], d.weekTop, d.badges, d.champ, d.theme, d.furni, d.statue, d.pos, d.dex && d.dex.seen, d.dex && d.dex.total, d.wins, d.graduated, d.lastGrad, d.trainer, period(d.theme)]);
     if (key !== Rm.key) {
       Rm.key = key;
       if (d.kind === "hall") paintHall(Rm, d);
@@ -1331,6 +1354,7 @@
     if (on.has("poster")) drawPoster(g);
     if (d.graduated > 0) drawTrophies(g, d.graduated);
     if (d.weekTop > 0) drawMedal(g);
+    if (d.badges > 0) drawGymBadges(g, d.champ || 0);
     if (on.has("rug")) drawRug(g);
     // 밤이면 방이 어두워지고 램프 둘레만 밝다
     if (per === "night" || per === "evening") {
@@ -1366,6 +1390,13 @@
     if (d.wins > 0) html.push(`<span class="rm-txt lt" style="left:${X(161)}%; top:${Y(52)}%;">${d.wins}승</span>`);
     if (d.graduated > 0) html.push(`<span class="rm-txt sm" style="left:${X(292)}%; top:${Y(44)}%;">졸업<br>${esc(d.lastGrad || "")}</span>`);
     if (d.weekTop > 0) html.push(`<span class="rm-txt lt" style="left:${X(116)}%; top:${Y(90)}%;">주간 1위 ×${d.weekTop}</span>`);
+    if (d.badges > 0) {
+      // 배지 그림 — 체육관 탭의 배지 그대로. 못 딴 칸은 점선 자리만
+      const art = window.ptbGymArt;
+      const cells = GYM_IDS.map((id, i) => `<i>${art ? art.badge(id, i < d.badges, 40) : ""}</i>`).join("");
+      html.push(`<div class="rm-gyb" style="left:${X(GYB.x + 2)}%; top:${Y(GYB.y + 2)}%; width:${X(GYB.w - 4)}%; height:${Y(GYB.h - 4)}%;">${cells}</div>`);
+      html.push(`<span class="rm-txt lt" style="left:${X(GYB.x + GYB.w / 2)}%; top:${Y(GYB.y + GYB.h + 4)}%;">배지 ${d.badges}/8${d.champ > 0 ? ` · 챔피언 ×${d.champ}` : ""}</span>`);
+    }
     html.push(`<div class="rm-plate"><b>${esc(d.trainer || "나")}</b>의 방<br>도감 ${dex.seen} · 졸업 ${d.graduated || 0}</div>`);
 
     Rm.el.dataset.theme = theme;
@@ -1689,6 +1720,7 @@
       `🏅 <b>결투 배지 진열장</b> — ${R0.wins}승${next ? ` · ${next}승이면 배지가 하나 더 빛난다` : " · 배지를 다 모았다"}`,
       `🏆 <b>졸업 트로피</b> — ${R0.graduated ? `${R0.graduated}마리 졸업 (마지막: ${esc(R0.lastGrad)})` : "마스터까지 키우면 생긴다"}`,
       `🏅 <b>주간 1위 메달</b> — ${R0.weekTop ? `${R0.weekTop}번` : "길드에서 한 주 동안 토큰을 가장 많이 쓰면 생긴다"}`,
+      `🏟️ <b>체육관 배지 진열장</b> — ${R0.badges ? `배지 ${R0.badges}/8${R0.champ ? ` · 🏆 챔피언 ${R0.champ}번 (금테 진열장)` : R0.badges >= 8 ? " · 챔피언 로드에서 챔피언이 되면 진열장이 금테가 된다" : ""}` : "배틀 탭 › 체육관에서 첫 배지를 따면 생긴다"}`,
     ].join("<br>");
 
     const pickable = (s.box || []).filter((m) => m.stageKey !== "egg");
@@ -1748,6 +1780,8 @@
       graduated: R0.graduated,
       lastGrad: R0.lastGrad,
       weekTop: R0.weekTop || 0,
+      badges: R0.badges || 0,
+      champ: R0.champ || 0,
       trainer: (s.friend && s.friend.trainer) || "나",
     };
   }

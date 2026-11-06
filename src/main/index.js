@@ -325,7 +325,17 @@ async function spriteUrl(desc, kind = "anim") {
   return p ? pathToFileURL(p).href : null;
 }
 
-/** 체육관 목록 — 배지 케이스 · 관장 카드 · 관장 팀 그림 */
+/** 관장 팀 그림 — 카드에 늘어놓는 작은 그림 */
+const teamArt = (g) =>
+  Promise.all(
+    g.team.map(async (t, k) => {
+      const { mon, grown } = gym.leaderMon(g, k);
+      const d = poke.describe(grown, mon.line, {});
+      return { name: d.name, lv: t.lv, url: await spriteUrl(d) };
+    }),
+  );
+
+/** 체육관 목록 — 배지 케이스 · 관장 카드 · 관장 팀 그림. 챔피언 로드(road)도 같이 */
 async function gymList() {
   const badges = save.badges || [];
   const gyms = await Promise.all(
@@ -333,29 +343,125 @@ async function gymList() {
       id: g.id, n, name: g.name, title: g.title, type: g.type, typeName: g.typeName, badge: g.badge, intro: g.intro,
       got: badges.includes(g.id),
       open: gymOpen(n),
-      team: await Promise.all(
-        g.team.map(async (t, k) => {
-          const { mon, grown } = gym.leaderMon(g, k);
-          const d = poke.describe(grown, mon.line, {});
-          return { name: d.name, lv: t.lv, url: await spriteUrl(d) };
-        }),
-      ),
+      team: await teamArt(g),
     })),
   );
-  return { gyms, tries: gymTriesLeft(), max: GYM_TRIES, badges: badges.length, legend: Boolean(save.gymLegend), candy: GYM_CANDY };
+  return { gyms, tries: gymTriesLeft(), max: GYM_TRIES, badges: badges.length, legend: Boolean(save.gymLegend), candy: GYM_CANDY, road: await roadView() };
+}
+
+/* ---------------- 🏆 챔피언 로드 (gym.roadOf) ---------------- */
+
+/**
+ * 배지 8개 뒤에 열린다. 매주 관장 셋의 재대결 → 챔피언. 한 관문씩 차례로 깨고, 진행은 그 주 안에서 이어진다.
+ * 지면 이번 주 횟수가 하나 준다(체육관과 따로). 이번 주 챔피언을 이긴 뒤에도 다시 붙을 수 있다(보상 없음).
+ *
+ * 보상 — 관문마다 🍬ROAD_CANDY, 챔피언 🍬CHAMP_CANDY, 처음으로 챔피언이 되면 마스터볼 하나.
+ * 기록 — 챔피언이 된 횟수 · 연속 주 · 최고 연속 · 이긴 팀(명예의 전당, 12주까지).
+ */
+const ROAD_TRIES = 5;
+const ROAD_PICK = 6;
+const ROAD_CANDY = 3;
+const CHAMP_CANDY = 15;
+
+const roadOpen = () => (save.badges || []).length >= gym.GYMS.length;
+/** 이번 주 진행 — { week, cleared, loss }. 주가 바뀌었으면 새로 */
+function roadNow() {
+  const wk = localMonday();
+  if (!save.road || save.road.week !== wk) save.road = { week: wk, cleared: 0, loss: 0 };
+  return save.road;
+}
+const roadCleared = () => (save.road && save.road.week === localMonday() ? save.road.cleared || 0 : 0);
+const roadTriesLeft = () => (save.road && save.road.week === localMonday() ? Math.max(0, ROAD_TRIES - (save.road.loss || 0)) : ROAD_TRIES);
+/** 지금 이어지는 연속 주 — 이번 주나 지난 주에 챔피언이었으면 그 값, 아니면 끊긴 것 */
+function champStreak() {
+  const c = save.champion;
+  if (!c || !c.last) return 0;
+  const wk = localMonday();
+  return c.last === wk || c.last === report.prevKey(wk) ? c.streak || 0 : 0;
+}
+
+async function roadView() {
+  const stages = gym.roadOf(localMonday());
+  const cleared = roadCleared();
+  const c = save.champion || {};
+  const hall = await Promise.all(
+    (c.hall || []).slice(-5).reverse().map(async (h) => ({
+      week: h.week,
+      team: await Promise.all((h.team || []).map(async (x) => ({ name: x.name, url: x.dexId ? await spriteUrl({ dexId: x.dexId, isShiny: x.shiny }, "still") : null }))),
+    })),
+  );
+  return {
+    open: roadOpen(), week: localMonday(), cleared, total: stages.length,
+    tries: roadTriesLeft(), max: ROAD_TRIES, pick: ROAD_PICK, candy: ROAD_CANDY, champCandy: CHAMP_CANDY,
+    record: { clears: c.clears || 0, streak: champStreak(), best: c.best || 0 },
+    hall,
+    stages: await Promise.all(
+      stages.map(async (g, k) => ({
+        id: g.id, base: g.base, champ: Boolean(g.champ), name: g.name, title: g.title, type: g.type, typeName: g.typeName, intro: g.intro,
+        state: k < cleared ? "done" : k === cleared ? "now" : "lock",
+        team: await teamArt(g),
+      })),
+    ),
+  };
+}
+
+async function roadChallenge(ids) {
+  if (!roadOpen()) return { ok: false, reason: "배지 8개를 모두 모아야 열립니다" };
+  if (roadTriesLeft() <= 0) return { ok: false, reason: "이번 주 챔피언 로드 도전 횟수를 다 썼습니다. 월요일에 다시 찹니다" };
+  const stages = gym.roadOf(localMonday());
+  const rd = roadNow();
+  const again = rd.cleared >= stages.length; // 이번 주 챔피언을 이미 이겼다 — 챔피언과 다시
+  const k = Math.min(rd.cleared, stages.length - 1);
+  const g = stages[k];
+  const f = await fightLeader(g, ids, ROAD_PICK, g.champ ? `챔피언 ${g.name}의 ` : `${g.name}의 `);
+  if (!f.ok) return f;
+
+  let reward = null;
+  if (f.win && !again) {
+    rd.cleared = k + 1;
+    if (g.champ) {
+      const c = (save.champion = save.champion || { clears: 0, streak: 0, best: 0, last: null, hall: [] });
+      const wk = localMonday();
+      c.streak = c.last === report.prevKey(wk) ? (c.streak || 0) + 1 : 1;
+      c.last = wk;
+      c.clears = (c.clears || 0) + 1;
+      c.best = Math.max(c.best || 0, c.streak);
+      const team = f.mine.map((x) => {
+        const d = poke.describe(x.grown, x.m.line, poke.look(x.m));
+        return { name: d.name, dexId: d.dexId || null, shiny: Boolean(d.isShiny) };
+      });
+      c.hall = [...(c.hall || []), { week: wk, team }].slice(-12);
+      save.candyBonus = (save.candyBonus ?? 0) + CHAMP_CANDY;
+      const first = c.clears === 1;
+      if (first) {
+        save.balls = save.balls || { great: 0, ultra: 0 };
+        save.balls.master = (save.balls.master || 0) + 1;
+      }
+      reward = { champ: true, candy: CHAMP_CANDY, streak: c.streak, clears: c.clears, masterBall: first };
+    } else {
+      save.candyBonus = (save.candyBonus ?? 0) + ROAD_CANDY;
+      const nx = stages[k + 1];
+      reward = { stage: k + 1, total: stages.length, candy: ROAD_CANDY, next: nx.champ ? `챔피언 ${nx.name}` : `관장 ${nx.name}` };
+    }
+  } else if (!f.win) {
+    rd.loss = (rd.loss || 0) + 1;
+  }
+  writeSave();
+  refresh(true);
+  return {
+    ok: true, road: true, win: f.win, reward, again, tries: roadTriesLeft(), max: ROAD_TRIES,
+    gym: { id: g.id, name: g.name, title: g.title, intro: g.intro, win: g.win, lose: g.lose, size: g.team.length, lead: g.champ ? `챔피언 ${g.name}` : `관장 ${g.name}`, stage: k + 1, total: stages.length, champ: Boolean(g.champ) },
+    mine: f.mine.map((x) => x.m.id),
+    rounds: f.rounds,
+  };
 }
 
 /**
- * 도전. ids 는 내 아이 1~3마리, 고른 순서대로 나간다. 계산은 여기서 끝내고 화면에는 판마다의 결투만 넘긴다.
- * 이미 딴 체육관도 다시 도전할 수 있다(보상은 없다). 지면 이번 주 횟수가 하나 준다.
+ * 관장(또는 챔피언) 한 명과 붙는다 — 고른 아이 max 마리까지, 고른 순서대로. 계산은 여기서 끝내고
+ * 화면에는 판마다의 결투(rounds)만 넘긴다. 보상 · 횟수는 부른 쪽이 정한다.
  */
-async function gymChallenge(gymId, ids) {
-  const n = gym.GYMS.findIndex((g) => g.id === gymId);
-  const g = gym.GYMS[n];
-  if (!g) return { ok: false, reason: "없는 체육관입니다" };
-  if (!gymOpen(n)) return { ok: false, reason: `${gym.GYMS[n - 1].badge}가 있어야 도전할 수 있습니다` };
-  if (gymTriesLeft() <= 0) return { ok: false, reason: "이번 주 도전 횟수를 다 썼습니다. 월요일에 다시 찹니다" };
-  const pick = [...new Set(Array.isArray(ids) ? ids : [])].slice(0, 3).map((id) => box.find(save.box, id));
+async function fightLeader(g, ids, max, prefix) {
+  const pick = [...new Set(Array.isArray(ids) ? ids : [])].slice(0, max).map((id) => box.find(save.box, id));
   if (!pick.length || pick.some((m) => !m)) return { ok: false, reason: "함께 싸울 아이를 골라 주세요" };
   const mine = pick.map((m) => ({ m, mon: box.withLv(m, growthSpeed()), grown: box.effOf(m, growthSpeed()) }));
   if (mine.some((x) => !poke.stageFor(x.grown))) return { ok: false, reason: "알은 싸울 수 없습니다" };
@@ -376,11 +482,29 @@ async function gymChallenge(gymId, ids) {
     const st = [prev[0] && prev[0].a === a ? prev[0].status : null, prev[1] && prev[1].b === b ? prev[1].status : null];
     const fighters = [
       { ...r.fighters[0], ...myArt[a], status: st[0], label: r.fighters[0].name },
-      { ...r.fighters[1], ...foeArt[b], status: st[1], label: `${g.name}의 ${r.fighters[1].name}` },
+      { ...r.fighters[1], ...foeArt[b], status: st[1], label: `${prefix}${r.fighters[1].name}` },
     ];
     prev = [{ a, status: r.end[0].status }, { b, status: r.end[1].status }];
     return { a, b, winner: r.winner, turns: r.turns, fighters, log: r.log };
   });
+  return { ok: true, win: res.win, mine, rounds };
+}
+
+/**
+ * 도전. ids 는 내 아이 1~3마리, 고른 순서대로 나간다. 계산은 여기서 끝내고 화면에는 판마다의 결투만 넘긴다.
+ * 이미 딴 체육관도 다시 도전할 수 있다(보상은 없다). 지면 이번 주 횟수가 하나 준다.
+ */
+async function gymChallenge(gymId, ids) {
+  if (gymId === "road") return roadChallenge(ids);
+  const n = gym.GYMS.findIndex((g) => g.id === gymId);
+  const g = gym.GYMS[n];
+  if (!g) return { ok: false, reason: "없는 체육관입니다" };
+  if (!gymOpen(n)) return { ok: false, reason: `${gym.GYMS[n - 1].badge}가 있어야 도전할 수 있습니다` };
+  if (gymTriesLeft() <= 0) return { ok: false, reason: "이번 주 도전 횟수를 다 썼습니다. 월요일에 다시 찹니다" };
+  const f = await fightLeader(g, ids, 3, `${g.name}의 `);
+  if (!f.ok) return f;
+  const res = { win: f.win };
+  const { mine, rounds } = f;
 
   let reward = null;
   if (res.win) {
@@ -685,6 +809,8 @@ function guildSnap() {
     // 공개를 끈 사람은 아예 보내지 않는다 — 서버에도 남지 않는다
     usage: save.guildShare !== false && guildUsage ? guildUsage : null,
     weekTop: (save.weekTop || []).length,
+    badges: (save.badges || []).length, // 체육관 배지 수 — 길드원 목록 · 방의 배지 진열장
+    champ: (save.champion || {}).clears || 0, // 챔피언 횟수
     walletId: (save.wallet && save.wallet.id) || "", // 길드 주간 코인 보상을 넣을 곳
   };
 }
@@ -970,7 +1096,7 @@ async function guildView() {
       updated: m.updated,
       canBattle: Boolean(s.team) && m.id !== g.memberId,
       usage: s.usage || null, // 공개를 끈 사람은 null
-      room: { theme: s.theme, furni: s.furni || [], statue: s.statue || null, pos: s.pos || {}, mons, dex: s.dex || { seen: 0, total: 0 }, wins: s.wins || 0, graduated: s.graduated || 0, lastGrad: s.lastGrad || "", weekTop: s.weekTop || 0 },
+      room: { theme: s.theme, furni: s.furni || [], statue: s.statue || null, pos: s.pos || {}, mons, dex: s.dex || { seen: 0, total: 0 }, wins: s.wins || 0, graduated: s.graduated || 0, lastGrad: s.lastGrad || "", weekTop: s.weekTop || 0, badges: s.badges || 0, champ: s.champ || 0 },
     };
   }));
   // 공동 목표 — 이번 주(내 PC 의 월요일)와, 끝난 주 중 가장 최근 것. 이룬 주는 한 번 알린다
@@ -1574,6 +1700,8 @@ function roomState() {
     lastGrad: ((save.graduated || []).slice(-1)[0] || {}).name || null,
     wins: ((save.friendRecord || {}).w || 0) + (save.box || []).reduce((a, m) => a + ((m.record || {}).w || 0), 0),
     weekTop: (save.weekTop || []).length, // 길드 주간 1위 메달
+    badges: (save.badges || []).length, // 🏟️ 체육관 배지 진열장 — 배지는 차례로 따니 개수만 알면 어느 배지인지 안다
+    champ: (save.champion || {}).clears || 0, // 🏆 챔피언이 된 횟수 — 진열장 위 트로피
   };
 }
 
@@ -1827,6 +1955,8 @@ let save = {
   gymWeek: null, // 체육관에서 진 횟수를 센 주(그 주 월요일)
   gymLoss: 0, // 이번 주에 진 횟수 — GYM_TRIES 까지
   gymLegend: false, // 배지 8개 보상(전설의 알)을 받았나
+  road: null, // 🏆 챔피언 로드 이번 주 진행 — { week, cleared(깬 관문 수), loss(진 횟수) }
+  champion: null, // 🏆 챔피언 기록 — { clears, streak, best, last(주), hall: [{ week, team }] }
   updateSkip: null, // "이 버전은 그만 알리기"를 누른 새 버전 — 팝오버 띠만 접는다
   updateNotified: null, // Windows 알림을 이미 보낸 새 버전 — 버전마다 한 번
   newsSeen: null, // 📢 새 소식을 열어 본 버전 — 지금 버전과 다르면 📢 에 빨간 점
@@ -3182,6 +3312,8 @@ function resetProgress() {
   save.candyExtra = 0;
   save.badges = []; // 체육관도 처음부터
   save.gymLegend = false;
+  save.road = null; // 챔피언 로드도
+  save.champion = null;
   save.charm = false;
   save.items = {}; // 사탕으로 산 것은 같이 비운다 — 변하지않는돌·미니룸
   save.room = room.fresh();

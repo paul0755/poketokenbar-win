@@ -27,6 +27,12 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 /* 바닥 그림은 밤이면 어둡게 칠한다. 따로 그린 가구·아이들도 맞춰 어둡게 — 램프만 빼고 */
 .rm-room[data-per="evening"] .rm-f { filter: brightness(.9); }
 .rm-room[data-per="night"] .rm-f { filter: brightness(.72) saturate(.85); }
+/* 🏟️ 체육관 배지 진열장의 배지 — 체육관 탭과 같은 SVG 를 4 × 2 칸에 */
+.rm-gyb { position: absolute; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); place-items: center; z-index: 3; pointer-events: none; }
+.rm-gyb i { display: block; width: 92%; height: 92%; line-height: 0; }
+.rm-gyb svg { width: 100%; height: 100%; filter: drop-shadow(0 .15cqw .2cqw rgba(0, 0, 0, .45)); }
+.rm-room[data-per="evening"] .rm-gyb { filter: brightness(.9); }
+.rm-room[data-per="night"] .rm-gyb { filter: brightness(.75) saturate(.85); }
 .rm-room .rm-f[data-f="lamp"], .rm-room .rm-f[data-c="neon"], .rm-room .rm-f[data-c="fireplace"] { filter: none; } /* 빛나는 것은 밤에도 밝다 */
 .rm-room[data-per="night"] .rm-mon .rm-body { filter: brightness(.86); }
 

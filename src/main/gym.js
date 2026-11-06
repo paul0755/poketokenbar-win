@@ -15,6 +15,7 @@ const battle = require("./battle");
 const poke = require("./pokemon");
 const SPECIES = require("./species.json");
 const GYMS = require("./gyms.json");
+const ROAD = require("./road.json");
 
 const PER_LEVEL = 15_000_000; // profile.js 와 같은 값
 const grownAt = (lv) => (lv - 1) * PER_LEVEL + PER_LEVEL / 2;
@@ -67,4 +68,70 @@ function challenge(mine, g, rng = Math.random) {
   return { win: j >= foe.length && Boolean(last) && last.r.winner === 0, rounds };
 }
 
-module.exports = { GYMS, PER_LEVEL, grownAt, leaderMon, challenge };
+/* ---------------- 🏆 챔피언 로드 ---------------- */
+
+/*
+ * 배지 8개를 다 모은 뒤 매주 열리는 길. 관장 셋의 재대결(gyms.json 순서대로) → 챔피언 누리(road.json).
+ * 누가 나오는지는 주(그 주 월요일 날짜)로 정한다 — 같은 주에는 언제 켜도 같은 길이다.
+ *
+ * 재대결 관장은 원래 팀에 road.json 의 add 를 더해 Lv.87 부터 두 칸씩(에이스가 가장 높다), 개체값 28.
+ * 챔피언은 pool 에서 넷 + 에이스 하나, 개체값 30. 내 쪽은 6마리까지 데려간다(체육관은 3).
+ * 시뮬레이션(Lv.100 여섯 마리)으로 재대결은 대개 이기고, 챔피언은 한 판에 절반쯤 이기게 맞췄다.
+ */
+const AGAIN_LV = 87;
+const AGAIN_STEP = 2;
+const AGAIN_IV = 28;
+const ROAD_LEADERS = 3;
+
+/** 주 이름으로 정하는 난수 — 문자열 해시(FNV-1a)를 씨앗으로 xorshift */
+function seeded(key) {
+  let h = 2166136261;
+  for (const c of String(key)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+  // 비슷한 날짜 문자열이 비슷한 씨앗이 되지 않게 한 번 더 섞는다(murmur3 마무리)
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  h = h >>> 0 || 1;
+  return () => {
+    h ^= h << 13; h >>>= 0;
+    h ^= h >>> 17;
+    h ^= h << 5; h >>>= 0;
+    return h / 4294967296;
+  };
+}
+
+/** 앞에서부터 n 개를 고른다(섞어서). 원본은 그대로 */
+function pickN(arr, n, rng) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a.slice(0, n);
+}
+
+/** 그 주의 길 — [재대결 관장 셋(체육관 순서), 챔피언]. 결투가 받는 모양(challenge 의 g)과 같다 */
+function roadOf(weekKey) {
+  const rng = seeded("road:" + weekKey);
+  const idx = pickN(GYMS.map((_, i) => i), ROAD_LEADERS, rng).sort((a, b) => a - b);
+  const stages = idx.map((i) => {
+    const g = GYMS[i];
+    const a = ROAD.again[g.id] || { add: [] };
+    const lines = [...g.team.map((t) => t.line), ...(a.add || [])];
+    return {
+      id: `again-${g.id}`, base: g.id, n: i, name: g.name, title: g.title, type: g.type, typeName: g.typeName,
+      iv: AGAIN_IV, intro: a.intro || g.intro, win: a.win || g.win, lose: a.lose || g.lose,
+      team: lines.map((line, k) => ({ line, lv: Math.min(100, AGAIN_LV + k * AGAIN_STEP) })),
+    };
+  });
+  const c = ROAD.champion;
+  const four = pickN(c.pool, c.lv.length, rng);
+  stages.push({
+    id: c.id, base: c.id, champ: true, name: c.name, title: c.title, type: c.type, typeName: c.typeName,
+    iv: c.iv, intro: c.intro, win: c.win, lose: c.lose,
+    team: [...four.map((line, k) => ({ line, lv: c.lv[k] })), { line: c.ace.line, lv: c.ace.lv }],
+  });
+  return stages;
+}
+
+module.exports = { GYMS, ROAD, PER_LEVEL, grownAt, leaderMon, challenge, roadOf, seeded };
