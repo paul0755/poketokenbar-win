@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld("ptb", {
   // 새 버전 — 릴리스 페이지 열기 · 이 버전은 그만 알리기
   updateOpen: () => ipcRenderer.send("update-open"),
   updateSkip: () => ipcRenderer.send("update-skip"),
+  updateCheck: () => ipcRenderer.invoke("update-check"),
   newsSeen: () => ipcRenderer.send("news-seen"),
   weekReport: (key) => ipcRenderer.invoke("week-report", key),
 
@@ -121,6 +122,7 @@ contextBridge.exposeInMainWorld("ptb", {
   requestSettings: () => ipcRenderer.send("request-settings"),
   onSettings: (cb) => ipcRenderer.on("settings", (_e, data) => cb(data)),
   setSettings: (patch) => ipcRenderer.send("set-settings", patch),
+  hotkeyPause: (on) => ipcRenderer.send("hotkey-pause", on),
   // 역산 결과를 보여줘야 하므로 invoke
   calibrateLimit: (a) => ipcRenderer.invoke("calibrate-limit", a),
   openDataFolder: () => ipcRenderer.send("open-data-folder"),

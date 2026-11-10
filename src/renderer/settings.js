@@ -52,6 +52,8 @@ window.ptb.onSettings((s) => {
   showBurn();
   $("pollMinutes").value = String(s.pollMinutes);
   $("autoLaunch").checked = s.autoLaunch;
+  hk = { value: s.hotkey || "", ok: s.hotkeyOk !== false, def: s.hotkeyDefault || hk.def };
+  if (!recording) showHotkey();
   $("onlineOn").checked = !!(s.online && s.online.enabled);
   $("onlineRelay").value = (s.online && s.online.custom) || "";
   $("onlineRelay").placeholder = s.onlineDefault || "";
@@ -103,7 +105,7 @@ function showGrowth(pct) {
 function parseTokens(v) {
   const t = String(v || "").trim().replace(/,/g, "");
   if (!t) return null;
-  const m = t.match(/^([d.]+)s*([kmbKMB])?$/);
+  const m = t.match(/^([\d.]+)\s*([kmbKMB])?$/);
   if (!m) return null;
   const n = parseFloat(m[1]);
   if (!Number.isFinite(n) || n <= 0) return null;
@@ -148,6 +150,84 @@ const sendOnline = () => {
   send({ online: { enabled: $("onlineOn").checked, relay } });
 };
 on("onlineOn", "change", sendOnline);
+
+/* ---------------- ⌨️ 팝오버 단축키 ----------------
+ * 버튼을 누르면 다음에 누르는 조합을 받는다. Ctrl · Alt · Win 중 하나는 있어야 한다(F 키는 혼자도 된다).
+ * 받는 동안은 지금 단축키를 잠깐 내려 둔다 — 같은 조합을 다시 누르면 팝오버가 열려 버린다.
+ */
+let hk = { value: "", ok: true, def: "Control+Alt+P" };
+let recording = false;
+const HK_NAME = { Control: "Ctrl", Super: "Win", Up: "↑", Down: "↓", Left: "←", Right: "→", PageUp: "PgUp", PageDown: "PgDn", Insert: "Ins", Delete: "Del" };
+const hkLabel = (acc) => acc.split("+").map((p) => HK_NAME[p] || p.replace(/^num/, "Num ")).join(" + ");
+const HK_CODE = { Space: "Space", ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right", Home: "Home", End: "End", PageUp: "PageUp", PageDown: "PageDown", Insert: "Insert", Delete: "Delete" };
+
+/** 눌린 키 → Electron 가속키의 키 이름. 받지 않는 키면 null */
+function hkKey(e) {
+  const c = e.code || "";
+  if (/^Key[A-Z]$/.test(c)) return c.slice(3);
+  if (/^Digit[0-9]$/.test(c)) return c.slice(5);
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(c)) return c;
+  if (/^Numpad[0-9]$/.test(c)) return "num" + c.slice(6);
+  return HK_CODE[c] || null;
+}
+function hkMods(e) {
+  return [e.ctrlKey && "Control", e.altKey && "Alt", e.shiftKey && "Shift", e.metaKey && "Super"].filter(Boolean);
+}
+
+function showHotkey(msg, warn) {
+  const b = $("hotkeyRec"), note = $("hotkeyNote");
+  b.classList.toggle("rec", recording);
+  b.classList.toggle("off", !recording && !hk.value);
+  $("hotkeyOff").disabled = recording || !hk.value;
+  note.classList.toggle("warn", Boolean(warn) || (!recording && hk.value && !hk.ok));
+  if (recording) {
+    b.textContent = msg || "조합을 누르세요…";
+    note.textContent = "Ctrl · Alt · Win 중 하나와 글자 · 숫자 · F 키를 함께 누르세요. Esc 는 취소.";
+    return;
+  }
+  b.textContent = hk.value ? hkLabel(hk.value) : "꺼짐";
+  note.textContent = !hk.value
+    ? `꺼져 있습니다. 왼쪽 버튼을 누르고 조합을 누르면 켜집니다 (기본 ${hkLabel(hk.def)}).`
+    : !hk.ok
+      ? `⚠️ ${hkLabel(hk.value)} 는 다른 프로그램이 이미 쓰고 있어 등록하지 못했습니다. 다른 조합을 골라 주세요.`
+      : `어디서든 ${hkLabel(hk.value)} 를 누르면 팝오버가 열리고, 한 번 더 누르면 닫힙니다. 바꾸려면 왼쪽 버튼을 누르세요.`;
+}
+
+function startRec() {
+  if (recording) return;
+  recording = true;
+  window.ptb.hotkeyPause(true);
+  showHotkey();
+}
+function stopRec() {
+  if (!recording) return;
+  recording = false;
+  window.ptb.hotkeyPause(false); // main 이 다시 등록하고 결과(되었나)를 보내 준다
+  showHotkey();
+}
+$("hotkeyRec").onclick = () => (recording ? stopRec() : startRec());
+$("hotkeyOff").onclick = () => send({ hotkey: "" });
+window.addEventListener("blur", stopRec);
+window.addEventListener("keydown", (e) => {
+  if (!recording) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  if (e.key === "Escape" && !e.ctrlKey && !e.altKey && !e.metaKey) return stopRec();
+  const mods = hkMods(e);
+  const key = hkKey(e);
+  if (!key) {
+    // 아직 조합키만 누르는 중 — 누른 만큼 보여 준다
+    if (["Control", "Alt", "Shift", "Meta"].includes(e.key)) return showHotkey(mods.length ? hkLabel(mods.join("+")) + " + …" : "");
+    return showHotkey("이 키는 쓸 수 없습니다", true);
+  }
+  const acc = [...mods, key].join("+");
+  if (!mods.some((m) => m !== "Shift") && !/^F\d+$/.test(key)) return showHotkey(hkLabel(acc) + " — Ctrl · Alt · Win 도 함께", true);
+  recording = false;
+  hk.value = acc; // 결과(등록 됐나)는 main 이 곧 보내 준다
+  send({ hotkey: acc });
+  window.ptb.hotkeyPause(false);
+  showHotkey();
+}, true);
 on("onlineRelay", "change", sendOnline);
 for (const id of ["limClaudeBlock", "limClaudeWeek", "limCodexBlock"]) {
   on(id, "change", () => {
@@ -416,7 +496,8 @@ $("backupList").addEventListener("click", async (e) => {
 loadBackups();
 $("close").onclick = () => window.ptb.closeSettings();
 window.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") window.ptb.closeSettings();
+  // 단축키 조합을 받다가 누른 Esc 는 "받기 취소"다 — 거기서 처리한 키(defaultPrevented)는 창을 닫지 않는다
+  if (e.key === "Escape" && !recording && !e.defaultPrevented) window.ptb.closeSettings();
 });
 
 window.ptb.requestSettings();

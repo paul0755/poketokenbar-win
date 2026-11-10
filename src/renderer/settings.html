@@ -90,6 +90,12 @@
   button:disabled { opacity: .4; cursor: default; pointer-events: none; }
 
   .danger { color: #ff8a8a; border-color: #5a2a2a; }
+  /* ⌨️ 단축키 — 누르면 다음 키 조합을 받는다 */
+  .kbd { min-width: 128px; font-weight: 700; color: var(--accent); font-family: "Segoe UI", "Malgun Gothic", sans-serif; }
+  .kbd.off { color: var(--dim); font-weight: 500; }
+  .kbd.rec { color: var(--text); border-color: var(--accent); animation: kbdblink 1s ease-in-out infinite; }
+  @keyframes kbdblink { 50% { border-color: var(--line); } }
+  .note.warn { color: #ffb36b; }
   .danger:hover { background: #2e1c1c; }
 </style>
 
@@ -347,6 +353,14 @@
       <span class="k">로그인 시 자동 시작</span>
       <label class="sw"><input type="checkbox" id="autoLaunch" /><span></span></label>
     </div>
+  </div>
+  <div class="row">
+    <div class="top">
+      <span class="k">⌨️ 팝오버 단축키</span>
+      <button class="kbd" id="hotkeyRec" title="누르고 새 조합을 누르면 바뀝니다"></button>
+      <button id="hotkeyOff">끄기</button>
+    </div>
+    <div class="note" id="hotkeyNote"></div>
   </div>
   <div class="row">
     <div class="top">

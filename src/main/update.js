@@ -9,7 +9,7 @@
  * 자동으로 깔지는 않는다 — 코드 서명이 없어 어차피 사람이 "추가 정보 → 실행"을 눌러야 한다.
  * 알리고, 누르면 릴리스 페이지를 연다. 그게 전부다.
  *
- * 네트워크는 하루 몇 번뿐이다(켤 때 · 6시간마다). 토큰 기록 같은 건 아무것도 보내지 않는다.
+ * 네트워크는 하루 몇 번뿐이다(켤 때 · 6시간마다 · 절전에서 깰 때 · 직접 누를 때). 토큰 기록 같은 건 아무것도 보내지 않는다.
  */
 const REPO = "paul0755/poketokenbar-win";
 const API = `https://api.github.com/repos/${REPO}/releases/latest`;
@@ -43,7 +43,10 @@ function fromRelease(r) {
 /** 열어도 되는 주소인가 — 이 저장소의 릴리스 페이지만 */
 const safeUrl = (u) => typeof u === "string" && u.startsWith(PAGE);
 
-/** 가장 최근 릴리스. 실패하면 null(조용히 — 다음에 다시 본다) */
+/**
+ * 가장 최근 릴리스. 받을 게 없으면 null, 묻지 못했으면 false(조용히 — 다음에 다시 본다).
+ * 둘을 나누는 건 "지금 확인"을 눌렀을 때 "최신입니다"와 "확인하지 못했습니다"를 가리려고.
+ */
 async function latest(current, timeoutMs = 10_000) {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), timeoutMs);
@@ -52,10 +55,10 @@ async function latest(current, timeoutMs = 10_000) {
       headers: { Accept: "application/vnd.github+json", "User-Agent": `PokeTokenBar/${current}` },
       signal: ac.signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) return res.status === 404 ? null : false; // 404 — 릴리스가 하나도 없다
     return fromRelease(await res.json());
   } catch {
-    return null;
+    return false;
   } finally {
     clearTimeout(t);
   }

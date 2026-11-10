@@ -1,5 +1,5 @@
 "use strict";
-const { app, Tray, BrowserWindow, Menu, ipcMain, nativeImage, screen, Notification, shell, dialog, powerMonitor } = require("electron");
+const { app, Tray, BrowserWindow, Menu, ipcMain, nativeImage, screen, Notification, shell, dialog, powerMonitor, globalShortcut } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -2088,6 +2088,7 @@ let save = {
   popSize: null,
   pollMinutes: 0.5, // 갱신 주기(분). 0.5 = 30초
   autoLaunch: false,
+  hotkey: "Control+Alt+P", // ⌨️ 어디서든 팝오버 여닫기(Electron 가속키 표기). "" 이면 끔
 };
 
 let hadSave = false; // 세이브 파일이 원래 있었는가 (첫 실행 vs 이전 버전 이어받기)
@@ -2724,7 +2725,11 @@ let prevSnap = null;
 // 시험용 — 지금 버전을 낮춰 잡아 띠 · 알림을 볼 수 있게. 평소엔 package.json 의 버전
 const CUR_VERSION = (process.env.POKETOKENBAR_VERSION_AS || "").trim() || app.getVersion();
 const UPDATE_EVERY_MS = 6 * 3600_000;
+const UPDATE_TICK_MS = 30 * 60_000; // 6시간이 지났나 이만큼마다 본다 — 절전으로 멈췄던 시간도 벽시계로 센다
+const UPDATE_WAKE_GAP_MS = 3600_000; // 절전에서 깼을 때 — 마지막 확인에서 1시간이 지났으면 다시 본다
 let updateInfo = null; // GitHub 의 가장 최근 릴리스 — 지금보다 새것일 때만
+let updateAt = 0; // 마지막으로 GitHub 에 물어본 때
+let updateBusy = null; // 묻는 중이면 그 약속 — 겹쳐 누르면 같은 답을 기다린다
 let updateNote = null; // 알림을 잡아 둔다 — 놓치면 눌러도 아무 일이 없다
 
 const updateView = () =>
@@ -2740,11 +2745,21 @@ function pushUpdate() {
   push(win, lastStats);
 }
 
-/** 새 버전이 있나 본다. 실패하면 조용히 넘어가고 다음 번에 다시 본다 */
-async function checkUpdate() {
+/**
+ * 새 버전이 있나 본다. 실패하면 조용히 넘어가고 다음 번에 다시 본다.
+ * 돌려주는 것 — { ok: false } 묻지 못함 · { ok: true, version: null } 최신 · { ok: true, version } 새 버전
+ */
+function checkUpdate() {
+  if (!updateBusy) updateBusy = askUpdate().finally(() => (updateBusy = null));
+  return updateBusy;
+}
+
+async function askUpdate() {
+  updateAt = Date.now();
   const r = await update.latest(CUR_VERSION);
-  if (!r) return;
-  const fresh = update.newer(r.version, CUR_VERSION) ? r : null;
+  if (r === false) return { ok: false };
+  const fresh = r && update.newer(r.version, CUR_VERSION) ? r : null;
+  let notified = false; // 이번에 Windows 알림을 띄웠나 — "지금 확인"이 두 번 알리지 않게
   const changed = (fresh && fresh.version) !== (updateInfo && updateInfo.version);
   updateInfo = fresh;
   if (fresh && save.updateNotified !== fresh.version) {
@@ -2755,12 +2770,46 @@ async function checkUpdate() {
         updateNote = new Notification({ title: `🆕 PokeTokenBar ${fresh.version}`, body: `새 버전이 나왔습니다 (지금 ${CUR_VERSION}). 눌러서 받기`, silent: false });
         updateNote.on("click", openUpdate);
         updateNote.show();
+        notified = true;
       } catch (e) {
         console.error("[update]", e.message);
       }
     }
   }
   if (changed) pushUpdate();
+  return { ok: true, version: fresh ? fresh.version : null, notified };
+}
+
+/** 마지막 확인에서 gap 이 지났을 때만 */
+function maybeCheckUpdate(gap) {
+  if (Date.now() - updateAt < gap) return;
+  checkUpdate().catch((e) => console.error("[update]", e.message));
+}
+
+/**
+ * 🔄 지금 확인 — 트레이 메뉴 · 📢 새 소식. 직접 누른 것이니 "이 버전은 그만"으로 접었던 띠도 다시 편다.
+ * 결과는 돌려준다(📢 에서 글자로). 트레이에서 누르면 팝오버가 없으니 Windows 알림으로 답한다.
+ */
+async function checkUpdateNow({ tell = false } = {}) {
+  const r = await checkUpdate();
+  if (r.ok && r.version && save.updateSkip === r.version) {
+    save.updateSkip = null;
+    writeSave();
+    pushUpdate();
+  }
+  if (tell && !r.notified) {
+    const title = !r.ok ? "새 버전을 확인하지 못했습니다" : r.version ? `🆕 PokeTokenBar ${r.version}` : "✅ 최신 버전입니다";
+    const body = !r.ok ? "인터넷 연결을 확인하고 잠시 뒤 다시 눌러 주세요" : r.version ? `새 버전이 나왔습니다 (지금 ${CUR_VERSION}). 눌러서 받기` : `지금 v${CUR_VERSION}이 가장 새 버전입니다`;
+    try {
+      if (!Notification.isSupported()) throw new Error("no notification");
+      updateNote = new Notification({ title, body, silent: true });
+      if (r.ok && r.version) updateNote.on("click", openUpdate);
+      updateNote.show();
+    } catch {
+      dialog.showMessageBox({ type: "info", title: "PokeTokenBar", message: title, detail: body });
+    }
+  }
+  return { ok: r.ok, version: r.version || null, current: CUR_VERSION };
 }
 
 /** 상태가 바뀐 순간에만 알린다. 자세한 판단은 notify.js가 한다. */
@@ -2840,16 +2889,24 @@ function logConsole(tag) {
 /** 팝오버가 이보다 작아지면 탭 줄과 카드가 깨진다. 화면 배치는 400px 을 기준으로 짰다 */
 const POP_MIN = { w: 400, h: 460 };
 
-function createWindow() {
-  // 700px가 늘 들어간다는 보장이 없다. 작업 영역을 넘지 않게 자르고,
-  // 잘린 만큼은 본문 스크롤이 받아준다.
-  const area = screen.getPrimaryDisplay().workArea;
-  // 끌어서 바꾼 크기를 기억해 둔다. 모니터가 바뀌었을 수 있어 작업 영역 안으로 자른다
+/**
+ * 팝오버를 띄울 크기 — 끌어서 바꾼 크기(popSize)를, 띄울 화면의 작업 영역 안으로 자른다.
+ * 700px가 늘 들어간다는 보장이 없다. 잘린 만큼은 본문 스크롤이 받아준다.
+ */
+function popWant(area) {
   const ps = save.popSize || {};
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(v)));
+  return {
+    w: clamp(ps.w || POP_MIN.w, POP_MIN.w, area.width),
+    h: clamp(ps.h || Math.min(760, area.height - 60), POP_MIN.h, area.height),
+  };
+}
+
+function createWindow() {
+  const want = popWant(screen.getPrimaryDisplay().workArea);
   win = new BrowserWindow({
-    width: clamp(ps.w || POP_MIN.w, POP_MIN.w, area.width),
-    height: clamp(ps.h || Math.min(760, area.height - 60), POP_MIN.h, area.height),
+    width: want.w,
+    height: want.h,
     minWidth: POP_MIN.w,
     minHeight: POP_MIN.h,
     show: false,
@@ -2866,11 +2923,21 @@ function createWindow() {
   // 최초 refresh가 로드보다 빠르면 그 send는 허공에 사라진다. 로드 후 한 번 더 민다.
   win.webContents.on("did-finish-load", () => (lastStats ? push(win, lastStats) : refresh()));
   win.webContents.on("console-message", logConsole("renderer"));
-  // 크기를 바꾸면 기억한다. 끄는 동안 수십 번 오니 멈춘 뒤에 한 번만 쓴다
+  /*
+   * 사람이 테두리를 끌어 바꾼 크기만 기억한다. 끄는 동안 수십 번 오니 멈춘 뒤에 한 번만 쓴다.
+   *
+   * resize 는 우리가 옮길 때도, Windows 가 배율이 다른 화면으로 옮기며 창을 키울 때도 온다.
+   * 그걸 다 적었더니 노트북(125%)에서 열고 닫을 때마다 popSize 가 1.25배로 불어
+   * 다음에 켜면 팝오버가 커져 있었다. will-resize 는 손으로 끌 때만 온다.
+   */
   let sizeTimer = null;
+  let userSizing = false;
+  win.on("will-resize", () => (userSizing = true));
   win.on("resize", () => {
+    if (!userSizing) return;
     clearTimeout(sizeTimer);
     sizeTimer = setTimeout(() => {
+      userSizing = false;
       if (!win || win.isDestroyed()) return;
       const [w, h] = win.getSize();
       save.popSize = { w, h };
@@ -2900,12 +2967,17 @@ function createWindow() {
 function showNearTray() {
   const b = tray.getBounds();
   const area = screen.getDisplayNearestPoint({ x: b.x, y: b.y }).workArea;
-  const size = win.getSize();
-  const w = size[0];
-  const h = size[1];
+  // 지금 창 크기가 아니라 기억한 크기로 — 배율이 바뀌며 불어난 크기를 이어받지 않게
+  const { w, h } = popWant(area);
   const x = Math.min(Math.max(area.x, Math.round(b.x + b.width / 2 - w / 2)), area.x + area.width - w);
   const y = b.y > area.y + area.height / 2 ? b.y - h - 8 : b.y + b.height + 8;
-  win.setPosition(x, Math.min(Math.max(area.y, y), area.y + area.height - h));
+  const bounds = { x, y: Math.min(Math.max(area.y, y), area.y + area.height - h), width: w, height: h };
+  /*
+   * 배율이 다른 화면으로 옮기면(모니터 100% ↔ 노트북 125%) Windows 가 창 크기를 그 비율만큼 바꾼다.
+   * 같은 자리 · 같은 크기를 한 번 더 주면 제 크기로 돌아온다(Electron 시험 — 한 번만 주면 739×904, 두 번이면 590×722).
+   */
+  win.setBounds(bounds);
+  win.setBounds(bounds);
   win.show();
   win.focus();
   // 숨어 있는 동안 갱신이 밀렸을 수 있다. 열자마자 다시 읽는다.
@@ -3196,6 +3268,9 @@ function settingsPayload() {
     burning: burnCfg(),
     pollMinutes: save.pollMinutes,
     autoLaunch: save.autoLaunch,
+    hotkey: save.hotkey ?? HOTKEY_DEFAULT,
+    hotkeyOk,
+    hotkeyDefault: HOTKEY_DEFAULT,
     online: onlineCfg(),
     onlineDefault: DEFAULT_RELAY,
     autoSources: officialSources(),
@@ -3236,7 +3311,48 @@ function restartPolling() {
   pollTimer = setInterval(() => refresh(true), ms);
 }
 
+/*
+ * ⌨️ 전역 단축키 — 트레이 아이콘을 찾지 않고 어디서든 팝오버를 여닫는다.
+ * 다른 프로그램이 먼저 잡은 조합이면 등록이 안 된다 — 그때는 설정 화면에 그렇게 적는다.
+ * 글자만 누르는 조합(Shift+P 따위)은 받지 않는다 — 타자 칠 때마다 팝오버가 뜬다.
+ */
+const HOTKEY_DEFAULT = "Control+Alt+P";
+const HOTKEY_MODS = ["Control", "Alt", "Shift", "Super"];
+const HOTKEY_KEY = /^([A-Z0-9]|F([1-9]|1[0-9]|2[0-4])|Space|Up|Down|Left|Right|Home|End|PageUp|PageDown|Insert|Delete|num[0-9])$/;
+let hotkeyOk = true; // 마지막 등록이 됐나
+let hotkeyPaused = false; // 설정 창에서 새 조합을 받는 동안 — 지금 조합을 눌러도 팝오버가 뜨지 않게
+
+function validHotkey(acc) {
+  if (typeof acc !== "string" || acc.length > 40) return false;
+  const parts = acc.split("+");
+  const key = parts.pop();
+  if (!HOTKEY_KEY.test(key)) return false;
+  if (new Set(parts).size !== parts.length || parts.some((m) => !HOTKEY_MODS.includes(m))) return false;
+  return parts.some((m) => m !== "Shift") || /^F\d+$/.test(key);
+}
+
+function togglePopover() {
+  if (!win || win.isDestroyed()) return;
+  if (win.isVisible() && win.isFocused()) win.hide();
+  else showNearTray();
+}
+
+function registerHotkey() {
+  globalShortcut.unregisterAll();
+  hotkeyOk = true;
+  const acc = save.hotkey;
+  if (!acc || hotkeyPaused || !validHotkey(acc)) return;
+  try {
+    hotkeyOk = globalShortcut.register(acc, togglePopover);
+  } catch (e) {
+    hotkeyOk = false;
+    console.error("[hotkey]", e.message);
+  }
+}
+
 function applySettings(patch) {
+  // 단축키는 받을 수 있는 조합만 — 설정 창 값을 믿지 않는다
+  if ("hotkey" in patch && patch.hotkey !== "" && !validHotkey(patch.hotkey)) delete patch.hotkey;
   Object.assign(save, patch);
   if ("burning" in patch) save.burning = burning.normalize(patch.burning); // 설정 창 값을 믿지 않는다
   writeSave();
@@ -3258,6 +3374,7 @@ function applySettings(patch) {
   }
   if ("trayIcon" in patch && lastStats) applyTray(lastStats);
   if ("pollMinutes" in patch) restartPolling();
+  if ("hotkey" in patch) registerHotkey();
   if ("growthPct" in patch || "pricePct" in patch) pushShop();
   if ("autoLaunch" in patch) {
     // 패키징 전(개발 중 electron.exe 실행)에는 등록해도 의미가 없다.
@@ -3293,7 +3410,14 @@ function openSettings() {
   setWin.loadFile(path.join(__dirname, "..", "renderer", "settings.html"));
   setWin.webContents.on("did-finish-load", pushSettings);
   setWin.webContents.on("console-message", logConsole("settings"));
-  setWin.on("closed", () => (setWin = null));
+  setWin.on("closed", () => {
+    setWin = null;
+    // 조합을 받다가 창을 닫았으면 원래 단축키를 되살린다
+    if (hotkeyPaused) {
+      hotkeyPaused = false;
+      registerHotkey();
+    }
+  });
 }
 
 /**
@@ -4390,7 +4514,10 @@ function buildMenu() {
     click: () => setWanderLevel(key),
   });
   return Menu.buildFromTemplate([
-    ...(updateInfo ? [{ label: `🆕 새 버전 ${updateInfo.version} 받기`, click: openUpdate }, { type: "separator" }] : []),
+    ...(updateInfo
+      ? [{ label: `🆕 새 버전 ${updateInfo.version} 받기`, click: openUpdate }]
+      : [{ label: `🔄 새 버전 확인 (지금 v${CUR_VERSION})`, enabled: !updateBusy, click: () => checkUpdateNow({ tell: true }).catch((e) => console.error("[update]", e.message)) }]),
+    { type: "separator" },
     { label: save.petVisible ? "펫 숨기기" : "바탕화면에 펫 띄우기", click: () => togglePet() },
     {
       label: "펫 움직임",
@@ -4458,10 +4585,19 @@ app.whenReady().then(async () => {
   tray.setToolTip("PokeTokenBar — 불러오는 중…");
 
   createWindow();
-  // 새 버전 — 켜고 조금 뒤(로그 읽기와 겹치지 않게) 한 번, 그 뒤 6시간마다
-  setTimeout(() => checkUpdate().catch((e) => console.error("[update]", e.message)), 15_000);
-  setInterval(() => checkUpdate().catch((e) => console.error("[update]", e.message)), UPDATE_EVERY_MS);
+  /*
+   * 새 버전 — 켜고 조금 뒤(로그 읽기와 겹치지 않게) 한 번, 그 뒤 6시간마다.
+   * setInterval(6시간)은 절전 동안 멈춰서 몇 시간씩 밀렸다. 30분마다 벽시계로 "6시간 지났나"를 본다.
+   * 절전에서 깨면(네트워크가 붙을 시간을 두고) 마지막 확인에서 1시간 넘었으면 바로 본다.
+   */
+  setTimeout(() => maybeCheckUpdate(0), 15_000);
+  setInterval(() => maybeCheckUpdate(UPDATE_EVERY_MS), UPDATE_TICK_MS);
+  const onWake = () => setTimeout(() => maybeCheckUpdate(UPDATE_WAKE_GAP_MS), 30_000);
+  powerMonitor.on("resume", onWake);
+  powerMonitor.on("unlock-screen", onWake);
   tray.on("click", () => (win.isVisible() ? win.hide() : showNearTray()));
+  registerHotkey(); // ⌨️ 어디서든 팝오버 — 기본 Ctrl + Alt + P
+  app.on("will-quit", () => globalShortcut.unregisterAll());
   tray.on("right-click", () => tray.popUpContextMenu(buildMenu()));
 
   // on 핸들러는 event 객체를 첫 인자로 넘긴다. 그대로 두면 force=truthy가 된다.
@@ -4658,10 +4794,18 @@ app.whenReady().then(async () => {
   ipcMain.on("open-settings", openSettings);
   ipcMain.on("request-settings", () => pushSettings());
   ipcMain.on("set-settings", (_e, patch) => applySettings(patch || {}));
+  // ⌨️ 설정 창이 새 조합을 받는 동안 잠깐 내려 둔다
+  ipcMain.on("hotkey-pause", (_e, on) => {
+    hotkeyPaused = Boolean(on);
+    registerHotkey();
+    pushSettings();
+  });
   ipcMain.on("close-settings", () => setWin && !setWin.isDestroyed() && setWin.close());
   ipcMain.on("open-data-folder", () => shell.openPath(app.getPath("userData")));
   // 새 버전 — 받기(릴리스 페이지) · 이 버전은 그만 알리기
   ipcMain.on("update-open", openUpdate);
+  // 🔄 지금 확인(📢 새 소식) — 결과는 글자로 돌려준다
+  ipcMain.handle("update-check", () => checkUpdateNow());
   // 📊 주간 리포트 — key 가 없으면 이번 주
   ipcMain.handle("week-report", (_e, key) => weekReport(typeof key === "string" ? key : null));
   // 📢 새 소식을 열었다 — 이 버전은 읽은 것으로

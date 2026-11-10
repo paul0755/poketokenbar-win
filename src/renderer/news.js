@@ -10,6 +10,18 @@
 (function () {
   const NEWS = [
     {
+      v: "0.14.8",
+      add: [
+        "⌨️ 단축키 — 어디서든 Ctrl + Alt + P 로 팝오버 열고 닫기, 설정 › 일반에서 바꾸기 · 끄기",
+        "🔄 새 버전 확인 — 📢 새 소식 · 트레이 메뉴에서 지금 바로",
+      ],
+      change: [
+        "절전에서 깨면 새 버전을 다시 확인 — 6시간 간격도 절전으로 밀리지 않게",
+        "배율이 다른 화면(노트북 125% · 모니터 100%)을 오가면 팝오버가 점점 커지던 것 고침",
+        "설정 › 한도에 300M · 1.5B 처럼 넣으면 못 읽던 것 고침",
+      ],
+    },
+    {
       v: "0.14.7",
       add: [
         "🏆 챔피언 로드 — 배지 8개 뒤, 매주 관장 재대결 셋과 챔피언",
@@ -106,6 +118,31 @@
       window.ptb.newsSeen();
     }
   }
+
+  /** 🔄 새 버전 확인 — 새 버전이면 위 띠가 저절로 뜬다(main 이 띠를 다시 보낸다) */
+  async function check() {
+    const btn = $("newsCheck"), out = $("newsChk");
+    btn.disabled = true;
+    out.hidden = false;
+    out.className = "newschk";
+    out.textContent = "GitHub 에 물어보는 중…";
+    let r = null;
+    try {
+      r = await window.ptb.updateCheck();
+    } catch {}
+    btn.disabled = false;
+    if (!r || !r.ok) {
+      out.className = "newschk bad";
+      out.textContent = "확인하지 못했습니다 — 인터넷 연결을 보고 잠시 뒤 다시 눌러 주세요";
+    } else if (r.version) {
+      out.className = "newschk new";
+      out.textContent = `🆕 v${r.version}이 나왔습니다 — 위 띠의 [받기]`;
+    } else {
+      out.className = "newschk ok";
+      out.textContent = `✅ v${r.current}이 가장 새 버전입니다`;
+    }
+  }
+  $("newsCheck").onclick = check;
 
   window.ptbNews = { update, open };
 })();
