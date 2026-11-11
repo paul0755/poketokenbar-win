@@ -39,6 +39,7 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 /* 캔버스 위에 얹는 글자 */
 .rm-txt { position: absolute; transform: translate(-50%, -50%); font: 800 1.9cqw/1 Consolas, "Malgun Gothic", monospace; color: #3b2a12; white-space: nowrap; text-align: center; pointer-events: none; }
 .rm-txt.lt { color: #ffffffcc; font-size: 1.5cqw; }
+.rm-txt.lcd { color: #1f3a1c; font-size: 1.4cqw; letter-spacing: 0; } /* 🦖 디지바이스 액정 */
 .rm-txt.board { line-height: 1.25; text-align: center; font-size: 1.35cqw; } /* 홀 전광판 */
 .rm-txt.sm { color: #455a64; font-size: 1.35cqw; line-height: 1.25; }
 .rm-txt.sign { color: #ffe9b0; font-size: 2.6cqw; letter-spacing: .1em; text-shadow: 0 .25cqw 0 #3e2412; }

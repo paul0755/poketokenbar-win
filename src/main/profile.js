@@ -15,7 +15,7 @@
  * 받는 순간 정해서 저장한다. 매번 계산하면 갱신할 때마다 능력치가
  * 흔들려서, 개체값이라는 말 자체가 성립하지 않는다.
  */
-const poke = require("./pokemon");
+const poke = require("./world").pack; // 🌏 지금 세계의 종 데이터(포켓몬이면 pokemon.js 그대로)
 
 const SPECIES = require("./species.json");
 const MOVES = require("./moves.json");

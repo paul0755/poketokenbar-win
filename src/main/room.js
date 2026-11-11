@@ -19,7 +19,15 @@
  * 값은 렌더러가 보낸 것을 믿지 않고 카탈로그에 있는 것만 받는다.
  */
 
+/*
+ * 🦖 디지털 월드에서는 "방"이 아니라 디지털 월드 맵이 기본이다(처음부터 있다). 포켓몬 세계에는 이 배경이 없다.
+ * 창문은 바깥이 없는 곳이라 처음엔 꺼 둔다(가구 목록에서 다시 켤 수 있다)
+ */
+const DIGI = require("./world").isDigimon;
+const HOME = DIGI ? "digital" : "cabin"; // 처음 배경
+
 const THEMES = [
+  ...(DIGI ? [{ id: "digital", name: "디지털 초원", icon: "🌿", cost: 0 }] : []),
   { id: "cabin", name: "오두막", icon: "🪵", cost: 0 },
   { id: "beach", name: "바닷가", icon: "🏖️", cost: 4 },
   { id: "night", name: "밤하늘", icon: "🌙", cost: 4 },
@@ -42,6 +50,25 @@ const FURNI = [
   { id: "poster", name: "산 풍경 포스터", icon: "🖼️", cost: 1, desc: "벽에 붙인다" },
 ];
 
+/*
+ * 🦖 디지털 월드의 가구 — 자리 · 크기 · 하는 일(앉기 · 먹기 · 잠자기 · 구경)은 그대로, 이름과 그림만 디지몬답게.
+ * 그림은 렌더러(room.js FURN_DG)가 그린다
+ */
+const FURNI_DG = {
+  window: { name: "데이터 창", icon: "🪟", desc: "하늘에 열린 창 — 데이터 하늘이 보인다" },
+  lamp: { name: "데이터 등불", icon: "💠", desc: "밤이 되면 수정이 더 밝게 빛난다" },
+  rug: { name: "꽃밭", icon: "🌼", desc: "초원 한가운데 핀다" },
+  cushion: { name: "디지타마 둥지", icon: "🪺", desc: "작은 아이가 올라앉아 쉰다" },
+  plant: { name: "고기밭", icon: "🍖", desc: "아이들이 와서 고기를 먹는다" },
+  shelf: { name: "자판기", icon: "🥤", desc: "초원 한복판에 서 있는 데이터 음료 자판기" },
+  bed: { name: "건초 침대", icon: "🌾", desc: "밤이 되면 누군가 올라가 잔다" },
+  desk: { name: "디지바이스 단말기", icon: "📟", desc: "화면에 디지코드가 흐른다" },
+  tv: { name: "초원의 TV", icon: "📺", desc: "디지털 월드엔 어디에나 TV 가 있다 — 모여서 구경한다" },
+  aquarium: { name: "공중전화 부스", icon: "☎️", desc: "아무도 없는데 가끔 벨이 울린다" },
+  poster: { name: "이정표", icon: "🪧", desc: "시작의 마을 쪽을 가리킨다" },
+};
+if (DIGI) for (const f of FURNI) Object.assign(f, FURNI_DG[f.id] || {});
+
 const DECO = require("./deco.json");
 const COIN_THEMES = DECO.themes;
 const COIN_FURNI = DECO.furni;
@@ -50,7 +77,7 @@ const isCoin = (id) => COIN_THEMES.some((d) => d.id === id) || COIN_FURNI.some((
 const MAX_MONS = 5;
 
 /** 처음 상태. 세이브에 없으면 이걸로 채운다 */
-const fresh = () => ({ theme: "cabin", themes: ["cabin"], owned: ["window"], coin: [], off: [], mons: null, pos: {}, tags: false });
+const fresh = () => ({ theme: HOME, themes: DIGI ? ["digital", "cabin"] : ["cabin"], owned: ["window"], coin: [], off: DIGI ? ["window"] : [], mons: null, pos: {}, tags: false, digital: DIGI || undefined });
 
 /** 옮길 수 있는 가구 — 바닥에 서는 사탕 가구와 코인 가구 전부(창문 · 러그 · 포스터는 벽지에 그려져 있다) */
 const MOVABLE = ["lamp", "bed", "aquarium", "tv", "desk", "shelf", "plant", "cushion", ...DECO.furni.map((d) => d.id)];
@@ -69,11 +96,19 @@ function normalize(save) {
     if (JSON.stringify(v) !== JSON.stringify(arr)) dirty = true;
     return v;
   };
-  r.themes = keep(r.themes, THEMES, ["cabin"]);
+  r.themes = keep(r.themes, THEMES, DIGI ? ["digital", "cabin"] : ["cabin"]);
+  // 디지털 월드 맵이 생기기 전에 시작한 디지털 월드 — 한 번만 맵으로 옮기고 창문을 끈다(그 뒤로 고른 건 그대로)
+  if (DIGI && !r.digital) {
+    r.digital = true;
+    r.theme = "digital";
+    if (!Array.isArray(r.off)) r.off = [];
+    if (!r.off.includes("window")) r.off.push("window");
+    dirty = true;
+  }
   r.owned = keep(r.owned, FURNI, ["window"]);
   r.coin = keep(r.coin, [...COIN_THEMES, ...COIN_FURNI], []);
   r.off = keep(r.off, [...FURNI, ...COIN_FURNI], []).filter((id) => r.owned.includes(id) || r.coin.includes(id));
-  if (!r.themes.includes(r.theme) && !r.coin.includes(r.theme)) { r.theme = "cabin"; dirty = true; }
+  if (!r.themes.includes(r.theme) && !r.coin.includes(r.theme)) { r.theme = HOME; dirty = true; }
   if (r.mons != null && !Array.isArray(r.mons)) { r.mons = null; dirty = true; }
   const pos = r.pos && typeof r.pos === "object" && !Array.isArray(r.pos) ? r.pos : {};
   const cleanPos = Object.fromEntries(Object.entries(pos).filter(([id, v]) => MOVABLE.includes(id) && okPos(v)));

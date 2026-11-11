@@ -1,0 +1,87 @@
+/* ⚔️ 필드 배틀 — 디지털 월드(digibattle.js). 포켓몬 세계에는 탭이 없다 */
+body:not(.world-digimon) nav [data-tab="field"] { display: none; }
+nav .fb-tab { color: #ffcf5a; }
+nav .fb-tab.on { color: #ffcf5a; background: rgba(255, 207, 90, .12); }
+
+.fb-pick { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.fb-pick select { flex: 1; min-width: 0; padding: 6px 8px; font: inherit; font-size: 12px; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 9px; }
+.fb-pick .fb-vs { font-size: 11px; font-weight: 900; color: #ff6a6a; letter-spacing: .5px; }
+.fb-pick .fb-go { flex-basis: 100%; padding: 8px; font: inherit; font-size: 13px; font-weight: 900; color: #0c1a10; background: linear-gradient(90deg, #3dffb4, #5ee7ff); border: 0; border-radius: 10px; cursor: pointer; }
+.fb-pick .fb-go.quit { color: var(--text); background: rgba(255, 255, 255, .1); }
+.fb-pick .fb-go:disabled { opacity: .45; cursor: default; }
+
+.fb-arena { position: relative; width: 100%; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 12px; border: 2px solid #1f5a4a; background: #78c3f2; container-type: inline-size; }
+.fb-arena canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fb-arena .fb-bg { image-rendering: pixelated; }
+.fb-mons { position: absolute; inset: 0; transform: translate(var(--sx, 0), var(--sy, 0)); pointer-events: none; }
+.fb-mon { position: absolute; image-rendering: pixelated; height: auto; transform-origin: 50% 100%; }
+.fb-mon.idle { animation: fb-bob 1.4s ease-in-out infinite; }
+@keyframes fb-bob { 50% { margin-top: -0.6%; } }
+.fb-q { position: absolute; font: 900 9cqw/1 "Consolas", monospace; color: rgba(12, 40, 30, .55); }
+#fbFx { z-index: 3; pointer-events: none; }
+.fb-ghost { pointer-events: none; }
+
+/* 필살기 컷인 — 비스듬한 띠 · 얼굴 · 이름 */
+.fb-cut { position: absolute; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; }
+.fb-cut .band { position: absolute; left: -6%; right: -6%; top: 46%; height: 40%; overflow: hidden; transform-origin: 50% 50%;
+  background: linear-gradient(90deg, rgba(4, 8, 18, .92), color-mix(in srgb, var(--c1) 55%, #050a14) 50%, rgba(4, 8, 18, .92));
+  border-top: 2px solid var(--c0); border-bottom: 2px solid var(--a0);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .4), 0 0 18px color-mix(in srgb, var(--c0) 60%, transparent); }
+.fb-cut.ult .band { border-image: linear-gradient(90deg, #ff4a6a, #ffd84a, #4affb4, #4ab4ff, #c44aff) 1; animation: fb-hue .6s linear infinite; }
+@keyframes fb-hue { to { filter: hue-rotate(360deg); } }
+.fb-cut.calm .band, .fb-cut.calm .ln, .fb-cut.calm .band::after { animation: none; }
+.fb-cut .ln { position: absolute; inset: 0; opacity: .5;
+  background: repeating-linear-gradient(0deg, transparent 0 5px, color-mix(in srgb, var(--c2) 40%, transparent) 5px 6px, transparent 6px 11px, color-mix(in srgb, var(--a0) 45%, transparent) 11px 12px);
+  animation: fb-lines .25s linear infinite; }
+.fb-cut .band::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 22px, rgba(255, 255, 255, .07) 22px 24px); animation: fb-streak .18s linear infinite; }
+@keyframes fb-lines { to { background-position: 0 12px; } }
+@keyframes fb-streak { from { background-position: 0 0; } to { background-position: -48px 0; } }
+.fb-cut img { position: absolute; left: 2%; bottom: -18%; height: 150%; image-rendering: pixelated; z-index: 1;
+  filter: drop-shadow(2px 0 0 var(--c0)) drop-shadow(-2px 0 0 var(--a0)) drop-shadow(0 0 6px var(--c0)); }
+.fb-cut.right img { left: auto; right: 2%; }
+.fb-cut .nm { position: absolute; right: 5%; top: 50%; translate: 0 -50%; display: grid; justify-items: end; gap: 2px; z-index: 2; max-width: 62%; }
+.fb-cut.right .nm { right: auto; left: 5%; justify-items: start; }
+.fb-cut .nm b { font: 900 7.2cqw/1 "Consolas", "D2Coding", monospace; letter-spacing: .5px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  text-shadow: 2px 0 0 var(--c0), -2px 0 0 var(--a0), 0 0 10px var(--c0); font-style: italic; }
+.fb-cut .nm small { font: 700 2.6cqw/1 "Pretendard", "Malgun Gothic", sans-serif; color: var(--c2); letter-spacing: 1px; }
+#fbUnder { pointer-events: none; }
+
+.fb-over { position: absolute; inset: 0; z-index: 4; display: none; place-items: center; }
+.fb-over.on { display: grid; }
+.fb-over.idle { place-items: start center; padding-top: 4%; pointer-events: none; }
+.fb-hint { padding: 6px 12px; font-size: 3.4cqw; text-align: center; color: #eafff6; background: rgba(6, 18, 28, .72); border-radius: 9px; line-height: 1.5; }
+.fb-hint b { color: #3dffb4; }
+.fb-hint small { display: block; font-size: 2.8cqw; color: #9fb3c8; }
+.fb-over.win, .fb-over.lose, .fb-over.draw { background: rgba(4, 10, 18, .55); }
+.fb-res { display: grid; gap: 4px; justify-items: center; padding: 12px 20px; text-align: center; background: rgba(6, 18, 28, .88); border: 1px solid #2c5a49; border-radius: 12px; }
+.fb-res b { font: 900 9cqw/1 "Consolas", monospace; letter-spacing: 2px; }
+.win .fb-res b { color: #3dffb4; text-shadow: 0 0 12px rgba(61, 255, 180, .6); }
+.lose .fb-res b { color: #ff5a6a; }
+.draw .fb-res b { color: #cfd4dc; }
+.fb-res span { font-size: 13px; font-weight: 800; }
+.fb-res span small, .fb-res > small { font-size: 11px; font-weight: 500; color: var(--muted); }
+.fb-res-btns { display: flex; gap: 6px; margin-top: 6px; }
+.fb-res-btns button { padding: 6px 12px; font: inherit; font-size: 12px; font-weight: 800; border: 0; border-radius: 9px; cursor: pointer; color: var(--text); background: rgba(255, 255, 255, .12); }
+.fb-res-btns .fb-again { color: #0c1a10; background: #3dffb4; }
+
+.fb-cmd { margin-top: 8px; padding: 10px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+.fb-gauge { display: flex; align-items: center; gap: 8px; font: 800 10px "Consolas", monospace; color: #b45cff; letter-spacing: 1px; }
+.fb-gauge .bar { position: relative; flex: 1; height: 10px; border-radius: 3px; background: rgba(255, 255, 255, .07); overflow: hidden; }
+.fb-gauge .bar i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, #7c5cff 0 6px, #b45cff 6px 8px); transition: width .1s linear; }
+.fb-gauge .bar i.full { background: repeating-linear-gradient(90deg, #ffffff 0 6px, #3dffb4 6px 8px); animation: fb-full .5s steps(2) infinite; }
+@keyframes fb-full { 50% { filter: brightness(1.4); } }
+/* 명령 문턱 — 20 · 30 · 40 */
+.fb-gauge .bar u { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, .35); }
+.fb-gauge em { width: 24px; font-style: normal; text-align: right; color: var(--text); }
+.fb-btns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+.fb-btns button { position: relative; display: grid; gap: 2px; justify-items: center; padding: 8px 4px 6px; font: inherit; font-size: 12px; font-weight: 800; color: var(--text); background: rgba(255, 255, 255, .06); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.fb-btns button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.fb-btns button small { font: 700 10px "Consolas", monospace; color: #b45cff; }
+.fb-btns button kbd { position: absolute; top: 3px; right: 5px; font: 600 9px "Consolas", monospace; color: var(--muted); }
+.fb-btns button:not(:disabled):hover { background: rgba(255, 255, 255, .12); }
+.fb-btns button:disabled { opacity: .38; cursor: default; }
+.fb-btns button.evo.ready { color: #0c1a10; background: linear-gradient(90deg, #3dffb4, #5ee7ff); border-color: transparent; animation: fb-full .6s steps(2) infinite; }
+.fb-btns button.evo.ready small { color: #0c1a10; }
+.fb-auto { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11px; color: var(--muted); cursor: pointer; }
+.fb-auto + .fb-auto { margin-top: 4px; }
+@media (max-width: 380px) { .fb-btns { grid-template-columns: repeat(2, 1fr); } }

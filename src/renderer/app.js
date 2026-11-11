@@ -31,7 +31,7 @@ function setTab(name) {
   for (const b of document.querySelectorAll("nav button[data-tab]")) {
     b.classList.toggle("on", b.dataset.tab === name);
   }
-  for (const id of ["home", "shop", "box", "room", "boss", "battle", "dex", "news", "report"]) $("tab-" + id).hidden = id !== name;
+  for (const id of ["home", "shop", "box", "room", "boss", "battle", "dex", "news", "report", "world", "jogress", "field"]) $("tab-" + id).hidden = id !== name;
   document.querySelector(".scroll").scrollTop = 0;
   // 열 때 최신 값을 받아온다. 상점·도감은 홈과 갱신 주기가 다르다.
   if (name === "shop") {
@@ -40,6 +40,8 @@ function setTab(name) {
   }
   if (name === "dex") window.ptb.requestDex();
   if (name === "news" && window.ptbNews) window.ptbNews.open(); // 📢 새 소식 — 열면 읽은 것으로
+  if (name === "field" && window.ptbField) window.ptbField.open(); // ⚔️ 필드 배틀 — 판 크기를 다시 잰다
+  if (name === "jogress" && window.ptbJogress) window.ptbJogress.open(); // 🧬 조그레스 — 열 때마다 박스를 다시 본다
   if (name === "report" && window.ptbReport) window.ptbReport.open(); // 📊 주간 리포트
   if (name === "boss" && window.ptbBoss) window.ptbBoss.open(); // 길드 레이드 — 열 때마다 다시 받는다
   if (name === "battle" && window.ptbGymOpen) window.ptbGymOpen(); // 체육관 · 챔피언 로드 — 주가 바뀌었을 수 있다
@@ -112,11 +114,22 @@ function renderBurn(b) {
     : `🔥 다음 버닝타임 ${whenLabel(b.next)}부터 ×${b.mult}`;
 }
 
+/**
+ * 화폐 — 포켓몬 세계는 🍬 사탕, 디지털 월드는 💠 비트. 메인이 세계와 함께 보낸다(s.world.cur).
+ * 방 · 리포트도 이걸 쓴다(window.ptbCur)
+ */
+const CUR0 = { name: "사탕", icon: "🍬", time: "사탕 타임" };
+const cur = () => (lastStats && lastStats.world && lastStats.world.cur) || CUR0;
+window.ptbCur = cur;
+/** 세계의 말 — "포켓몬" / "디지몬". 받침이 같아(ㄴ) 조사는 그대로 둔다. 화면의 <span class="mw"> 도 이걸로 */
+const monWord = () => (lastStats && lastStats.world && lastStats.world.id === "digimon" ? "디지몬" : "포켓몬");
+window.ptbMonWord = monWord;
+
 /** 사탕 타임 — 모두 같은 고정 시간(10~16 · 18~24시), 사탕만 ×1.5 */
 const sweetLabel = (t) =>
   t.on
-    ? `🍬 사탕 타임 ×${t.mult}${t.until ? " — " + whenLabel(t.until) + "까지" : ""}`
-    : `🍬 다음 사탕 타임 ${whenLabel(t.next)}부터 ×${t.mult}`;
+    ? `${cur().icon} ${cur().time} ×${t.mult}${t.until ? " — " + whenLabel(t.until) + "까지" : ""}`
+    : `${cur().icon} 다음 ${cur().time} ${whenLabel(t.next)}부터 ×${t.mult}`;
 
 function renderSweet(t) {
   const el = $("monSweet");
@@ -132,11 +145,12 @@ function renderHome(s) {
   // 개체
   $("pic").innerHTML = s.animUrl || s.stillUrl
     ? `<img src="${s.animUrl || s.stillUrl}" alt="">`
-    : window.eggSvg(70, mon.single);
+    : window.eggSvg(70, mon.single, mon.egg);
   $("monName").textContent = mon.name;
 
   const b = [];
-  if (s.rarity) {
+  if (mon.attr) b.push(`<span class="badge attr a-${mon.attr}">${mon.attr}</span>`); // 🦖 디지몬 속성
+  else if (s.rarity && s.rarity.stars) { // 디지몬은 별이 없다(0) — 디지타마 옆에 "디지몬" 배지는 군더더기
     const cls = s.rarity.stars >= 5 ? " r5" : "";
     b.push(`<span class="badge${cls}">${s.rarity.label}</span>`);
   }
@@ -159,6 +173,7 @@ function renderHome(s) {
   // 키우는 아이의 상태를 확인하려고 매번 탭을 옮기게 된다.
   const act = (s.box || []).find((m) => m.id === s.activeId);
   const ap = act && act.profile;
+  if (!ap && act && act.lv) t.push(`<span class="chip"><b>Lv.${act.lv}</b></span>`); // 🦖 디지몬
   if (ap) {
     t.push(`<span class="chip"><b>Lv.${ap.level}</b></span>`);
     for (let i = 0; i < ap.types.length; i++) {
@@ -179,7 +194,8 @@ function renderHome(s) {
   $("chain").innerHTML = tree
     .map((n, i) => {
       const cls = ["node", n.reached ? "reached" : "", n.current ? "current" : ""].join(" ");
-      const pic = n.url ? `<img src="${n.url}" alt="">` : window.eggSvg(42);
+      // 🦖 디지몬의 앞길은 아직 안 정해졌다(쓰는 대로 갈린다) — 알이 아니라 "?"
+      const pic = n.url ? `<img src="${n.url}" alt="">` : n.unknown ? '<div class="unk">?</div>' : window.eggSvg(42);
       const at = n.at === 0 ? "시작" : fmt(n.at);
       return (
         (i ? '<span class="arrow">▸</span>' : "") +
@@ -189,11 +205,13 @@ function renderHome(s) {
     .join("");
   // 다음 단계가 남았으면 그것만 짚어 준다. 표 전체를 다시 설명할 필요는 없다.
   const next = tree.find((n) => !n.reached);
-  $("treeNote").textContent = next ? "다음 " + next.name : tree.length ? "끝까지 왔습니다" : "";
+  $("treeNote").textContent = next
+    ? next.unknown ? "다음 모습은 쓰는 대로 갈립니다" : "다음 " + next.name
+    : tree.length ? "끝까지 왔습니다" : "";
 
   // 펫 줄
   const purl = s.petAnimUrl || s.petStillUrl;
-  $("petThumb").innerHTML = purl ? `<img src="${purl}" alt="">` : window.eggSvg(34, mon.single);
+  $("petThumb").innerHTML = purl ? `<img src="${purl}" alt="">` : window.eggSvg(34, mon.single, mon.egg);
   $("petName").textContent = s.petName || mon.name;
   $("petState").textContent = s.petLine == null ? "키우는 아이를 따라갑니다" : "도감에서 고른 아이";
   const pt = $("petToggle");
@@ -331,13 +349,13 @@ function renderBox(s) {
         ? m.evolveTo ? `진화 멈춤 — 돌을 빼면 ${m.evolveTo}` : "변하지않는돌 — 진화 멈춤"
         : m.next ? `${m.next}까지 ${fmt(m.remaining)}` : "다 자랐습니다";
       const p = m.profile;
-      const lv = p ? `Lv.${p.level} · ` : "";
+      const lv = p ? `Lv.${p.level} · ` : m.lv ? `Lv.${m.lv} · ` : ""; // 🦖 디지몬은 프로필 없이 레벨만
       return `
         <div class="bx ${m.active ? "act" : ""} ${m.fav ? "fv" : ""}" data-id="${m.id}">
-          <div class="pic"><button class="fav ${m.fav ? "on" : ""}" data-fav="${m.id}" title="${m.fav ? "즐겨찾기 풀기" : "즐겨찾기 — 위쪽에 모으고, 놓아주기 · 팔기를 막습니다"}">${m.fav ? "♥" : "♡"}</button>${m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50, m.single)}</div>
+          <div class="pic"><button class="fav ${m.fav ? "on" : ""}" data-fav="${m.id}" title="${m.fav ? "즐겨찾기 풀기" : "즐겨찾기 — 위쪽에 모으고, 놓아주기 · 팔기를 막습니다"}">${m.fav ? "♥" : "♡"}</button>${m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50, m.single, m.egg)}</div>
           <div class="info" title="눌러서 상세 보기">
             <div class="nm">${m.name}${m.shiny ? " ★" : ""}${tags}</div>
-            <div class="sub">${lv}${"★".repeat(m.stars)} ${m.stage}${m.nature ? " · " + m.nature : ""}</div>
+            <div class="sub">${lv}${m.stars ? "★".repeat(m.stars) + " " : ""}${m.stage}${m.nature ? " · " + m.nature : ""}</div>
             <div class="sub">${goal}</div>
             <div class="track"><i style="width:${Math.round((m.ratio || 0) * 100)}%"></i></div>
           </div>
@@ -727,7 +745,8 @@ function renderLimits(L, srcId, srcLabel) {
 /* ---------------- 상점 ---------------- */
 
 window.ptb.onShop((s) => {
-  $("wallet").textContent = "🍬 " + s.candy.left;
+  $("walletLab").textContent = "쓸 수 있는 " + cur().name;
+  $("wallet").textContent = cur().icon + " " + s.candy.left;
   $("walletSub").innerHTML =
     `${fmt(s.candy.per)} 쓸 때마다 1개 · 다음까지 <b>${fmt(s.candy.toNext)}</b><br>` +
     (s.candy.time ? `${sweetLabel(s.candy.time)} (매일 10~16 · 18~24시)<br>` : "") +
@@ -737,11 +756,11 @@ window.ptb.onShop((s) => {
     .map((it) => {
       const dis = it.owned || !it.afford ? " disabled" : "";
       return `<div class="item">
-          <div class="ic">${it.ball && window.ptbBall ? window.ptbBall.svg(it.ball) : it.egg && window.ptbEgg ? window.ptbEgg.svg(it.egg, 34) : it.icon}</div>
+          <div class="ic">${it.ball && window.ptbBall ? window.ptbBall.svg(it.ball) : it.egg && window.ptbEgg ? window.ptbEgg.svg(it.egg, 34) : it.capsule && window.ptbEgg ? window.ptbEgg.capsule(34) : it.icon}</div>
           <div class="body">
             <div class="nm">${it.name}</div>
             <div class="de">${it.desc}</div>
-            <div class="pr">가격 🍬${it.cost}${it.have != null ? ` · 가진 수 ${it.have}` : ""}</div>
+            <div class="pr">가격 ${cur().icon}${it.cost}${it.have != null ? ` · 가진 수 ${it.have}` : ""}</div>
           </div>
           <button data-id="${it.id}"${dis}>${it.owned ? (it.weekly ? "이번 주 ✓" : "보유") : "구매"}</button>
         </div>`;
@@ -852,8 +871,53 @@ $("updSkip").onclick = () => {
   window.ptb.updateSkip();
 };
 
+/* ---------------- 🌏 세계 바꾸기 — 탭 줄의 알약 · 세계 탭 ---------------- */
+const WORLD_DESC = {
+  pokemon: "포켓몬 614종 · 결투 · 체육관 · 챔피언 로드 · 길드 · 레이드 · 🍬 사탕",
+  digimon: "디지몬 151종 · 쓰는 대로 갈리는 진화(Claude 백신 · Codex 데이터 · 밤 바이러스) · 💠 비트",
+};
+let worldBusy = false;
+function renderWorld(w) {
+  if (!w) return;
+  $("worldIco").textContent = w.icon;
+  if (worldBusy) return;
+  $("wdCards").innerHTML = w.list
+    .map((x) => {
+      const tag = x.current ? '<span class="tag">지금 여기</span>' : x.started ? '<span class="tag st">키우는 중</span>' : '<span class="tag new">처음</span>';
+      const big = x.id === "digimon" && window.ptbEgg ? window.ptbEgg.digicode(58) : x.icon;
+      const btn = x.current
+        ? '<button class="go" disabled>여기</button>'
+        : `<button class="go" data-world="${x.id}" ${w.locked ? "disabled" : ""}>가기</button>`;
+      const more = x.current ? "" : x.started ? "<br>돌아가면 그동안 쓴 만큼 따라잡습니다" : "<br>들어간 날부터 자랍니다";
+      return `<div class="wdcard ${x.id}${x.current ? " cur" : ""}">
+        <div class="big">${big}</div>
+        <div class="bd"><div class="nm">${x.icon} ${x.label} ${tag}</div><div class="de">${WORLD_DESC[x.id] || ""}${more}</div></div>
+        ${btn}
+      </div>`;
+    })
+    .join("");
+}
+$("wdCards").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-world]");
+  if (!b || worldBusy) return;
+  worldBusy = true;
+  b.disabled = true;
+  b.textContent = "다시 켭니다…";
+  const r = await window.ptb.worldSwitch(b.dataset.world);
+  if (!r || !r.ok) {
+    worldBusy = false;
+    b.disabled = false;
+    b.textContent = "가기";
+    toast((r && r.reason) || "바꾸지 못했습니다");
+  }
+});
+
 window.ptb.onStats((s) => {
   lastStats = s;
+  renderWorld(s.world);
+  // 🌏 세계 — 디지털 월드면 포켓몬 세계에만 있는 탭 · 버튼을 감춘다(index.html 의 body.world-digimon)
+  document.body.classList.toggle("world-digimon", Boolean(s.world && s.world.id === "digimon"));
+  for (const el of document.querySelectorAll(".mw")) el.textContent = monWord();
   renderUpdate(s.update);
   if (window.ptbNews) window.ptbNews.update(s.news);
   if (window.ptbReport) window.ptbReport.update(s.report);

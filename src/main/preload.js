@@ -123,6 +123,12 @@ contextBridge.exposeInMainWorld("ptb", {
   onSettings: (cb) => ipcRenderer.on("settings", (_e, data) => cb(data)),
   setSettings: (patch) => ipcRenderer.send("set-settings", patch),
   hotkeyPause: (on) => ipcRenderer.send("hotkey-pause", on),
+  worldSwitch: (id) => ipcRenderer.invoke("world-switch", id),
+  jogressList: () => ipcRenderer.invoke("jogress-list"),
+  jogress: (a) => ipcRenderer.invoke("jogress", a),
+  fieldSetup: (a) => ipcRenderer.invoke("field-setup", a),
+  fieldEnd: (a) => ipcRenderer.invoke("field-end", a),
+  onFieldStart: (cb) => ipcRenderer.on("field-start", (_e, a) => cb(a)),
   // 역산 결과를 보여줘야 하므로 invoke
   calibrateLimit: (a) => ipcRenderer.invoke("calibrate-limit", a),
   openDataFolder: () => ipcRenderer.send("open-data-folder"),

@@ -45,7 +45,7 @@ function pending(prev, cur, opts = {}) {
   if (cur.graduated > prev.graduated) {
     out.push({
       key: "graduate",
-      title: "🎓 " + (cur.name || "포켓몬") + " 졸업",
+      title: "🎓 " + (cur.name || (require("./world").isDigimon ? "디지몬" : "포켓몬")) + " 졸업",
       body: "도감에 기록됐습니다. 다음 알은 공짜입니다.",
     });
   }

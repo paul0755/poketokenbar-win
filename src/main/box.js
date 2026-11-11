@@ -25,7 +25,7 @@
  * 성장량에 곱하는 방식을 유지하는 것도 같은 이유다.
  */
 
-const poke = require("./pokemon");
+const poke = require("./world").pack; // 🌏 지금 세계의 종 데이터(포켓몬이면 pokemon.js 그대로)
 const profile = require("./profile");
 
 let seq = 0;

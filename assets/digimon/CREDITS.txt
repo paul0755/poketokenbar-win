@@ -1,0 +1,14 @@
+Digimon dot sprites in this folder
+==================================
+
+Source: humulos.com (https://humulos.com/digimon/) - Vital Bracelet color dot sprites,
+recreated by humulos and the Digitama Hatchery community or distributed via Wikimon (https://wikimon.net).
+The only change made here: the two animation frames of each sprite were joined into one animated GIF
+(<name>.gif), plus a single-frame copy (<name>-still.gif). Built by scripts/digimon.js.
+
+Digimon and all related names, characters and images are trademarks and copyrighted works of
+Bandai (and Toei Animation). PokeTokenBar is a non-commercial fan project and is not affiliated with,
+endorsed or sponsored by them.
+
+If you are a rights holder and want these files removed, open an issue at
+https://github.com/paul0755/poketokenbar-win and they will be taken down.

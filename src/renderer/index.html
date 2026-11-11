@@ -37,6 +37,129 @@
   nav .sp { flex: 1; }
   nav .ico { padding: 6px 9px; font-size: 13px; }
 
+  /* ---------- 🌏 세계 바꾸기 — 탭 줄의 알약 버튼(눈에 띄게) · 세계 탭의 카드 ---------- */
+  nav .world-btn {
+    position: relative; display: inline-flex; align-items: center; gap: 3px; margin-right: 4px; padding: 4px 9px 4px 8px;
+    font-size: 14px; color: var(--text); border-radius: 99px;
+    background: linear-gradient(var(--bg), var(--bg)) padding-box, linear-gradient(135deg, #ff5a5a, #ffcb05 35%, #3dffb4 65%, #7c5cff) border-box;
+    border: 1.5px solid transparent; box-shadow: 0 0 10px rgba(61, 255, 180, .18);
+  }
+  nav .world-btn i { font-style: normal; font-size: 10px; font-weight: 800; color: var(--muted); }
+  nav .world-btn:hover, nav .world-btn.on { box-shadow: 0 0 14px rgba(255, 203, 5, .35); }
+  nav .world-btn.on { background: linear-gradient(var(--card2), var(--card2)) padding-box, linear-gradient(135deg, #ff5a5a, #ffcb05 35%, #3dffb4 65%, #7c5cff) border-box; }
+  /* 기본 폭(400)에서는 탭 줄이 꽉 찬다 — 알약은 그림만, 탭 사이는 조금씩 좁힌다(⚙ · ✕ 가 밀려나지 않게) */
+  @media (max-width: 460px) {
+    nav { padding-left: 8px; padding-right: 8px; }
+    nav button { padding-left: 7px; padding-right: 7px; }
+    nav .ico { padding-left: 6px; padding-right: 6px; }
+    nav .world-btn { margin-right: 2px; padding: 3px 6px; }
+    nav .world-btn i { display: none; }
+  }
+  .wdhead { display: flex; align-items: baseline; gap: 8px; margin: 2px 2px 10px; }
+  .wdhead .t { font-size: 15px; font-weight: 800; }
+  .wdhead .c { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .wdcard { position: relative; display: flex; gap: 12px; align-items: center; margin-bottom: 9px; padding: 14px; border-radius: 14px; border: 1.5px solid var(--line); overflow: hidden; }
+  .wdcard.pokemon { background: linear-gradient(135deg, rgba(255, 90, 90, .16), rgba(255, 203, 5, .10) 60%, var(--card)); }
+  .wdcard.digimon { background: linear-gradient(135deg, rgba(61, 255, 180, .14), rgba(124, 92, 255, .14) 60%, var(--card)); }
+  .wdcard.cur { border-color: #ffcb05; box-shadow: 0 0 0 1px rgba(255, 203, 5, .35) inset; }
+  .wdcard .big { flex-shrink: 0; width: 64px; height: 64px; display: grid; place-items: center; font-size: 40px; border-radius: 14px; background: rgba(0, 0, 0, .22); }
+  .wdcard .big svg { width: 58px; height: 58px; }
+  .wdcard .bd { flex: 1; min-width: 0; }
+  .wdcard .nm { font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .wdcard .tag { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 99px; color: #0c1a10; background: #ffcb05; }
+  .wdcard .tag.new { background: #3dffb4; }
+  .wdcard .tag.st { color: var(--text); background: rgba(255, 255, 255, .12); }
+  .wdcard .de { margin-top: 3px; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+  .wdcard .go { flex-shrink: 0; padding: 8px 14px; font: inherit; font-size: 12px; font-weight: 800; color: #14151a; background: #ffcb05; border: 0; border-radius: 10px; cursor: pointer; }
+  .wdcard .go:disabled { opacity: .45; cursor: default; }
+  .wdnote { margin: 4px 2px; font-size: 11px; color: var(--muted); line-height: 1.55; }
+
+  /* ---------- 🧬 조그레스 — 디지털 월드의 "합체" 탭 ---------- */
+  body:not(.world-digimon) nav [data-tab="jogress"] { display: none; }
+  nav .jg-tab { color: #3dffb4; }
+  nav .jg-tab.on { color: #3dffb4; background: rgba(61, 255, 180, .12); }
+  .jg-empty { padding: 26px 14px; text-align: center; font-size: 12px; color: var(--muted); line-height: 1.6; background: var(--card); border: 1px dashed var(--line); border-radius: 12px; }
+  .jg-card { margin-bottom: 10px; padding: 12px; border-radius: 14px; border: 1px solid #2c5a49; background: linear-gradient(160deg, rgba(61, 255, 180, .08), var(--card) 55%); }
+  .jg-base { display: flex; gap: 10px; align-items: center; }
+  .jg-base img, .jg-base .jg-noimg { width: 52px; height: 52px; image-rendering: pixelated; }
+  .jg-base b { font-size: 14px; }
+  .jg-base small { display: block; font-size: 11px; color: var(--muted); }
+  .jg-base > div { flex: 1; min-width: 0; }
+  .jg-bar { margin-top: 5px; height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+  .jg-bar i { display: block; height: 100%; background: linear-gradient(90deg, #12b886, #3dffb4); }
+  .jg-row { display: flex; gap: 10px; align-items: stretch; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #2c5a49; }
+  .jg-res { width: 84px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 4px; border-radius: 10px; background: rgba(0, 0, 0, .25); text-align: center; }
+  .jg-res img { width: 60px; height: 60px; image-rendering: pixelated; }
+  .jg-res b { font-size: 12px; }
+  .jg-res small { font-size: 10px; color: var(--muted); }
+  .jg-res.unknown img { filter: brightness(0) drop-shadow(0 0 3px #3dffb4); opacity: .85; }
+  .jg-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .jg-needline { font-size: 11.5px; color: var(--muted); }
+  .jg-needline b { color: var(--text); }
+  .jg-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .jg-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 3px; font: inherit; font-size: 11px; color: var(--text); background: rgba(255, 255, 255, .05); border: 1px solid var(--line); border-radius: 99px; cursor: pointer; }
+  .jg-chip img, .jg-chip .jg-noimg { width: 24px; height: 24px; image-rendering: pixelated; }
+  .jg-chip.on { border-color: #3dffb4; background: rgba(61, 255, 180, .14); }
+  .jg-chip:disabled { opacity: .45; cursor: default; }
+  .jg-need { font-size: 11px; color: #ff9f6b; }
+  .jg-act { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .jg-go { padding: 7px 12px; font: inherit; font-size: 12px; font-weight: 800; color: #04110c; background: #3dffb4; border: 0; border-radius: 10px; cursor: pointer; }
+  .jg-go.armed { background: #ffcb05; }
+  .jg-go:disabled { opacity: .4; cursor: default; }
+  .jg-why { font-size: 10.5px; color: var(--muted); }
+  .jg-why.warn { color: #ffb36b; }
+  .jg-noimg { display: inline-grid; place-items: center; font-weight: 800; color: var(--muted); }
+  /* 합체 연출 — 두 그림이 가운데로 모여 번쩍이고, 결과가 떠오른다 */
+  .jg-fx { position: fixed; inset: 0; z-index: 50; background: rgba(2, 8, 6, .96); overflow: hidden; pointer-events: none; }
+  .jg-fx img, .jg-fx .jg-noimg { width: 96px; height: 96px; image-rendering: pixelated; }
+  .jg-fx-a, .jg-fx-b, .jg-fx-r { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+  .jg-fx-r { opacity: 0; display: flex; flex-direction: column; align-items: center; }
+  .jg-fx-r img { width: 140px; height: 140px; filter: drop-shadow(0 0 14px #3dffb4); }
+  .jg-fx-r b { margin-top: 6px; font-size: 18px; color: #eafff6; text-shadow: 0 0 8px #3dffb4; }
+  .jg-fx-r small { font-size: 11px; color: #9fe8c9; }
+  .jg-fx-flash { position: absolute; inset: 0; background: #eafff6; opacity: 0; }
+  .jg-fx-t { position: absolute; left: 0; right: 0; top: 16%; text-align: center; font: 800 15px/1 Consolas, monospace; letter-spacing: .3em; color: #3dffb4; text-shadow: 0 0 10px #3dffb4; opacity: 0; }
+  .jg-fx.play .jg-fx-a { animation: jgA 3.4s steps(24, end) forwards; }
+  .jg-fx.play .jg-fx-b { animation: jgB 3.4s steps(24, end) forwards; }
+  .jg-fx.play .jg-fx-flash { animation: jgFlash 3.4s linear forwards; }
+  .jg-fx.play .jg-fx-r { animation: jgR 3.4s ease-out forwards; }
+  .jg-fx.play .jg-fx-t { animation: jgT 3.4s steps(6, end) forwards; }
+  @keyframes jgA { 0% { transform: translate(-190%, -50%); filter: none; } 35% { transform: translate(-100%, -50%); filter: drop-shadow(4px 0 0 #3dffb4) drop-shadow(-4px 0 0 #b45cff); } 48% { transform: translate(-50%, -50%); opacity: 1; } 52%, 100% { transform: translate(-50%, -50%); opacity: 0; } }
+  @keyframes jgB { 0% { transform: translate(90%, -50%); } 35% { transform: translate(0%, -50%); filter: drop-shadow(-4px 0 0 #3dffb4) drop-shadow(4px 0 0 #b45cff); } 48% { transform: translate(-50%, -50%); opacity: 1; } 52%, 100% { transform: translate(-50%, -50%); opacity: 0; } }
+  @keyframes jgFlash { 0%, 46% { opacity: 0; } 52% { opacity: 1; } 70% { opacity: 0; } 100% { opacity: 0; } }
+  @keyframes jgR { 0%, 55% { opacity: 0; transform: translate(-50%, -40%) scale(.6); } 70% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 80%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+  @keyframes jgT { 0%, 10% { opacity: 0; } 20%, 90% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* ---------- 🌏 디지털 월드 — 포켓몬 세계에만 있는 것(결투 · 보스 · 출석 · 길드)은 감춘다 ---------- */
+  body.world-digimon nav [data-tab="boss"],
+  body.world-digimon nav [data-tab="battle"],
+  body.world-digimon #homeCheckin,
+  body.world-digimon #rmSwitch [data-view="guild"],
+  body.world-digimon #rmSwitch [data-view="list"],
+  body.world-digimon #shSwitch [data-view="mall"],
+  body.world-digimon #ssBox,
+  body.world-digimon #dexTiers,
+  body.world-digimon .rm-coin-h,
+  body.world-digimon #rmCoinNote,
+  body.world-digimon #rmCoinThemes,
+  body.world-digimon #rmCoinFurni { display: none !important; }
+  .badge.a-언노운 { color: #fff; background: #5b6170; }
+  /* 🦖 디지코드 알 — 줄마다 깜박이고, 빛 한 줄이 위에서 아래로 훑는다 */
+  .egg-digicode .dc-row { animation: dcflick 2.2s steps(2, end) infinite; }
+  @keyframes dcflick { 0%, 100% { opacity: .9; } 50% { opacity: .35; } }
+  .egg-digicode .dc-scan { animation: dcscan 2.6s linear infinite; }
+  @keyframes dcscan { from { transform: translateY(-10px); } to { transform: translateY(104px); } }
+  .badge.attr { font-weight: 700; }
+  /* 세계에 따라 바뀌는 말 — 포켓몬 세계는 .w-poke, 디지털 월드는 .w-digi */
+  .w-digi { display: none; }
+  body.world-digimon .w-poke { display: none; }
+  body.world-digimon .w-digi { display: inline; }
+  .badge.a-백신 { color: #0c1a10; background: #7cd4ff; }
+  .badge.a-데이터 { color: #0c1a10; background: #9ef0a8; }
+  .badge.a-바이러스 { color: #fff; background: #a35cff; }
+  .badge.a-프리 { color: #0c1a10; background: #e0e0e0; }
+  .node .unk { width: 42px; height: 42px; margin: 0 auto; display: grid; place-items: center; font-size: 20px; font-weight: 800; color: var(--muted); border: 1.5px dashed var(--line); border-radius: 10px; }
+
   /* ---------- 새 버전 띠 ---------- */
   .upd {
     display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin: 0 12px 8px; padding: 6px 6px 6px 11px;
@@ -501,16 +624,20 @@
 <link rel="stylesheet" href="online.css" />
 <link rel="stylesheet" href="gym.css" />
 <link rel="stylesheet" href="boss.css" />
+<link rel="stylesheet" href="digibattle.css" />
 
 <nav>
   <button data-tab="home" class="on">홈</button>
   <button data-tab="shop">상점</button>
   <button data-tab="box">박스</button>
-  <button data-tab="room">방</button>
+  <button data-tab="room"><span class="w-poke">방</span><span class="w-digi">월드</span></button>
   <button data-tab="boss">보스</button>
   <button data-tab="battle">배틀</button>
   <button data-tab="dex">도감</button>
+  <button data-tab="field" class="fb-tab" title="필드 배틀 — 초원에서 싸우며 진화한다">⚔️ 배틀</button>
+  <button data-tab="jogress" class="jg-tab" title="조그레스 — 두 디지몬을 합쳐 진화시킨다">🧬 합체</button>
   <span class="sp"></span>
+  <button class="world-btn" data-tab="world" id="worldBtn" title="세계 바꾸기 — 포켓몬 세계 ⇄ 디지털 월드"><span id="worldIco">🌏</span><i>⇄</i></button>
   <button class="ico news-btn" data-tab="news" title="새 소식 — 버전마다 바뀐 점">📢<i class="dot" id="newsDot" hidden></i></button>
   <button class="ico" id="gear" title="설정">⚙</button>
   <button class="ico" id="close" title="닫기 (Esc)">✕</button>
@@ -591,7 +718,7 @@
     </div>
     <div id="shShop">
     <div class="wallet">
-      <div class="lab">쓸 수 있는 사탕</div>
+      <div class="lab" id="walletLab">쓸 수 있는 사탕</div>
       <div class="n" id="wallet">🍬 –</div>
       <div class="sub" id="walletSub"></div>
     </div>
@@ -658,16 +785,16 @@
   <!-- ---------------- 미니룸 (room.js) ---------------- -->
   <section id="tab-room" hidden>
     <div class="rm-switch" id="rmSwitch">
-      <button data-view="mine" class="on">🏠 내 방</button>
+      <button data-view="mine" class="on"><span class="w-poke">🏠 내 방</span><span class="w-digi">🌐 내 디지털 월드</span></button>
       <button data-view="guild">🏰 길드</button>
       <button data-view="list">📋 길드 목록</button>
-      <span class="c">포켓몬을 누르면 깡충 · 이름표</span>
+      <span class="c"><span class="mw">포켓몬</span>을 누르면 깡충 · 이름표</span>
     </div>
     <div id="rmMineView">
     <div class="rm-room" id="rmRoom" data-theme="cabin">
       <div class="rm-scene"></div>
       <div class="rm-actors" id="rmActors"></div>
-      <div class="rm-empty" id="rmEmpty" hidden>아래에서 방에 둘 포켓몬을 골라 주세요</div>
+      <div class="rm-empty" id="rmEmpty" hidden>아래에서 방에 둘 <span class="mw">포켓몬</span>을 골라 주세요</div>
     </div>
     <div class="rm-panel" id="rmPanel">
       <div class="rm-tools">
@@ -679,11 +806,11 @@
       <div class="rm-chips" id="rmThemes"></div>
       <h5>가구</h5>
       <div class="rm-furni" id="rmFurni"></div>
-      <h5>🪙 코인 꾸미기 — 코인으로만 산다<span class="w" id="rmCoins">🪙 –</span></h5>
+      <h5 class="rm-coin-h">🪙 코인 꾸미기 — 코인으로만 산다<span class="w" id="rmCoins">🪙 –</span></h5>
       <div class="rm-coin-note" id="rmCoinNote"></div>
       <div class="rm-chips" id="rmCoinThemes"></div>
       <div class="rm-furni" id="rmCoinFurni"></div>
-      <h5>방에 둘 포켓몬 <span id="rmMonsCount"></span></h5>
+      <h5>방에 둘 <span class="mw">포켓몬</span> <span id="rmMonsCount"></span></h5>
       <div class="rm-chips" id="rmMons"></div>
       <h5>키운 기록 — 사지 않아도 저절로 생긴다</h5>
       <div class="rm-rec" id="rmRec"></div>
@@ -944,6 +1071,58 @@
   </section>
 
   <!-- 📢 새 소식 — 버전마다 바뀐 점(news.js) -->
+  <!-- ⚔️ 필드 배틀 — 디지털 월드의 결투(digibattle.js) -->
+  <section id="tab-field" hidden>
+    <div class="wdhead"><span class="t">⚔️ 필드 배틀</span><span class="c">테이머 게이지로 명령하고, 싸우며 진화시키세요</span></div>
+    <div class="fb-pick">
+      <select id="fbMe" title="내 파트너"></select>
+      <span class="fb-vs">VS</span>
+      <select id="fbFoe" title="상대"></select>
+      <button class="fb-go" id="fbGo">⚔️ 배틀 시작</button>
+    </div>
+    <div class="fb-arena" id="fbArena">
+      <canvas class="fb-bg" id="fbBg" width="320" height="200"></canvas>
+      <canvas id="fbUnder"></canvas>
+      <div class="fb-mons" id="fbMons"></div>
+      <canvas id="fbFx"></canvas>
+      <div class="fb-cut" id="fbCut" style="display:none"><div class="band"><i class="ln"></i><img alt=""><div class="nm"><b></b><small></small></div></div></div>
+      <div class="fb-over" id="fbOver"></div>
+    </div>
+    <div class="fb-cmd" id="fbCmd">
+      <div class="fb-gauge">TAMER<div class="bar"><i id="fbGauge"></i><u style="left:20%"></u><u style="left:30%"></u><u style="left:40%"></u></div><em id="fbGaugeN">0</em></div>
+      <div class="fb-btns">
+        <button data-cmd="special"><span>🔥 필살기</span><small>40</small><kbd>1</kbd></button>
+        <button data-cmd="guard"><span>🛡 막아!</span><small>20</small><kbd>2</kbd></button>
+        <button data-cmd="rally"><span>📣 힘내!</span><small>30</small><kbd>3</kbd></button>
+        <button data-cmd="evolve" class="evo"><span>🧬 진화!</span><small>60</small><kbd>4</kbd></button>
+      </div>
+      <label class="fb-auto"><input type="checkbox" id="fbAuto"> 자동 명령 — 테이머 AI 가 대신 명령합니다(지켜보기만)</label>
+      <label class="fb-auto"><input type="checkbox" id="fbCalm"> 연출 약하게 — 화면 번쩍임을 빼고 흔들림 · 어두워짐을 줄입니다</label>
+    </div>
+    <div class="wdnote" style="margin-top:8px">둘 다 <b>성장기</b>로 시작합니다. 게이지가 차면 그 자리에서 진화(성숙기 60 · 완전체 80 · 궁극체 100) — 그 아이가 가 본 모습까지만 올라갑니다.
+      디지몬은 자기 기술을 알아서 쓰고, 첫째 기술(필살기)만 명령으로 씁니다. 게이지를 명령에 쓰면 진화가 늦어지고, 필살기에 맞으면 게이지가 깨집니다(막으면 안 깨져요). 속성 상성: 백신 ▶ 바이러스 ▶ 데이터 ▶ 백신. 이기면 전적이 남습니다(보상은 없습니다).
+      바탕화면에서 펫을 다른 펫 위에 놓아도 여기서 붙습니다.</div>
+  </section>
+
+  <!-- 🧬 조그레스 — 디지털 월드의 합체 진화(jogress.js) -->
+  <section id="tab-jogress" hidden>
+    <div class="wdhead"><span class="t">🧬 조그레스 진화</span><span class="c" id="jgBits">💠 –</span></div>
+    <div class="wdnote" style="margin:-4px 2px 10px">어떤 디지몬은 둘이 합쳐야만 다음 모습이 됩니다. 단계를 넘어도 저절로 되지 않아요.
+      밑동이 이번 단계를 절반 넘게 자랐고, 맞는 짝이 박스에 있으면 💠 비트로 합칠 수 있습니다. 짝은 합쳐져 박스에서 사라집니다.</div>
+    <div id="jgList"></div>
+  </section>
+  <div class="jg-fx" id="jgFx" hidden></div>
+
+  <!-- 🌏 세계 — 포켓몬 세계 ⇄ 디지털 월드(app.js renderWorld) -->
+  <section id="tab-world" hidden>
+    <div class="wdhead"><span class="t">세계 바꾸기</span><span class="c">두 세계는 같은 토큰으로 함께 자랍니다</span></div>
+    <div id="wdCards"></div>
+    <div class="wdnote">
+      세계마다 박스 · 도감 · 화폐 · 방이 따로입니다. 다른 세계로 갔다 돌아오면 그 사이 쓴 토큰만큼 한꺼번에 따라잡습니다 —
+      버닝타임 몫도 쓴 시각대로 칩니다. 처음 들어가는 세계는 그날부터 자랍니다(지난 사용량은 넣지 않습니다). 바꾸면 앱이 몇 초 만에 다시 켜집니다.
+    </div>
+  </section>
+
   <section id="tab-news" hidden>
     <div class="newshead"><span class="t">📢 새 소식</span><span class="c" id="newsCur"></span><button class="mini" id="newsCheck" title="GitHub 에 새 버전이 나왔나 지금 본다">🔄 새 버전 확인</button></div>
     <div class="newschk" id="newsChk" hidden></div>
@@ -968,6 +1147,8 @@
 <script src="ballart.js"></script>
 <script src="news.js"></script>
 <script src="report.js"></script>
+<script src="jogress.js"></script>
+<script src="digibattle.js"></script>
 <script src="app.js"></script>
 <script src="moves.js"></script>
 <script src="raidfx.js"></script>

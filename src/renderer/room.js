@@ -200,6 +200,76 @@
       },
     },
 
+    /*
+     * 🌿 디지털 초원 — 디지털 월드의 기본 맵. 파란 하늘 · 뭉게구름 · 멀리 뾰족한 산과 언덕 · 숲,
+     * 하늘엔 데이터 큐브가 몇 개 떠 있다(여기가 디지털 월드라는 표시). 바닥은 풀밭과 흙길
+     */
+    digital: {
+      wall(g) {
+        const bands = ["#5fb4ee", "#78c3f2", "#93d1f5", "#b4e1f8"];
+        bands.forEach((c, i) => { R(g, 0, i * 25, AW, 25, c); if (i) dither(g, 0, i * 25, AW, 2, bands[i - 1]); });
+        R(g, 0, 100, AW, FLOOR - 100, "#c9ebfa");
+        // 뭉게구름
+        const cloud = (x, y, s) => {
+          oval(g, x, y, 10 * s, 4 * s, "#ffffff"); oval(g, x - 7 * s, y + 2 * s, 7 * s, 3 * s, "#ffffff"); oval(g, x + 8 * s, y + 2 * s, 8 * s, 3 * s, "#ffffff");
+          R(g, x - 13 * s, y + 4 * s, 28 * s, 1, "#d8eefa");
+        };
+        cloud(52, 22, 1); cloud(150, 12, 0.8); cloud(214, 36, 1.1);
+        // 데이터 큐브 — 하늘에 떠 있는 작은 네모(디지털 월드의 표시)
+        const cube = (x, y, sz) => { R(g, x, y, sz, sz, "#3dd6a0"); R(g, x, y, sz, 1, "#b8ffe6"); R(g, x, y, 1, sz, "#b8ffe6"); R(g, x + sz - 1, y + 1, 1, sz - 1, "#1a8f69"); R(g, x + 1, y + sz - 1, sz - 1, 1, "#1a8f69"); };
+        cube(104, 30, 5); cube(266, 16, 4); cube(28, 52, 4); cube(186, 58, 3);
+        // 해
+        oval(g, 290, 32, 9, 9, "#fff3a8"); oval(g, 290, 32, 7, 7, "#ffe066"); R(g, 286, 28, 3, 2, "#fffbe0");
+        // 멀리 뾰족한 산(가운데) — 꼭대기에 눈, 옆으로 이어진 먼 산
+        for (let x = 0; x < AW; x++) {
+          const far = Math.round(92 - Math.max(0, 14 - Math.abs(x - 40) * 0.35) - Math.max(0, 12 - Math.abs(x - 250) * 0.3) - Math.sin(x / 11) * 2);
+          R(g, x, far, 1, FLOOR - far, "#8fb9d6");
+        }
+        for (let x = 110; x < 210; x++) {
+          const top = Math.round(36 + Math.abs(x - 160) * 1.05);
+          if (top > FLOOR) continue;
+          R(g, x, top, 1, FLOOR - top, x < 160 ? "#6f8fb0" : "#5a7898");
+          if (top < 52) R(g, x, top, 1, Math.min(6, 52 - top), "#f4f8fb"); // 눈
+        }
+        // 가까운 언덕과 숲
+        for (let x = 0; x < AW; x++) {
+          const hill = Math.round(104 - Math.sin(x / 26) * 6 - Math.sin(x / 9 + 1) * 2);
+          R(g, x, hill, 1, FLOOR - hill, "#6fbf4f");
+          R(g, x, hill, 1, 1, "#9be07a");
+        }
+        const r = seeded(51);
+        for (let x = 2; x < AW; x += 7 + Math.floor(r() * 9)) {
+          if (x > 128 && x < 192 && r() < 0.6) continue; // 산 앞은 비워 둔다
+          const h = 10 + Math.floor(r() * 8), y = Math.round(104 - Math.sin(x / 26) * 6) - h + 4;
+          for (let i = 0; i < h; i++) { const w = Math.max(1, Math.floor((i * 7) / h)); R(g, x - (w >> 1), y + i, w + 1, 1, i % 3 ? "#2f7d3a" : "#3c9447"); }
+          R(g, x, y + h, 1, 2, "#5d4037");
+        }
+      },
+      trim: ["#4f9a3a", "#3a7a2a", "#8fd96a"],
+      floor(g) {
+        R(g, 0, FLOOR, AW, AH - FLOOR, "#79c556");
+        dither(g, 0, FLOOR, AW, AH - FLOOR, "#6db84c");
+        // 흙길 — 왼쪽 앞에서 오른쪽 뒤로
+        for (let y = FLOOR; y < AH; y++) {
+          const t = (y - FLOOR) / (AH - FLOOR);
+          const cx = Math.round(230 - t * 120 + Math.sin(t * 5) * 14), w = Math.round(10 + t * 30);
+          R(g, cx - w, y, w * 2, 1, "#d9b98a");
+          R(g, cx - w, y, 2, 1, "#b8956a"); R(g, cx + w - 2, y, 2, 1, "#b8956a");
+        }
+        // 풀 포기 · 꽃
+        const r = seeded(19);
+        for (let i = 0; i < 90; i++) {
+          const x = Math.floor(r() * AW), y = FLOOR + 4 + Math.floor(r() * (AH - FLOOR - 6));
+          R(g, x, y, 1, 2, "#4f9a3a"); R(g, x + 2, y - 1, 1, 3, "#4f9a3a"); R(g, x + 1, y + 1, 1, 1, "#3a7a2a");
+        }
+        for (let i = 0; i < 26; i++) {
+          const x = Math.floor(r() * AW), y = FLOOR + 6 + Math.floor(r() * (AH - FLOOR - 8));
+          const c = ["#ffffff", "#ffd54f", "#ff8fb1", "#b39ddb"][i % 4];
+          R(g, x, y, 2, 2, c); R(g, x, y + 2, 1, 1, "#3a7a2a");
+        }
+      },
+    },
+
     /* ---- 코인 배경 (deco.json) ---- */
 
     // 포켓몬센터 — 흰 벽 · 몬스터볼 무늬 빨간 띠 · 분홍 징두리 · 크림 타일
@@ -331,6 +401,12 @@
       const r = seeded(13);
       for (let i = 0; i < 22; i++) R(g, x + Math.floor(r() * w), y + Math.floor(r() * (ground - y)), 1, 1, "#ffffff");
     }
+    if (theme === "digital") {
+      // 디지털 월드 — 창밖도 데이터 하늘(격자)
+      R(g, x, y, w, h, "#0b2846");
+      for (let i = 0; i < w; i += 6) R(g, x + i, y, 1, h, "#147a7466");
+      for (let j = 0; j < h; j += 6) R(g, x, y + j, w, 1, "#147a7466");
+    }
     if (theme === "cave") {
       // 동굴 밖 — 바위 틈으로 보이는 하늘
       dither(g, x, y, w, 4, "#3f3b47");
@@ -355,9 +431,55 @@
     box(g, x - 4, y + h, w + 8, 4, "#8a5a32", "#4e3018", "#a8743f"); // 창턱
   }
 
-  function drawDexFrame(g) {
+  /**
+   * 🦖 디지털 월드의 도감 — 액자 대신 휴대용 기기(디지바이스 느낌). 도감 수(9/153)는 HTML 글자로
+   * 액정 한가운데(116, 41)에 얹힌다(.rm-txt.lcd). 위에 고리, 옆에 버튼 둘, 아래에 하나
+   */
+  function drawDigivice(g) {
+    const cx = 117, cy = 38; // 액정 한가운데 — 도감 수 글자가 여기 얹힌다
+    const OUT = "#24485a", BODY = "#cdeef7", HI = "#f4fcff", SH = "#93cfe0", SH2 = "#6fb2c7";
+    oval(g, cx, 59, 21, 2, "#0000002a"); // 그림자
+    // 안테나 — 왼쪽 위 검은 막대
+    for (let i = 0; i < 7; i++) R(g, 99 + Math.floor(i / 2), 13 + i, 3, 1, i ? "#263238" : "#455a64");
+    // 아래 발판 둘
+    for (const fx of [103, 123]) { R(g, fx, 52, 10, 6, OUT); R(g, fx + 1, 52, 8, 5, BODY); R(g, fx + 1, 56, 8, 1, SH2); R(g, fx + 3, 53, 1, 3, SH); R(g, fx + 6, 53, 1, 3, SH); }
+    // 몸체 — 팔각형에 가까운 통통한 꼴
+    const rows = [];
+    for (let y = 18; y <= 54; y++) {
+      const d = Math.min(y - 18, 54 - y);
+      const inset = d < 6 ? 6 - d : 0;
+      rows.push([y, 95 + inset, 139 - inset]);
+    }
+    for (const [y, x0, x1] of rows) R(g, x0, y, x1 - x0 + 1, 1, OUT);
+    for (const [y, x0, x1] of rows.slice(1, -1)) R(g, x0 + 1, y, x1 - x0 - 1, 1, BODY);
+    for (const [y, x0, x1] of rows.slice(1, 10)) R(g, x0 + 1, y, x1 - x0 - 1, 1, y < 22 ? HI : BODY);
+    for (const [y, x0, x1] of rows.slice(-8, -1)) R(g, x0 + 1, y, x1 - x0 - 1, 1, SH);
+    // 양옆 줄진 손잡이
+    for (let y = 24; y <= 50; y += 3) { R(g, 96, y, 6, 1, SH2); R(g, 133, y, 6, 1, SH2); R(g, 96, y + 1, 6, 1, HI); R(g, 133, y + 1, 6, 1, HI); }
+    R(g, 102, 22, 1, 30, SH2); R(g, 132, 22, 1, 30, SH2);
+    // 액정을 두른 둥근 테 — 둘레에 디지코드 눈금
+    oval(g, cx, cy, 15, 15, OUT); oval(g, cx, cy, 14, 14, "#e9f8fc"); oval(g, cx, cy, 14, 14, HI, -14, -8);
+    for (let k = 0; k < 20; k++) {
+      const a = (k / 20) * Math.PI * 2 - Math.PI / 2;
+      const px = Math.round(cx + Math.cos(a) * 11.5), py = Math.round(cy + Math.sin(a) * 11.5);
+      R(g, px, py, k % 3 === 0 ? 2 : 1, 1, "#4a6f80");
+    }
+    // 액정 — 네모, 어두운 테두리, 점무늬
+    R(g, 106, 30, 23, 17, OUT);
+    R(g, 107, 31, 21, 15, "#b8cc98");
+    for (let i = 0; i < 21; i += 2) for (let j = 0; j < 15; j += 2) R(g, 107 + i, 31 + j, 1, 1, "#aabf8a");
+    R(g, 107, 31, 21, 1, "#d6e6bc");
+    // 버튼 — 남색 타원(왼쪽 하나, 오른쪽 둘)
+    const btn = (bx, by, rx, ry) => { oval(g, bx, by, rx + 1, ry + 1, "#1a237e"); oval(g, bx, by, rx, ry, "#3f51b5"); oval(g, bx, by, rx - 1, ry - 1, "#5c6bc0"); R(g, bx - 1, by - ry + 1, 2, 1, "#9fa8da"); };
+    btn(99, 38, 3, 5);
+    btn(135, 29, 3, 4);
+    btn(135, 47, 3, 4);
+  }
+
+  function drawDexFrame(g, dg) {
     box(g, 100, 24, 32, 26, "#e2b93b", "#8a6a12", "#ffe28a", "#b8901e");
     R(g, 103, 27, 26, 20, "#fffaf0");
+    if (dg) return void drawDigivice(g);
     oval(g, 116, 33, 4, 4, "#e53935", -4, -1); oval(g, 116, 33, 4, 4, "#fafafa", 0, 4);
     R(g, 112, 33, 9, 1, "#222"); R(g, 115, 32, 3, 3, "#222"); R(g, 116, 33, 1, 1, "#fff");
   }
@@ -522,6 +644,98 @@
       R(g, 7, 4, 3, 1, "#ff8a80");
     } },
   };
+
+  /* ================= 🦖 디지털 월드의 가구 — 자리 · 크기(w, h)는 FURN 그대로, 그림만 =================
+     이름은 메인(main/room.js FURNI_DG)이 준다. 데이터 등불 · 디지타마 둥지 · 고기밭 · 자판기 · 건초 침대 ·
+     디지바이스 단말기 · 초원의 TV · 공중전화 부스 */
+  const FURN_DG = {
+    lamp(g) { // 데이터 등불 — 나무 기둥 위 빛나는 수정
+      R(g, 8, 18, 2, 38, "#6d4c41"); R(g, 8, 18, 1, 38, "#8d6e63");
+      R(g, 4, 56, 10, 3, "#5d4037"); R(g, 2, 59, 14, 3, "#3e2723");
+      R(g, 5, 15, 8, 3, "#795548");
+      for (let i = 0; i < 14; i++) { const w = i < 7 ? 1 + i : 14 - i; R(g, 9 - (w >> 1) - 1, i + 1, w + 2, 1, i < 7 ? "#7ff3ff" : "#3cc6e0"); }
+      R(g, 8, 3, 1, 5, "#e8ffff"); R(g, 10, 6, 1, 2, "#e8ffff");
+    },
+    bed(g) { // 건초 침대 — 낮은 나무 틀 위 볏짚 더미
+      box(g, 4, 24, 62, 8, "#8d5a34", "#5e3a1d", "#a8743f");
+      R(g, 6, 32, 3, 4, "#5e3a1d"); R(g, 61, 32, 3, 4, "#5e3a1d");
+      oval(g, 35, 20, 31, 8, "#d9b44a"); oval(g, 35, 19, 29, 6, "#ecd06a");
+      const r = seeded(61);
+      for (let i = 0; i < 70; i++) { const x = 8 + Math.floor(r() * 54), y = 13 + Math.floor(r() * 12); R(g, x, y, 3, 1, r() < 0.5 ? "#c9a23a" : "#f6e08a"); }
+      oval(g, 14, 16, 7, 4, "#f2e6c8"); oval(g, 14, 15, 6, 3, "#fffaf0"); // 베개 대신 큰 잎
+    },
+    aquarium(g) { // 공중전화 부스 — 초록 지붕, 유리, 안의 전화기
+      const x0 = 9;
+      box(g, x0, 2, 20, 34, "#2e7d32", "#1b5e20", "#4caf50");
+      R(g, x0 - 1, 0, 22, 4, "#1b5e20"); R(g, x0, 0, 20, 1, "#66bb6a");
+      R(g, x0 + 3, 6, 14, 26, "#bfe8f5"); R(g, x0 + 3, 6, 14, 2, "#e6f7fc"); R(g, x0 + 9, 6, 1, 26, "#2e7d32");
+      box(g, x0 + 4, 16, 6, 8, "#81c784", "#1b5e20"); R(g, x0 + 5, 18, 4, 1, "#1b5e20"); R(g, x0 + 5, 20, 4, 1, "#1b5e20"); // 전화기
+      R(g, x0 + 11, 12, 1, 6, "#ffffff88");
+    },
+    tv(g) { // 초원의 TV — 나무 상자 TV 와 안테나, 화면엔 지지직
+      R(g, 13, 0, 1, 6, "#9e9e9e"); R(g, 27, 1, 1, 5, "#9e9e9e"); R(g, 12, 0, 3, 1, "#cfd8dc"); R(g, 26, 0, 3, 1, "#cfd8dc");
+      box(g, 2, 6, 36, 28, "#8d5a34", "#4e3018", "#a8743f");
+      R(g, 6, 10, 22, 18, "#6f7f86");
+      const r = seeded(71);
+      for (let i = 0; i < 70; i++) R(g, 6 + Math.floor(r() * 22), 10 + Math.floor(r() * 18), 1, 1, r() < 0.5 ? "#dfe7ea" : "#4a575d");
+      R(g, 31, 11, 3, 3, "#3e2723"); R(g, 31, 17, 3, 3, "#3e2723"); R(g, 32, 24, 2, 1, "#ff5252");
+      R(g, 6, 34, 3, 4, "#4e3018"); R(g, 31, 34, 3, 4, "#4e3018");
+    },
+    desk(g) { // 디지바이스 단말기 — 돌 받침 위 화면, 디지코드가 흐른다
+      box(g, 12, 22, 32, 18, "#8a8f98", "#4b5058", "#b5bac2", "#6b7078");
+      R(g, 14, 30, 28, 1, "#6b7078");
+      box(g, 6, 0, 44, 22, "#37474f", "#1c262b", "#546e7a");
+      R(g, 9, 3, 38, 15, "#06221a");
+      for (let i = 0; i < 5; i++) for (let j = 0; j < 9; j++) if ((i * 7 + j * 3) % 4) R(g, 11 + j * 4, 5 + i * 3, 2, 1, i === 4 ? "#7dffd0" : "#2bd99b");
+      R(g, 22, 19, 12, 2, "#2bd99b"); R(g, 24, 19, 2, 2, "#e8fff6");
+    },
+    shelf(g) { // 자판기 — 빨간 몸통, 음료 진열, 투입구
+      box(g, 0, 0, 38, 64, "#d32f2f", "#7f1d1d", "#ef5350", "#b71c1c");
+      R(g, 3, 4, 32, 30, "#e3f2fd"); R(g, 3, 4, 32, 1, "#ffffff");
+      const col = ["#42a5f5", "#ffca28", "#66bb6a", "#ef5350", "#ab47bc", "#26c6da"];
+      for (let row = 0; row < 3; row++) for (let i = 0; i < 6; i++) { R(g, 5 + i * 5, 7 + row * 9, 3, 6, col[(i + row * 2) % 6]); R(g, 5 + i * 5, 7 + row * 9, 3, 1, "#ffffffaa"); }
+      for (let i = 0; i < 6; i++) R(g, 5 + i * 5, 14 + 9 * 2 + 1, 3, 1, "#90a4ae");
+      R(g, 4, 38, 20, 6, "#212121"); R(g, 6, 40, 16, 1, "#7dffd0"); // 표시창
+      R(g, 28, 38, 4, 8, "#b71c1c"); R(g, 29, 40, 2, 4, "#212121"); // 동전 구멍
+      box(g, 6, 50, 26, 9, "#424242", "#212121", "#616161"); // 꺼내는 곳
+    },
+    plant(g) { // 고기밭 — 흙더미에서 뼈 붙은 고기가 자란다
+      oval(g, 12, 36, 11, 5, "#6d4c41"); oval(g, 12, 35, 10, 4, "#8d6e63");
+      const meat = (x, y) => {
+        R(g, x - 1, y + 7, 2, 8, "#fafafa"); R(g, x - 2, y + 14, 4, 2, "#fafafa"); // 뼈
+        oval(g, x, y + 3, 5, 6, "#b5482a"); oval(g, x - 1, y + 2, 4, 5, "#d4683f"); R(g, x - 2, y, 2, 2, "#f0a07a");
+      };
+      meat(7, 10); meat(17, 6);
+      R(g, 2, 30, 2, 4, "#4f9a3a"); R(g, 21, 29, 2, 5, "#4f9a3a");
+    },
+    cushion(g) { // 디지타마 둥지 — 잔가지 둥지에 깨진 알껍데기
+      oval(g, 14, 15, 13, 2, "#0003");
+      oval(g, 14, 11, 13, 6, "#8d6e63"); oval(g, 14, 10, 11, 4, "#a1887f");
+      for (let i = 0; i < 12; i++) R(g, 3 + i * 2, 9 + (i % 3), 3, 1, "#6d4c41");
+      R(g, 7, 6, 4, 4, "#fffaf0"); R(g, 8, 5, 2, 1, "#fffaf0"); R(g, 17, 5, 5, 5, "#fffaf0"); R(g, 19, 4, 1, 1, "#fffaf0");
+      R(g, 8, 7, 1, 1, "#7ec8a9"); R(g, 19, 7, 2, 1, "#7ec8a9");
+    },
+  };
+  /** 🦖 꽃밭(러그 자리) */
+  function drawFlowerBed(g) {
+    oval(g, 160, 168, 66, 14, "#5aa83c"); oval(g, 160, 168, 62, 12, "#6fbf4f");
+    const r = seeded(83);
+    for (let i = 0; i < 70; i++) {
+      const a = r() * Math.PI * 2, d = Math.sqrt(r());
+      const x = Math.round(160 + Math.cos(a) * 58 * d), y = Math.round(168 + Math.sin(a) * 10 * d);
+      const c = ["#ffffff", "#ffd54f", "#ff8fb1", "#b39ddb", "#ff7043"][i % 5];
+      R(g, x, y, 2, 1, c); R(g, x, y + 1, 1, 1, "#3a7a2a");
+    }
+  }
+  /** 🦖 이정표(포스터 자리) — 나무 기둥과 화살표 판 */
+  function drawSign(g) {
+    const x = 196, y = 18;
+    R(g, x + 11, y + 10, 4, 34, "#795548"); R(g, x + 11, y + 10, 1, 34, "#a1887f");
+    for (let i = 0; i < 12; i++) R(g, x + 22 + Math.floor(i / 2) * 0 + (i < 6 ? i : 11 - i), y + 4 + i, 1, 1, "#5d4037");
+    box(g, x - 2, y + 4, 26, 12, "#a1887f", "#5d4037", "#d7ccc8");
+    for (let i = 0; i < 6; i++) R(g, x + 24 + i, y + 4 + i, 1, 12 - i * 2, "#a1887f");
+    R(g, x + 2, y + 8, 3, 1, "#3e2723"); R(g, x + 7, y + 8, 5, 1, "#3e2723"); R(g, x + 14, y + 8, 4, 1, "#3e2723"); R(g, x + 4, y + 11, 10, 1, "#3e2723");
+  }
 
   /* ================= 포켓몬이 가는 자리 ================= */
 
@@ -1336,6 +1550,7 @@
   }
 
   function paintScene(Rm, d) {
+    const dg = document.body.classList.contains("world-digimon"); // 🦖 디지털 월드 — 가구 그림이 다르다(FURN_DG)
     const on = new Set((d.furni || []).filter((id) => FURN[id] || COIN[id] || ["window", "rug", "poster"].includes(id)));
     const theme = THEMES[d.theme] ? d.theme : "cabin";
     const per = period(theme);
@@ -1349,13 +1564,13 @@
     T.floor(g);
     dither(g, 0, FLOOR, AW, 3, "#0000002e"); // 벽 아래 그늘
     if (on.has("window")) drawWindow(g, theme, per);
-    drawDexFrame(g);
+    drawDexFrame(g, dg);
     if (d.wins > 0) drawBadges(g, d.wins);
-    if (on.has("poster")) drawPoster(g);
+    if (on.has("poster")) (dg ? drawSign : drawPoster)(g);
     if (d.graduated > 0) drawTrophies(g, d.graduated);
     if (d.weekTop > 0) drawMedal(g);
     if (d.badges > 0) drawGymBadges(g, d.champ || 0);
-    if (on.has("rug")) drawRug(g);
+    if (on.has("rug")) (dg ? drawFlowerBed : drawRug)(g);
     // 밤이면 방이 어두워지고 램프 둘레만 밝다
     if (per === "night" || per === "evening") {
       g.fillStyle = per === "night" ? "rgba(10, 14, 40, .32)" : "rgba(60, 20, 40, .12)";
@@ -1364,7 +1579,8 @@
     if (on.has("lamp")) {
       const a = per === "night" ? 0.3 : 0.14;
       const [lx, ly] = posOf("lamp", FURN.lamp);
-      for (let r = 34; r > 4; r -= 6) { g.fillStyle = `rgba(255, 220, 140, ${a / 3})`; g.beginPath(); g.ellipse(lx + 9, ly + 10, r, r * 0.85, 0, 0, Math.PI * 2); g.fill(); }
+      const glow = dg ? "127, 243, 255" : "255, 220, 140"; // 데이터 등불은 푸른 빛
+      for (let r = 34; r > 4; r -= 6) { g.fillStyle = `rgba(${glow}, ${a / 3})`; g.beginPath(); g.ellipse(lx + 9, ly + 10, r, r * 0.85, 0, 0, Math.PI * 2); g.fill(); }
     }
 
     const html = [];
@@ -1380,13 +1596,13 @@
       const move = COIN[id].wall ? "wall" : COIN[id].flat ? "flat" : "floor";
       html.push(`<canvas class="rm-f" data-c="${id}" data-move="${move}" data-x="${x}" data-y="${y}" width="${w}" height="${h}" style="left:${X(x)}%; top:${Y(y)}%; width:${X(w)}%; height:${Y(h)}%; z-index:${z};"></canvas>`);
     }
-    if (on.has("aquarium")) {
-      // 물고기는 움직여야 해서 따로 얹는다
+    if (on.has("aquarium") && !dg) {
+      // 물고기는 움직여야 해서 따로 얹는다(디지털 월드의 같은 자리는 공중전화 부스라 없다)
       const [ax, ay] = posOf("aquarium", FURN.aquarium);
       html.push(`<i class="rm-fish" style="left:${X(ax + 4)}%; top:${Y(ay + 8)}%; --sw:${X(26)}cqw;"></i><i class="rm-fish b" style="left:${X(ax + 6)}%; top:${Y(ay + 15)}%; --sw:${X(22)}cqw;"></i>`);
     }
     // 글자 — 캔버스에 쓰면 뭉개진다
-    html.push(`<span class="rm-txt" style="left:${X(116)}%; top:${Y(41)}%;">${dex.seen}/${dex.total}</span>`);
+    html.push(`<span class="rm-txt${dg ? " lcd" : ""}" style="left:${X(116)}%; top:${Y(dg ? 39 : 41)}%;">${dex.seen}/${dex.total}</span>`);
     if (d.wins > 0) html.push(`<span class="rm-txt lt" style="left:${X(161)}%; top:${Y(52)}%;">${d.wins}승</span>`);
     if (d.graduated > 0) html.push(`<span class="rm-txt sm" style="left:${X(292)}%; top:${Y(44)}%;">졸업<br>${esc(d.lastGrad || "")}</span>`);
     if (d.weekTop > 0) html.push(`<span class="rm-txt lt" style="left:${X(116)}%; top:${Y(90)}%;">주간 1위 ×${d.weekTop}</span>`);
@@ -1397,7 +1613,7 @@
       html.push(`<div class="rm-gyb" style="left:${X(GYB.x + 2)}%; top:${Y(GYB.y + 2)}%; width:${X(GYB.w - 4)}%; height:${Y(GYB.h - 4)}%;">${cells}</div>`);
       html.push(`<span class="rm-txt lt" style="left:${X(GYB.x + GYB.w / 2)}%; top:${Y(GYB.y + GYB.h + 4)}%;">배지 ${d.badges}/8${d.champ > 0 ? ` · 챔피언 ×${d.champ}` : ""}</span>`);
     }
-    html.push(`<div class="rm-plate"><b>${esc(d.trainer || "나")}</b>의 방<br>도감 ${dex.seen} · 졸업 ${d.graduated || 0}</div>`);
+    html.push(`<div class="rm-plate"><b>${esc(d.trainer || "나")}</b>의 ${d.theme === "digital" ? "디지털 월드" : "방"}<br>도감 ${dex.seen} · 졸업 ${d.graduated || 0}</div>`);
 
     Rm.el.dataset.theme = theme;
     Rm.el.dataset.per = per; // 밤이면 가구·아이들도 같이 어두워진다(room.css)
@@ -1410,7 +1626,7 @@
     for (const c of layer.querySelectorAll("canvas.rm-f")) {
       const g2 = c.getContext("2d");
       g2.imageSmoothingEnabled = false;
-      if (c.dataset.f) FURN[c.dataset.f].draw(g2);
+      if (c.dataset.f) (dg && FURN_DG[c.dataset.f] ? FURN_DG[c.dataset.f] : FURN[c.dataset.f].draw)(g2);
       else {
         const k = { id: c.dataset.c, f: COIN[c.dataset.c], g: g2, dexId: d.statue || null };
         Rm.coin.push(k);
@@ -1678,18 +1894,30 @@
     return cv.toDataURL();
   }
 
-  window.ptbRoom = { create, markIcon, MARK_IDS: Object.keys(MARKS), FURN_IDS: [...Object.keys(FURN), ...Object.keys(COIN)] };
+  /** ⚔️ 필드 배틀(digibattle.js)의 전장 — 가구 없는 디지털 초원 한 장 */
+  function paintField() {
+    const [c, g] = canvas(AW, AH);
+    const T = THEMES.digital;
+    T.wall(g);
+    trim(g, T);
+    T.floor(g);
+    dither(g, 0, FLOOR, AW, 3, "#0000002e");
+    return c;
+  }
+
+  window.ptbRoom = { create, markIcon, paintField, MARK_IDS: Object.keys(MARKS), FURN_IDS: [...Object.keys(FURN), ...Object.keys(COIN)] };
 
   /* ================= 내 방 ================= */
 
   const mine = create($("rmRoom"));
-  mine.setEmpty("아래에서 방에 둘 포켓몬을 골라 주세요");
+  // 빈 방 글은 index.html 의 #rmEmpty 그대로 — "포켓몬/디지몬"(.mw)은 세계에 따라 app.js 가 바꾼다
   const BADGE_NOTE = [1, 10, 30, 100];
 
   function renderPanel(s) {
     const R0 = s.room;
     const left = s.candy ? s.candy.left : 0;
-    $("rmWallet").textContent = "🍬 " + left;
+    const cu = (window.ptbCur ? window.ptbCur() : { name: "사탕", icon: "🍬", time: "사탕 타임" }); // 🍬 사탕 · 💠 비트
+    $("rmWallet").textContent = cu.icon + " " + left;
     $("rmTags").classList.toggle("on", Boolean(R0.tags));
     document.body.classList.toggle("rm-tags-on", Boolean(R0.tags)); // 길드원 방을 볼 때도
     $("rmReset").disabled = !Object.keys(R0.pos || {}).length;
@@ -1699,7 +1927,7 @@
       .filter((t) => !t.coin || t.owned)
       .map((t) => t.owned
         ? `<button data-theme="${t.id}" class="${t.id === R0.theme ? "on" : ""}">${t.icon} ${t.name}</button>`
-        : `<button data-buy-theme="${t.id}" ${left < t.cost ? "disabled" : ""}>${t.icon} ${t.name}<span class="c">🍬${t.cost}</span></button>`)
+        : `<button data-buy-theme="${t.id}" ${left < t.cost ? "disabled" : ""}>${t.icon} ${t.name}<span class="c">${cu.icon}${t.cost}</span></button>`)
       .join("");
 
     $("rmFurni").innerHTML = R0.furni
@@ -1707,7 +1935,7 @@
       .map((f) => `<div class="it${f.coin ? " coin" : ""}"><span class="ic">${f.icon}</span><span class="t">${f.name}<span>${f.desc}</span></span>${
         f.owned
           ? `<button data-toggle="${f.id}">${f.on ? "치우기" : "놓기"}</button>`
-          : `<button class="buy" data-buy-furni="${f.id}" ${left < f.cost ? "disabled" : ""}>🍬${f.cost}</button>`
+          : `<button class="buy" data-buy-furni="${f.id}" ${left < f.cost ? "disabled" : ""}>${cu.icon}${f.cost}</button>`
       }</div>`)
       .join("");
 

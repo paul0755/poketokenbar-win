@@ -4,7 +4,13 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const usage = require("./usage");
-const poke = require("./pokemon");
+/*
+ * 🌏 세계 — 포켓몬 세계 / 디지털 월드. 켤 때 정한다(world.js). poke 는 그 세계의 종 데이터다 —
+ * 포켓몬 세계면 pokemon.js 그대로라 이 파일의 나머지는 세계를 몰라도 된다. 디지털 월드에서만 다른 곳은
+ * world.isDigimon 으로 가른다(결투 · 야생 · 길드 · 지갑은 아직 포켓몬 세계에만).
+ */
+const world = require("./world");
+const poke = world.pack;
 const limits = require("./limits");
 const box = require("./box");
 const profile = require("./profile");
@@ -79,13 +85,194 @@ function dataDirOverride() {
 })();
 
 const CACHE = path.join(app.getPath("userData"), "sprites");
-const SAVE = path.join(app.getPath("userData"), "save.json");
-const BACKUPS = path.join(app.getPath("userData"), "backups");
+// 세계마다 세이브 · 백업이 따로다 — 포켓몬 세계는 예전 이름 그대로(save.json)
+const SAVE = path.join(app.getPath("userData"), world.saveName);
+const BACKUPS = path.join(app.getPath("userData"), world.backupsName);
 
 let tray = null;
 let win = null; // 팝오버
 let lastStats = null;
 let lastUsage = null; // 마지막 스캔 결과. 설정 화면의 경로 진단에 쓴다
+
+/* ---------------- 🧬 조그레스(합체 진화) — 디지털 월드 ----------------
+ * 어떤 디지몬은 둘이 합쳐야만 된다(worlds/digimon.js 의 FUSE). 단계를 넘어도 저절로 그쪽으로 가지 않고,
+ * "합체" 탭에서 밑동 · 짝 · 💠 비트로 한다. 밑동이 결과 모습이 되고, 짝은 합쳐져 박스에서 빠진다.
+ * 밑동은 이번 단계를 절반 넘게 자랐어야 한다(궁극체는 언제든). 즐겨찾기한 아이는 짝으로 쓰지 않는다(놓아주기와 같다)
+ */
+/* ---------------- ⚔️ 필드 배틀 — 디지털 월드 ----------------
+ * 포켓몬식 턴 결투 대신, 디지털 초원에서 둘이 알아서 뛰어다니며 싸운다. 나는 테이머 — 게이지로 명령하고
+ * 게이지가 꽉 차면 싸우는 중에 진화시킨다(renderer/digibattle.js 가 판을 돌린다).
+ * 여기서는 판에 들어갈 두 디지몬(성장기 ~ 지금 모습)을 넘기고, 끝나면 전적만 남긴다.
+ * 보상은 없다 — 화폐(비트)는 실제로 쓴 토큰에서만 나온다는 원칙
+ */
+let fieldNow = null; // { a, b, at } — 지금 벌어진 판. 끝을 한 번만 받는다
+const FIELD_MIN_MS = 5000;
+async function fieldSetup({ a, b } = {}) {
+  if (!poke.battleForms) return { ok: false, reason: "필드 배틀은 디지털 월드에만 있습니다" };
+  const sp = growthSpeed();
+  const A = box.find(save.box, a);
+  if (!A) return { ok: false, reason: "내보낼 디지몬을 골라 주세요" };
+  const ea = box.effOf(A, sp);
+  const fa = poke.battleForms(A, ea);
+  if (!fa) return { ok: false, reason: "디지타마는 싸울 수 없습니다" };
+  const lvA = profile.levelOf(ea);
+  let B = null, fb, lvB;
+  if (b && b !== "wild") {
+    B = box.find(save.box, b);
+    if (!B) return { ok: false, reason: "없는 상대입니다" };
+    if (B.id === A.id) return { ok: false, reason: "서로 다른 두 디지몬을 골라 주세요" };
+    const eb = box.effOf(B, sp);
+    fb = poke.battleForms(B, eb);
+    if (!fb) return { ok: false, reason: "디지타마는 싸울 수 없습니다" };
+    lvB = profile.levelOf(eb);
+  } else {
+    fb = poke.wildForms(fa.length);
+    lvB = Math.max(1, Math.min(100, lvA + Math.floor(Math.random() * 7) - 3));
+  }
+  const art = (forms) => Promise.all(forms.map(async (f) => {
+    const p = await poke.spriteWithFallback({ dexId: f.id }, CACHE, "anim");
+    return { ...f, url: p ? pathToFileURL(p).href : null };
+  }));
+  fieldNow = { a: A.id, b: B ? B.id : null, at: Date.now() };
+  return {
+    ok: true,
+    me: { id: A.id, lv: lvA, forms: await art(fa), record: A.record || { w: 0, l: 0 } },
+    foe: { id: B ? B.id : null, wild: !B, lv: lvB, forms: await art(fb), record: B ? B.record || { w: 0, l: 0 } : null },
+  };
+}
+/** result: "win" | "lose" | "draw" — 내(a) 쪽에서 본 결과 */
+function fieldEnd({ a, result } = {}) {
+  const f = fieldNow;
+  if (!f || f.a !== a || Date.now() - f.at < FIELD_MIN_MS) return { ok: false, reason: "끝낼 판이 없습니다" };
+  fieldNow = null;
+  const A = box.find(save.box, f.a), B = f.b ? box.find(save.box, f.b) : null;
+  const bump = (m, k) => { if (m) m.record = { w: (m.record || {}).w || 0, l: (m.record || {}).l || 0, [k]: ((m.record || {})[k] || 0) + 1 }; };
+  if (result === "win") { bump(A, "w"); bump(B, "l"); }
+  else if (result === "lose") { bump(A, "l"); bump(B, "w"); }
+  writeSave();
+  refresh(true);
+  return { ok: true, record: A ? A.record : null };
+}
+
+async function jogressList() {
+  if (!poke.fuseOptions) return { ok: false, reason: "합체 진화는 디지털 월드에만 있습니다" };
+  const sp = growthSpeed();
+  const seen = poke.seenIds(save.maxStage);
+  const mons = save.box.map((m) => ({ m, eff: box.effOf(m, sp) }));
+  const card = async ({ m, eff }) => {
+    const d = poke.describe(eff, m.line);
+    const p = await poke.spriteWithFallback(d, CACHE, "anim");
+    return { id: m.id, name: d.name, stage: d.stage.label, attr: d.attr, fav: Boolean(m.fav), active: m.id === save.activeId, url: p ? pathToFileURL(p).href : null };
+  };
+  const list = [];
+  for (const x of mons) {
+    const opts = poke.fuseOptions(x.m, x.eff);
+    if (!opts.length) continue;
+    const options = [];
+    for (const o of opts) {
+      const partners = [];
+      for (const y of mons) if (y.m.id !== x.m.id && poke.fits(o.partner.spec, poke.keyNow(y.m, y.eff))) partners.push(await card(y));
+      const p = await poke.spriteWithFallback({ dexId: o.toId }, CACHE, "anim");
+      const known = seen.has(o.toId); // 만난 적 없는 결과는 이름 · 그림을 가린다(실루엣)
+      options.push({ to: o.to, name: known ? o.name : null, level: o.level, cost: priceOf(o.cost), need: o.partner.text, partners, ready: o.ready, ratio: o.ratio, url: p ? pathToFileURL(p).href : null, known });
+    }
+    list.push({ base: await card(x), options });
+  }
+  return { ok: true, list, bits: candy().left };
+}
+
+async function jogressDo({ baseId, partnerId, to } = {}) {
+  if (!poke.fuseOptions) return { ok: false, reason: "합체 진화는 디지털 월드에만 있습니다" };
+  const a = box.find(save.box, baseId), b = box.find(save.box, partnerId);
+  if (!a || !b || a === b) return { ok: false, reason: "합칠 두 디지몬을 골라 주세요" };
+  if (b.fav) return { ok: false, reason: "즐겨찾기한 아이는 합체 재료로 쓸 수 없습니다. ♥ 를 먼저 풀어 주세요" };
+  const sp = growthSpeed();
+  const ea = box.effOf(a, sp), eb = box.effOf(b, sp);
+  const o = poke.fuseOptions(a, ea).find((x) => x.to === to);
+  if (!o) return { ok: false, reason: "이 디지몬은 그 모습으로 합체할 수 없습니다" };
+  if (!o.ready) return { ok: false, reason: `아직 진화 데이터가 모자랍니다 (${Math.round(o.ratio * 100)}% — 50% 를 넘으면 합칠 수 있습니다)` };
+  if (!poke.fits(o.partner.spec, poke.keyNow(b, eb))) return { ok: false, reason: `짝이 맞지 않습니다 — ${o.partner.text}` };
+  const cost = priceOf(o.cost);
+  if (candy().left < cost) return { ok: false, reason: CUR.lack + ` (💠${cost} 필요)` };
+
+  const nameA = poke.describe(ea, a.line).name, nameB = poke.describe(eb, b.line).name;
+  save.candySpent = (save.candySpent ?? 0) + cost;
+  const r = poke.applyFuse(a, ea, to);
+  if (!r) { save.candySpent -= cost; return { ok: false, reason: "합치지 못했습니다" }; }
+  // 결과 단계의 문턱까지 채운다 — 한 단계 위로 합치면 그 단계에 막 들어선 모습이 된다
+  const at = poke.STAGES[r.stage].at;
+  if (ea < at) a.fed = (a.fed || 0) + (at - ea);
+  // 짝은 합쳐져 사라진다
+  holdBack(b);
+  save.box = save.box.filter((x) => x.id !== b.id);
+  save.petIds = save.petIds.filter((x) => x !== b.id);
+  if (save.activeId === b.id) save.activeId = a.id;
+  destroyPet(b.id);
+  // 도감 — 합쳐진 모습을 만났다
+  const ef = box.effOf(a, sp);
+  const st = poke.stageFor(ef, a.line);
+  a.maxStage = Math.max(a.maxStage ?? -1, st);
+  save.maxStage[a.line] = Math.max(save.maxStage[a.line] ?? -1, st);
+  save.fusions = (save.fusions || 0) + 1;
+  const d = poke.describe(ef, a.line);
+  const p = await poke.spriteWithFallback(d, CACHE, "anim");
+  writeSave();
+  syncPets();
+  refresh(true);
+  pushDex();
+  pushShop();
+  return { ok: true, message: `🧬 ${nameA} + ${nameB} → ${d.name}!`, result: { name: d.name, stage: d.stage.label, url: p ? pathToFileURL(p).href : null }, cost };
+}
+
+/* ---------------- 🌏 세계 ---------------- */
+
+/**
+ * 화폐 — 포켓몬 세계는 🍬 이상한사탕, 디지털 월드는 💠 비트(디지몬 게임의 돈). 세는 법은 같다(25M 마다 1).
+ * lack 는 "모자랍니다" 앞 — 받침에 따라 이/가가 갈려서 통째로 둔다
+ */
+const CUR = world.isDigimon
+  ? { name: "비트", icon: "💠", time: "비트 타임", lack: "비트가 모자랍니다" }
+  : { name: "사탕", icon: "🍬", time: "사탕 타임", lack: "사탕이 모자랍니다" };
+
+/** 화면에 알릴 세계 — 지금 세계와 바꿀 수 있는 세계(시작했나) */
+function worldView() {
+  const dir = app.getPath("userData");
+  return {
+    id: world.id,
+    label: world.label,
+    icon: world.icon,
+    locked: world.envLocked,
+    cur: CUR,
+    list: Object.values(world.WORLDS).map((w) => ({ id: w.id, label: w.label, icon: w.icon, started: world.started(dir, w.id), current: w.id === world.id })),
+  };
+}
+
+/**
+ * 세계를 바꾼다 — 다음 세계를 적고 앱을 다시 켠다. 켜 둔 채로 갈아 끼우면 곳곳에 쥔 상태(박스 · 펫 · 타이머)가
+ * 옛 세계를 가리킨 채 남는다. 몇 초면 다시 뜨고, 그 사이 쓴 토큰은 각 세계가 다음에 켜질 때 따라잡는다.
+ */
+function switchWorld(id) {
+  if (id === world.id) return { ok: false, reason: "이미 " + world.label + "입니다" };
+  if (world.envLocked) return { ok: false, reason: "POKETOKENBAR_WORLD 환경변수로 정해져 있어 바꿀 수 없습니다" };
+  if (!world.choose(id)) return { ok: false, reason: "모르는 세계입니다" };
+  writeSave();
+  setTimeout(() => {
+    app.relaunch();
+    app.quit();
+  }, 300);
+  return { ok: true };
+}
+
+/** 트레이 메뉴 — 다른 세계로 */
+function worldMenu() {
+  if (world.envLocked) return [];
+  return Object.values(world.WORLDS)
+    .filter((w) => w.id !== world.id)
+    .map((w) => ({
+      label: `${w.icon} ${w.label}로 가기${world.started(app.getPath("userData"), w.id) ? "" : " (처음 — 오늘부터 함께 자랍니다)"}`,
+      click: () => switchWorld(w.id),
+    }));
+}
 
 /**
  * 이상한사탕 1개의 값. 하루 5천만~1억을 쓰면 하루 2~4개다.
@@ -773,8 +960,14 @@ function guildBenchCodes() {
   return guildBench.codes;
 }
 
+/** 이 모습을 만났나 — 디지털 월드는 길마다 지나온 모습을 모아서(같은 디지몬이 여러 길에 있다) */
+function seenTest() {
+  const ids = poke.seenIds ? poke.seenIds(save.maxStage) : null;
+  return (sp) => (ids ? ids.has(sp.dexId) : (save.maxStage[sp.line] ?? -1) >= sp.stage);
+}
+
 const dexCount = () => ({
-  seen: dexSpecies().filter((sp) => (save.maxStage[sp.line] ?? -1) >= sp.stage).length,
+  seen: dexSpecies().filter(seenTest()).length,
   total: dexSpecies().length,
 });
 
@@ -887,6 +1080,7 @@ let guildPushed = { body: "", room: "", at: 0 };
  * 늘 바뀌어서, 그대로 두면 길드원 모두가 1분마다 서버를 두드린다.
  */
 async function guildPush(force = false) {
+  if (world.isDigimon) return; // 길드 기록은 포켓몬 세계 기준 — 디지털 월드의 박스로 덮지 않는다
   const g = save.guild;
   if (!g || g.gone || !onlineCfg().enabled || !save.trainerName) return;
   const snap = guildSnap();
@@ -1394,7 +1588,10 @@ async function walletEnsure() {
   return { ok: true, wallet: save.wallet, created: true };
 }
 
+const DIGI_NO = { ok: false, reason: "디지털 월드에서는 아직 지갑 · 출석을 쓰지 않습니다 — 포켓몬 세계에서" };
+
 async function walletInfo() {
+  if (world.isDigimon) return DIGI_NO;
   const e = await walletEnsure();
   if (!e.ok) return e;
   const r = await walletCall("/" + save.wallet.id, { key: save.wallet.key });
@@ -1420,6 +1617,7 @@ async function walletInfo() {
 }
 
 async function walletCheckin() {
+  if (world.isDigimon) return DIGI_NO;
   const e = await walletEnsure();
   if (!e.ok) return e;
   const r = await walletCall(`/${save.wallet.id}/checkin`, { key: save.wallet.key, day: dayKey(new Date()) });
@@ -1716,7 +1914,7 @@ function roomBuy(kind, id) {
   const have = kind === "theme" ? r.themes : r.owned;
   if (have.includes(id)) return { ok: false, reason: "이미 가지고 있습니다" };
   const cost = roomPrice(it.cost);
-  if (candy().left < cost) return { ok: false, reason: "사탕이 모자랍니다" };
+  if (candy().left < cost) return { ok: false, reason: CUR.lack };
   save.candySpent = (save.candySpent ?? 0) + cost;
   have.push(id);
   if (kind === "theme") r.theme = id; // 산 배경은 바로 바른다
@@ -1902,7 +2100,7 @@ function toggleStone(id, item = "everstone") {
   return { ok: true, message: `${battle.josa(name, "이가")} 변하지않는돌을 지녔다. 이제 진화하지 않습니다` };
 }
 
-const SHOP = [
+const SHOP_ALL = [
   { id: "egg", name: "포켓몬 알", cost: 2, desc: "평범한 알. 박스에 한 마리 늘어난다", icon: "🥚", egg: "plain" },
   { id: "egg-super", name: "슈퍼 알", cost: 7, desc: "★3 이상 확정", icon: "🥚", egg: "super" },
   { id: "egg-legend", name: "희귀 알", cost: 18, desc: "★4 이상 확정", icon: "🥚", egg: "legend" },
@@ -1922,6 +2120,15 @@ const SHOP = [
   { id: "master-ball", name: "마스터볼", cost: 40, desc: "던지면 반드시 잡힌다. 전설도. 한 주에 1개만 살 수 있다", icon: "🟣", ball: "master", weekly: "masterWeek" },
   { id: "charm", name: "반짝이는 부적", cost: 60, desc: "이로치 확률 2배. 한 번만 살 수 있다", icon: "✨", once: true },
 ];
+/**
+ * 🦖 디지털 월드의 상점 — 디지타마 · 진화 캡슐만. 변하지않는돌은 없다(디지몬은 쓰는 대로 갈리며 자라는 게 재미다).
+ * 진화 캡슐은 이상한사탕 자리(같은 값 · 같은 성장량) — 사탕을 먹이는 게 아니라 데이터를 주입한다
+ */
+const DIGI_SHOP = {
+  egg: { name: "디지타마", desc: "디지코드로 감싼 알. 박스에 들어오면 무늬가 드러난다 — 무엇이 깨어날지는 아무도 모른다", icon: "🥚", egg: "digicode" },
+  "rare-candy": { name: "진화 캡슐", desc: "키우는 디지몬에게 데이터 1000만을 주입한다. 다음 진화가 가까워진다 — 어느 쪽으로 갈릴지는 그동안 쓴 버릇대로", icon: "💊", capsule: true },
+};
+const SHOP = world.isDigimon ? SHOP_ALL.filter((x) => DIGI_SHOP[x.id]).map((x) => ({ ...x, ...DIGI_SHOP[x.id] })) : SHOP_ALL;
 
 let save = {
   /**
@@ -2369,7 +2576,7 @@ function buy(itemId) {
   if (item.weekly && save[item.weekly] === localMonday()) return { ok: false, reason: `${item.name}은 한 주에 1개만 살 수 있습니다. 다음 주 월요일에 다시 살 수 있습니다` };
   const c = candy();
   const cost = priceOf(item.cost);
-  if (c.left < cost) return { ok: false, reason: "사탕이 모자랍니다" };
+  if (c.left < cost) return { ok: false, reason: CUR.lack };
 
   save.candySpent = (save.candySpent ?? 0) + cost;
   let msg = "";
@@ -2386,7 +2593,7 @@ function buy(itemId) {
     const a = box.active(save);
     if (!a) { save.candySpent -= cost; return { ok: false, reason: "키우는 아이가 없습니다" }; }
     a.fed = (a.fed || 0) + CANDY_FEED;
-    msg = poke.describe(box.effOf(a, growthSpeed()), a.line, poke.look(a)).name + "이(가) 자랐습니다";
+    msg = poke.describe(box.effOf(a, growthSpeed()), a.line, poke.look(a)).name + (world.isDigimon ? "에게 데이터를 주입했습니다" : "이(가) 자랐습니다");
     if (a.hold === "everstone" && box.effOf(a, growthSpeed(), true) > box.effOf(a, growthSpeed())) msg += " — 변하지않는돌 때문에 진화는 멈춰 있습니다";
   } else if (itemId === "tm") {
     const a = box.active(save);
@@ -2504,6 +2711,7 @@ async function buildStats() {
       }
     }
     hatch(0);
+    if (world.isDigimon && !hadSave) save.candyBonus = -Math.floor((u.total + (save.candyExtra ?? 0)) / CANDY_PER); // 사탕도 0 부터
     writeSave();
   }
 
@@ -2520,6 +2728,12 @@ async function buildStats() {
     candy: burning.share(u.events, from, to, sweet) * (sweet.mult - 1),
   });
   if (box.accrue(save, u.total, fed)) writeSave();
+  // 🦖 디지몬은 단계를 넘을 때 그 사이 쓴 버릇(Claude · Codex · 밤)으로 다음 모습이 갈린다
+  if (poke.branch) {
+    let moved = false;
+    for (const m of save.box) if (poke.branch(m, box.effOf(m, growthSpeed()), u.events)) moved = true;
+    if (moved) writeSave();
+  }
   guildUsage = weekUsage(u, burn);
   weekTick(u);
 
@@ -2552,12 +2766,16 @@ async function buildStats() {
         stage: d.stage.label,
         stageKey: d.stage.key,
         single: Boolean(d.single), // 알이면 전설의 알 그림으로
+        egg: d.egg || null, // 🦖 디지타마 무늬(디지털 월드의 알)
+        skills: d.skills || null, // 🦖 필살기 — 펫이 디지털 연출로 쓴다(digifx.js)
+        attr: d.attr || null, // 🦖 속성 — 연출 색
         fav: Boolean(m.fav),
         dex: d.dexId || 0, // 박스 정렬(도감 번호 순). 알은 0
         ratio: d.progress.ratio,
         next: d.progress.next,
         remaining: d.progress.remaining,
         grown: e,
+        lv: world.isDigimon && d.stage.key !== "egg" ? profile.levelOf(e) : null, // 🦖 디지몬은 프로필이 없어 레벨만 따로
         stars: r.stars,
         rarity: r.label,
         shiny: Boolean(m.shiny),
@@ -2594,6 +2812,7 @@ async function buildStats() {
 
   return {
     usage: slim,
+    world: worldView(),
     mon,
     stillPath: still,
     // 렌더러에 Windows 경로를 넘기면 역슬래시를 직접 다뤄야 한다. 변환은 Node가 한다.
@@ -2607,7 +2826,7 @@ async function buildStats() {
     dex: {
       // 도감이 종 단위가 됐으므로 홈의 진행도도 종으로 센다.
       // 라인 수(221)와 종 수(519)가 섞이면 어느 쪽이 진짜인지 알 수 없다.
-      seen: dexSpecies().filter((sp) => (save.maxStage[sp.line] ?? -1) >= sp.stage).length,
+      seen: dexSpecies().filter(seenTest()).length,
       total: dexSpecies().length,
       graduated: save.graduated.length,
     },
@@ -3020,6 +3239,7 @@ function ownedLines() {
 let dexSpeciesCache = null;
 function dexSpecies() {
   if (dexSpeciesCache) return dexSpeciesCache;
+  if (poke.species) return (dexSpeciesCache = poke.species());
   const out = [];
   poke.LINES.forEach((L, line) => {
     const firstStage = new Map(); // dexId -> 가장 이른 단계
@@ -3051,11 +3271,16 @@ async function buildDex() {
   }
 
   const list = dexSpecies();
+  const isSeen = seenTest();
+  // 🦖 디지털 월드는 같은 디지몬이 여러 길에 있다 — "보유"는 길이 아니라 지금 박스의 모습 · 졸업한 모습으로
+  const ownedIds = world.isDigimon
+    ? new Set([...save.box.map((m) => poke.describe(box.effOf(m, growthSpeed()), m.line).dexId), ...save.graduated.map((g) => g.dexId)])
+    : null;
   const entries = await Promise.all(
     list.map(async (sp) => {
       // 그 라인을 만났고, 이 모습까지 실제로 키웠을 때만 만난 것으로 친다.
-      const reached = (save.maxStage[sp.line] ?? -1) >= sp.stage;
-      const seen = save.seen.includes(sp.line) && reached;
+      const reached = isSeen(sp);
+      const seen = (world.isDigimon || save.seen.includes(sp.line)) && reached;
       if (!seen) return { dexId: sp.dexId, seen: false };
       const r = poke.rarityOf(sp.line);
       const p = await poke.spriteWithFallback({ dexId: sp.dexId, isShiny: false }, CACHE, "still");
@@ -3068,7 +3293,7 @@ async function buildDex() {
         stars: r.stars,
         label: r.label,
         graduated: gradCount.get(sp.line) ?? 0,
-        owned: owned.has(sp.line),
+        owned: ownedIds ? ownedIds.has(sp.dexId) : owned.has(sp.line),
         isPet: petDex.has(sp.dexId),
         url: p ? pathToFileURL(p).href : null,
       };
@@ -3268,6 +3493,7 @@ function settingsPayload() {
     burning: burnCfg(),
     pollMinutes: save.pollMinutes,
     autoLaunch: save.autoLaunch,
+    world: worldView(),
     hotkey: save.hotkey ?? HOTKEY_DEFAULT,
     hotkeyOk,
     hotkeyDefault: HOTKEY_DEFAULT,
@@ -4035,6 +4261,7 @@ function wildLeftToday() {
 function scheduleWild(ms) {
   clearTimeout(wildTimer);
   wildTimer = null;
+  if (world.isDigimon) return; // 야생은 포켓몬 세계에만
   const d = ms ?? wild.nextDelay(save.wildLevel || "rare");
   if (d == null) return;
   wildTimer = setTimeout(tryWild, d);
@@ -4532,9 +4759,10 @@ function buildMenu() {
       enabled: !wildNow && !duel && wildLeftToday() > 0,
       click: () => spawnWild().catch((e) => console.error("[wild]", e.message)),
     },
-    { label: "🍬 상점 (사탕 " + candy().left + ")", click: openShop },
+    { label: `${CUR.icon} 상점 (${CUR.name} ${candy().left})`, click: openShop },
     { label: "📖 도감 열기", click: openDex },
     { label: "⚙️ 설정", click: openSettings },
+    ...worldMenu(),
     { label: "새로고침", click: () => refresh(true) },
     { type: "separator" },
     { label: "종료", click: () => app.quit() },
@@ -4792,6 +5020,13 @@ app.whenReady().then(async () => {
     return { ok: true };
   });
   ipcMain.on("open-settings", openSettings);
+  // 🧬 조그레스 — 디지털 월드의 합체 진화
+  ipcMain.handle("jogress-list", () => jogressList());
+  ipcMain.handle("jogress", (_e, a) => jogressDo(a || {}));
+  ipcMain.handle("field-setup", (_e, a) => fieldSetup(a || {}));
+  ipcMain.handle("field-end", (_e, a) => fieldEnd(a || {}));
+  // 🌏 세계 바꾸기 — 다시 켠다
+  ipcMain.handle("world-switch", (_e, id) => switchWorld(id));
   ipcMain.on("request-settings", () => pushSettings());
   ipcMain.on("set-settings", (_e, patch) => applySettings(patch || {}));
   // ⌨️ 설정 창이 새 조합을 받는 동안 잠깐 내려 둔다
@@ -5015,6 +5250,13 @@ app.whenReady().then(async () => {
       if (oid === id || o.win.isDestroyed() || !o.win.isVisible()) continue;
       const q = o.win.getPosition();
       if (Math.hypot(q[0] - p[0], q[1] - p[1]) < w * 0.55) { other = oid; break; }
+    }
+    if (other && world.isDigimon) {
+      // 🦖 디지털 월드 — 바탕화면에서 겹치면 팝오버의 필드 배틀이 열리고 둘이 붙는다
+      startWander(id);
+      openTab("field");
+      if (win && !win.isDestroyed()) win.webContents.send("field-start", { a: id, b: other });
+      return;
     }
     if (other) {
       desktopBattle(id, other, 50).then((r) => {

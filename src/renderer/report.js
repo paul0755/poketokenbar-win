@@ -18,6 +18,7 @@
     return n.toLocaleString("ko-KR");
   }
   const pct = (x) => Math.round((x || 0) * 100) + "%";
+  const cuR = () => (window.ptbCur ? window.ptbCur() : { name: "사탕", icon: "🍬", time: "사탕 타임" }); // 🍬 사탕 · 💠 비트
 
   /** "11월 2일 – 8일" · 달이 넘어가면 "10월 27일 – 11월 2일" */
   function rangeLabel(k) {
@@ -82,7 +83,7 @@
       : r.sources.length ? `<div class="rpsub">전부 ${esc(r.sources[0].label)}에서 썼습니다</div>` : "";
 
     const times = r.total
-      ? `<div class="rptimes">${r.burning ? `<span>🔥 버닝타임 몫 <b>${pct(r.burnShare)}</b></span>` : ""}<span>🍬 사탕 타임 몫 <b>${pct(r.sweetShare)}</b></span></div>`
+      ? `<div class="rptimes">${r.burning ? `<span>🔥 버닝타임 몫 <b>${pct(r.burnShare)}</b></span>` : ""}<span>${cuR().icon} ${cuR().time} 몫 <b>${pct(r.sweetShare)}</b></span></div>`
       : "";
 
     const top = !r.tracked

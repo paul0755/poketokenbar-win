@@ -1,0 +1,2626 @@
+{
+ "source": "humulos.com (Vital Bracelet dot) · digi-api.com (evolutions)",
+ "nodes": {
+  "pulse": {
+   "en": "Pulsemon",
+   "level": "Child",
+   "attr": "Vaccine",
+   "sprite": "vbdm_pulse",
+   "skills": [
+    "Elec Rush",
+    "Petit Impulse"
+   ]
+  },
+  "bulk": {
+   "en": "Bulkmon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbdm_bulk",
+   "skills": [
+    "Electrical Fist",
+    "Thunder Dread",
+    "Core Electrical Fist"
+   ]
+  },
+  "bout": {
+   "en": "Boutmon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbdm_bout",
+   "skills": [
+    "Lightning Heel",
+    "Buden Blast",
+    "Storm of Blows"
+   ]
+  },
+  "kazuchi": {
+   "en": "Kazuchimon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbdm_kazuchi",
+   "skills": [
+    "Dual Sword Stance Lightning",
+    "Chivalry Tenacity",
+    "Divine Electricity-summoned Lightning"
+   ]
+  },
+  "shiva": {
+   "en": "Shivamon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbdm_shiva",
+   "skills": [
+    "Marathi: Uniform Ray",
+    "Marathi: Lotus Act",
+    "Marathi: Composed Devout Meditation"
+   ]
+  },
+  "achilles": {
+   "en": "Achillesmon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbdm_achilles",
+   "skills": [
+    "Grc: Windswept",
+    "Grc: Asteroid",
+    "Grc: Ruthless Spear"
+   ]
+  },
+  "shroud": {
+   "en": "Shroudmon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbdm_shroud",
+   "skills": [
+    "Oni Instantaneous Roaring Fist",
+    "Hellfire Destructive Turning Kick",
+    "Devouring Thunder and Fire Breaker"
+   ]
+  },
+  "shoot": {
+   "en": "Shootmon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbdm_shoot",
+   "skills": [
+    "Cannonball Shooter",
+    "Wild Pitch",
+    "Round Jail"
+   ]
+  },
+  "dive": {
+   "en": "Divemon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbdm_dive",
+   "skills": [
+    "Fillet Blade",
+    "Ripple Edge",
+    "Liquid Veil"
+   ]
+  },
+  "tempo": {
+   "en": "Tempomon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbdm_tempo",
+   "skills": [
+    "Rhythmic Arts",
+    "Howling Blast",
+    "Upbeat Twister"
+   ]
+  },
+  "climb": {
+   "en": "Climbmon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbdm_climb",
+   "skills": [
+    "False Escape Isolation",
+    "Crack Piton",
+    "Dynamic Scyther"
+   ]
+  },
+  "pist": {
+   "en": "Pistmon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbdm_pist",
+   "skills": [
+    "Bramble Shot",
+    "Crimson Spores",
+    "Killing Cadence"
+   ]
+  },
+  "exer": {
+   "en": "Exermon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbdm_exer",
+   "skills": [
+    "Insec Mind",
+    "Defibrilla-shock"
+   ]
+  },
+  "runner": {
+   "en": "Runnermon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbdm_runner",
+   "skills": [
+    "Lightning Rush",
+    "Heartbeat Impulse"
+   ]
+  },
+  "namake": {
+   "en": "Namakemon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbdm_namake",
+   "skills": [
+    "Poop Throw",
+    "Paralyze Lick"
+   ]
+  },
+  "v": {
+   "en": "V-mon",
+   "level": "Child",
+   "attr": "Free",
+   "sprite": "vbdm_v",
+   "skills": [
+    "V-mon Head",
+    "Buzzing Punch",
+    "Hopping Kick"
+   ]
+  },
+  "vdra": {
+   "en": "V-dramon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbdm_vdra",
+   "skills": [
+    "V-Breath Arrow",
+    "Hammer Punch",
+    "Cutter Shoot"
+   ]
+  },
+  "aerovdra": {
+   "en": "Aero V-dramon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbdm_aerovdra",
+   "skills": [
+    "V-Wing Blade",
+    "Dragon Impulse",
+    "Magnum Crash"
+   ]
+  },
+  "ulforcevdra": {
+   "en": "Ulforce V-dramon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbdm_ulforcevdra",
+   "skills": [
+    "Shining V Force",
+    "Ulforce Saber",
+    "Dragon Impulse X"
+   ]
+  },
+  "xv": {
+   "en": "XV-mon",
+   "level": "Adult",
+   "attr": "Free",
+   "sprite": "vbdm_xv",
+   "skills": [
+    "X-Laser",
+    "Strong Crunch",
+    "Hearty Shatter"
+   ]
+  },
+  "paildra": {
+   "en": "Paildramon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbdm_paildra",
+   "skills": [
+    "Desperado Blaster",
+    "Esp: \"Fencing\"",
+    "Wire Punch"
+   ]
+  },
+  "dinobee": {
+   "en": "Dinobeemon",
+   "level": "Perfect",
+   "attr": "Free",
+   "sprite": "vbdm_dinobee",
+   "skills": [
+    "Hell Masquerade",
+    "Irritant Buzz"
+   ]
+  },
+  "grankuwaga": {
+   "en": "Gran Kuwagamon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbdm_grankuwaga",
+   "skills": [
+    "Dimension Scissor",
+    "Grand Death Screw",
+    "Zone Black Hole"
+   ]
+  },
+  "fladra": {
+   "en": "Fladramon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbdm_fladra",
+   "skills": [
+    "Knuckle Fire",
+    "Fire Rocket",
+    "Claw Express"
+   ]
+  },
+  "lighdra": {
+   "en": "Lighdramon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbdm_lighdra",
+   "skills": [
+    "Lightning Blade",
+    "Blue Thunder",
+    "Electric Bite"
+   ]
+  },
+  "goldvdra": {
+   "en": "Gold V-dramon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbdm_goldvdra",
+   "skills": [
+    "V-Breath Arrow",
+    "Cutter Punch",
+    "Cutter Shoot"
+   ]
+  },
+  "magna": {
+   "en": "Magnamon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbdm_magna",
+   "skills": [
+    "Extreme Jihad",
+    "Plasma Shoot",
+    "Magnum Punch"
+   ]
+  },
+  "agu": {
+   "en": "Agumon",
+   "level": "Child",
+   "attr": "Vaccine",
+   "sprite": "vbdm_agu",
+   "skills": [
+    "Baby Flame",
+    "Spitfire",
+    "Cross Fight"
+   ]
+  },
+  "grey": {
+   "en": "Greymon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbdm_grey",
+   "skills": [
+    "Mega Flame",
+    "Great Antler",
+    "Grey Tooth"
+   ]
+  },
+  "metalgrey_va": {
+   "en": "Metal Greymon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbdm_metalgrey_va",
+   "skills": [
+    "Giga Destroyer",
+    "Trident Arm",
+    "Over Flame"
+   ]
+  },
+  "wargrey": {
+   "en": "War Greymon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbdm_wargrey",
+   "skills": [
+    "Gaia Force",
+    "Great Tornado",
+    "Dramon Killer"
+   ]
+  },
+  "victorygrey": {
+   "en": "Victory Greymon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbdm_victorygrey",
+   "skills": [
+    "Trident Gaia",
+    "Victory Charge",
+    "Victory Shield"
+   ]
+  },
+  "blackwargrey": {
+   "en": "Black War Greymon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbdm_blackwargrey",
+   "skills": [
+    "Dark Gaia Force",
+    "Gaia Force",
+    "Dramon Killer"
+   ]
+  },
+  "omega": {
+   "en": "Omegamon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbdm_omega",
+   "skills": [
+    "Grey Sword",
+    "Garuru Cannon",
+    "All Recover"
+   ]
+  },
+  "blitzgrey_d@be": {
+   "en": "Blitz Greymon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbbe_blitzgrey_d",
+   "skills": [
+    "Plasma Stake",
+    "Thunder Vernier",
+    "Elec Guard"
+   ]
+  },
+  "vermilli": {
+   "en": "Vermillimon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbdm_vermilli",
+   "skills": [
+    "Volcano Strike S",
+    "Hard Tackle",
+    "Trick Void"
+   ]
+  },
+  "skullgrey": {
+   "en": "Skull Greymon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbdm_skullgrey",
+   "skills": [
+    "Ground Zero",
+    "Oblivion Bird",
+    "Ground Zero Revision"
+   ]
+  },
+  "mame_d@be": {
+   "en": "Mamemon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbbe_mame_d",
+   "skills": [
+    "Smiley Bomb",
+    "Strike Upper",
+    "One-Two Rush"
+   ]
+  },
+  "banchomame_d@be": {
+   "en": "Bancho Mamemon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbbe_banchomame_d",
+   "skills": [
+    "Thousand Blasting",
+    "Strike of the Man's Spirit",
+    "Golden Rush"
+   ]
+  },
+  "monochro": {
+   "en": "Monochromon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbdm_monochro",
+   "skills": [
+    "Volcano Strike",
+    "Gran Fire",
+    "Guardy Tusk"
+   ]
+  },
+  "darktyrano": {
+   "en": "Dark Tyranomon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbdm_darktyrano",
+   "skills": [
+    "Fire Blast",
+    "Dark Nail",
+    "Iron Tail"
+   ]
+  },
+  "devi": {
+   "en": "Devimon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbdm_devi",
+   "skills": [
+    "Death Claw",
+    "Leather Wing",
+    "Hell Contract"
+   ]
+  },
+  "baal": {
+   "en": "Baalmon",
+   "level": "Perfect",
+   "attr": "Free",
+   "sprite": "vbdm_baal",
+   "skills": [
+    "Guiltish",
+    "Leak Information",
+    "God Beating"
+   ]
+  },
+  "noblepump": {
+   "en": "Noble Pumpmon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbdm_noblepump",
+   "skills": [
+    "Trick or Treat Wallace",
+    "Wassamu Ring Jack",
+    "Atlantic Dam"
+   ]
+  },
+  "beelzebu_2010": {
+   "en": "Beelzebumon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbdm_beelzebu_2010",
+   "skills": [
+    "Double Impact",
+    "Darkness Claw",
+    "Quick Shot"
+   ]
+  },
+  "vamde": {
+   "en": "Vamdemon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbdm_vamde",
+   "skills": [
+    "Night Raid",
+    "Bloody Stream",
+    "Cloud Minion"
+   ]
+  },
+  "pie": {
+   "en": "Piemon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbdm_pie",
+   "skills": [
+    "Trump Sword",
+    "Clown Trick",
+    "Masks Square"
+   ]
+  },
+  "neovamde": {
+   "en": "Neo Vamdemon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbdm_neovamde",
+   "skills": [
+    "Nightmare Raid",
+    "Bloody Stream Glade",
+    "Gardiac Raid"
+   ]
+  },
+  "kuzuha@be": {
+   "en": "Kuzuhamon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbbe_kuzuha",
+   "skills": [
+    "Reverse Izuna",
+    "Womb Realm Mandala"
+   ]
+  },
+  "arcturus@be": {
+   "en": "Arcturusmon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbbe_arcturus",
+   "skills": [
+    "Black Death",
+    "Black Confession"
+   ]
+  },
+  "joker": {
+   "en": "Jokermon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbdm_joker",
+   "skills": [
+    "Lunatic Slash",
+    "Gaia Magicar"
+   ]
+  },
+  "fanto": {
+   "en": "Fantomon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbdm_fanto",
+   "skills": [
+    "Soul Chopper",
+    "Death Sentence",
+    "Diabolic Star"
+   ]
+  },
+  "monzae_d@be": {
+   "en": "Monzaemon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbbe_monzae_d",
+   "skills": [
+    "Lovely Attack",
+    "Boom Boom Punch",
+    "Silence Hug"
+   ]
+  },
+  "shinmonzae_d@be": {
+   "en": "Shin Monzaemon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbbe_shinmonzae_d",
+   "skills": [
+    "Nightmare Rain",
+    "Fancy Fantasista",
+    "Sweet Lovely Attack"
+   ]
+  },
+  "airdra_d@be": {
+   "en": "Airdramon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbbe_airdra_d",
+   "skills": [
+    "Spinning Needle",
+    "God Tornado",
+    "Wing Cutter"
+   ]
+  },
+  "tyrano_d@be": {
+   "en": "Tyranomon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbbe_tyrano_d",
+   "skills": [
+    "Fire Breath",
+    "Slash Nail",
+    "Dino Kick"
+   ]
+  },
+  "soloogar@be": {
+   "en": "Soloogarmon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbbe_soloogar",
+   "skills": [
+    "Prominence Laser",
+    "Eruption Howling",
+    "Sköll Rage"
+   ]
+  },
+  "fenrilooga@be": {
+   "en": "Fenriloogamon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbbe_fenrilooga",
+   "skills": [
+    "Ragnarök Howling",
+    "Jötunheimr Gale",
+    "Hróðvitnir"
+   ]
+  },
+  "rasen@be": {
+   "en": "Rasenmon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbbe_rasen",
+   "skills": [
+    "Gyro Smash",
+    "Qualialise Blast",
+    "Spiral Vanish"
+   ]
+  },
+  "helloogar@be": {
+   "en": "Helloogarmon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbbe_helloogar",
+   "skills": [
+    "Howling Burst",
+    "Inferno Claw",
+    "Hati Embrace"
+   ]
+  },
+  "mastertyrano@be": {
+   "en": "Master Tyranomon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbbe_mastertyrano",
+   "skills": [
+    "Master Fire",
+    "Master Claw",
+    "Super-heated Fighting Spirit"
+   ]
+  },
+  "rusttyrano@be": {
+   "en": "Rust Tyranomon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbbe_rusttyrano",
+   "skills": [
+    "Terror's Cluster",
+    "Rust Breath",
+    "Rust Claw"
+   ]
+  },
+  "ragna@be": {
+   "en": "Ragnamon",
+   "level": "Ultimate",
+   "attr": "Unknown",
+   "sprite": "vbbe_ragna",
+   "skills": [
+    "Ragnarök Cannon",
+    "Gimlet Gun",
+    "Spaser"
+   ]
+  },
+  "seadra_d@be": {
+   "en": "Seadramon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbbe_seadra_d",
+   "skills": [
+    "Ice Arrow",
+    "Bind",
+    "Water Breath"
+   ]
+  },
+  "mera_d@be": {
+   "en": "Meramon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbbe_mera_d",
+   "skills": [
+    "Burning Fist",
+    "Magma Bomb",
+    "Heat Wave"
+   ]
+  },
+  "nume_d@be": {
+   "en": "Numemon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbbe_nume_d",
+   "skills": [
+    "Poop",
+    "Poop Throw",
+    "Long-range Poop Throw"
+   ]
+  },
+  "geogrey@be": {
+   "en": "Geo Greymon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbbe_geogrey",
+   "skills": [
+    "Mega Flame",
+    "Mega Burst",
+    "Horn Impulse"
+   ]
+  },
+  "rizegrey@be": {
+   "en": "Rize Greymon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbbe_rizegrey",
+   "skills": [
+    "Trident Revolver",
+    "Rising Destroyer",
+    "Solid Strike"
+   ]
+  },
+  "shinegrey@be": {
+   "en": "Shine Greymon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbbe_shinegrey",
+   "skills": [
+    "Glorious Burst",
+    "Shining Blast",
+    "GeoGrey Sword"
+   ]
+  },
+  "slayerdra@be": {
+   "en": "Slayerdramon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbbe_slayerdra",
+   "skills": [
+    "Divine Dragon Slash Ripper",
+    "Rising Dragon Slash Wave",
+    "Biting Dragon Slash Blade"
+   ]
+  },
+  "exa@be": {
+   "en": "Examon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbbe_exa",
+   "skills": [
+    "Avalon's Gate",
+    "Pendragon's Glory",
+    "Dragonic Impact"
+   ]
+  },
+  "wingdra@be": {
+   "en": "Wingdramon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbbe_wingdra",
+   "skills": [
+    "Blaze Sonic Breath",
+    "Explode Sonic Lance",
+    "Wing Blast"
+   ]
+  },
+  "breakdra@be": {
+   "en": "Breakdramon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbbe_breakdra",
+   "skills": [
+    "Destroyed Rush",
+    "Infinity Boring",
+    "Gravity Press"
+   ]
+  },
+  "groundra@be": {
+   "en": "Groundramon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbbe_groundra",
+   "skills": [
+    "Scrapless Claw",
+    "Megaton Hammer Crush",
+    "Giga Crack"
+   ]
+  },
+  "jes@be": {
+   "en": "Jesmon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbbe_jes",
+   "skills": [
+    "Furrow-sword Judgment",
+    "Deu: \"Sword Ghost\"",
+    "OS Generics"
+   ]
+  },
+  "gabu": {
+   "en": "Gabumon",
+   "level": "Child",
+   "attr": "Data",
+   "sprite": "vbdm_gabu",
+   "skills": [
+    "Petit Fire",
+    "Little Horn",
+    "Hidden Knock"
+   ]
+  },
+  "garuru": {
+   "en": "Garurumon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbdm_garuru",
+   "skills": [
+    "Foxfire",
+    "Body Blow",
+    "Garuru Thrust"
+   ]
+  },
+  "weregaruru": {
+   "en": "Were Garurumon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbdm_weregaruru",
+   "skills": [
+    "Kaiser Nail",
+    "Baldy Blow",
+    "Garuru Kick"
+   ]
+  },
+  "metalgaruru": {
+   "en": "Metal Garurumon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbdm_metalgaruru",
+   "skills": [
+    "Cocytus Breath",
+    "Grace Cross Freezer",
+    "Garuru Tomahawk"
+   ]
+  },
+  "zdgaruru": {
+   "en": "Z'd Garurumon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbdm_zdgaruru",
+   "skills": [
+    "Z'd Cannon",
+    "Fullmetal Blaze",
+    "Blowback Breath"
+   ]
+  },
+  "panda": {
+   "en": "Pandamon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbdm_panda",
+   "skills": [
+    "Animal Nail",
+    "Bamboo Grass Punch",
+    "Yúnnán Province"
+   ]
+  },
+  "drimoge": {
+   "en": "Drimogemon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbdm_drimoge",
+   "skills": [
+    "Drill Spin",
+    "Crusher Bone",
+    "Screw Claw"
+   ]
+  },
+  "dorulu": {
+   "en": "Dorulumon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbdm_dorulu",
+   "skills": [
+    "Drill Buster",
+    "Dorulu Tornado",
+    "Drill Blader"
+   ]
+  },
+  "ghost": {
+   "en": "Ghostmon",
+   "level": "Child",
+   "attr": "Data",
+   "sprite": "vbdm_ghost",
+   "skills": [
+    "Little Plasma",
+    "Jack Raid"
+   ]
+  },
+  "saberdra": {
+   "en": "Saberdramon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbdm_saberdra",
+   "skills": [
+    "Black Saber",
+    "Mach Shadow",
+    "Night Roar"
+   ]
+  },
+  "wizar": {
+   "en": "Wizarmon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbdm_wizar",
+   "skills": [
+    "Thunder Cloud",
+    "Magic Game",
+    "Terror Illusion"
+   ]
+  },
+  "pump": {
+   "en": "Pumpmon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbdm_pump",
+   "skills": [
+    "Trick or Treat",
+    "Body Blow",
+    "Jack O' Lantern"
+   ]
+  },
+  "bake": {
+   "en": "Bakemon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbdm_bake",
+   "skills": [
+    "Hell's Hand",
+    "Death Charm",
+    "Nightmare Wave"
+   ]
+  },
+  "worm": {
+   "en": "Wormmon",
+   "level": "Child",
+   "attr": "Free",
+   "sprite": "vbdm_worm",
+   "skills": [
+    "Sticky Net",
+    "Silk Thread",
+    "Random Roll"
+   ]
+  },
+  "sting": {
+   "en": "Stingmon",
+   "level": "Adult",
+   "attr": "Free",
+   "sprite": "vbdm_sting",
+   "skills": [
+    "Spiking Finish",
+    "Hell Squeeze",
+    "Moon Shooter"
+   ]
+  },
+  "jewelbee": {
+   "en": "Jewelbeemon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbdm_jewelbee",
+   "skills": [
+    "Spike Buster",
+    "Shot Claw"
+   ]
+  },
+  "banchosting": {
+   "en": "Bancho Stingmon",
+   "level": "Ultimate",
+   "attr": "Free",
+   "sprite": "vbdm_banchosting",
+   "skills": [
+    "Bloody Finish",
+    "Explosive Thunderstorm",
+    "Redbutt"
+   ]
+  },
+  "shadra": {
+   "en": "Shadramon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbdm_shadra",
+   "skills": [
+    "Flare Buster",
+    "Indent Screw",
+    "Psychic Wave"
+   ]
+  },
+  "hudie": {
+   "en": "Hudiemon",
+   "level": "Adult",
+   "attr": "Free",
+   "sprite": "vbdm_hudie",
+   "skills": [
+    "Infinity Dream",
+    "Flying Kick"
+   ]
+  },
+  "goki": {
+   "en": "Gokimon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbdm_goki",
+   "skills": [
+    "Dream Dust",
+    "Terrible Fly",
+    "Mega Blaster"
+   ]
+  },
+  "kongou": {
+   "en": "Kongoumon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbdm_kongou",
+   "skills": [
+    "Teppou",
+    "Vajra"
+   ]
+  },
+  "gamma@be": {
+   "en": "Gammamon",
+   "level": "Child",
+   "attr": "Virus",
+   "sprite": "vbbe_gamma",
+   "skills": [
+    "Horn Attack",
+    "Breaclaw"
+   ]
+  },
+  "betelgamma@be": {
+   "en": "Betel Gammamon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbbe_betelgamma",
+   "skills": [
+    "Sorblow",
+    "Sorshot"
+   ]
+  },
+  "canoweiss@be": {
+   "en": "Canoweissmon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbbe_canoweiss",
+   "skills": [
+    "Gallia Fissure",
+    "Dragonia",
+    "Lat: \"Meteor Light\""
+   ]
+  },
+  "sirius@be": {
+   "en": "Siriusmon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbbe_sirius",
+   "skills": [
+    "Photon Blaster",
+    "Cosmo Blade",
+    "Breaquasar"
+   ]
+  },
+  "cannondra@be": {
+   "en": "Cannondramon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbbe_cannondra",
+   "skills": [
+    "Dyna Cannon",
+    "Grenade Storm"
+   ]
+  },
+  "spino@be": {
+   "en": "Spinomon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbbe_spino",
+   "skills": [
+    "Blue Prominence",
+    "Sonic Slash Rain"
+   ]
+  },
+  "fuma@be": {
+   "en": "Fumamon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbbe_fuma",
+   "skills": [
+    "Swallow",
+    "Śāriputra",
+    "Yomi Return"
+   ]
+  },
+  "ghilliedhu@be": {
+   "en": "Ghilliedhumon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbbe_ghilliedhu",
+   "skills": [
+    "True Eyes",
+    "Core Shoot"
+   ]
+  },
+  "bomber@be": {
+   "en": "Bombermon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbbe_bomber",
+   "skills": [
+    "Combo Blast",
+    "Limit Explosion"
+   ]
+  },
+  "zanmetsu@be": {
+   "en": "Zanmetsumon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbbe_zanmetsu",
+   "skills": [
+    "Five Continuous Soul-rending Beheadings",
+    "Quintuple Spiral Slash",
+    "Prison Gate Bind"
+   ]
+  },
+  "regulus@be": {
+   "en": "Regulusmon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbbe_regulus",
+   "skills": [
+    "Kalyp Bite",
+    "Genierce",
+    "Dead-end Spike"
+   ]
+  },
+  "kausgamma@be": {
+   "en": "Kaus Gammamon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbbe_kausgamma",
+   "skills": [
+    "Urda Impulse",
+    "Lamberta Kick"
+   ]
+  },
+  "wezengamma@be": {
+   "en": "Wezen Gammamon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbbe_wezengamma",
+   "skills": [
+    "Sedna",
+    "Albion"
+   ]
+  },
+  "gulusgamma@be": {
+   "en": "Gulus Gammamon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbbe_gulusgamma",
+   "skills": [
+    "Dark Pales",
+    "Desdemona",
+    "Dead-end Skewer"
+   ]
+  },
+  "sealsdra@be": {
+   "en": "Sealsdramon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbbe_sealsdra",
+   "skills": [
+    "Death Behind",
+    "Scouter Monoeye"
+   ]
+  },
+  "boko@be": {
+   "en": "Bokomon",
+   "level": "Child",
+   "attr": "Vaccine",
+   "sprite": "vbbe_boko",
+   "skills": [
+    "Book of Knowledge",
+    "Wild Escape Dash"
+   ]
+  },
+  "koe@be": {
+   "en": "Koemon",
+   "level": "Child",
+   "attr": "Virus",
+   "sprite": "vbbe_koe",
+   "skills": [
+    "Baby Sling",
+    "Mischievous Hoop"
+   ]
+  },
+  "beta_d@be": {
+   "en": "Betamon",
+   "level": "Child",
+   "attr": "Virus",
+   "sprite": "vbbe_beta_d",
+   "skills": [
+    "Electric Shock",
+    "Beta Slugger",
+    "Cutter Fin"
+   ]
+  },
+  "draco@be": {
+   "en": "Dracomon",
+   "level": "Child",
+   "attr": "Data",
+   "sprite": "vbbe_draco",
+   "skills": [
+    "Baby Breath",
+    "G Shurunen",
+    "Tail Smash"
+   ]
+  },
+  "hack@be": {
+   "en": "Hackmon",
+   "level": "Child",
+   "attr": "Data",
+   "sprite": "vbbe_hack",
+   "skills": [
+    "Fif Slash",
+    "Teen Ram",
+    "Baby Flame"
+   ]
+  },
+  "baohack@be": {
+   "en": "Bao Hackmon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbbe_baohack",
+   "skills": [
+    "Fif Cross",
+    "Burn Flame",
+    "Dragless-spiker"
+   ]
+  },
+  "saviorhack@be": {
+   "en": "Savior Hackmon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbbe_saviorhack",
+   "skills": [
+    "Resist Raid",
+    "Meteor Flame",
+    "Trident Saber"
+   ]
+  },
+  "magnakid@be": {
+   "en": "Magna Kidmon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbbe_magnakid",
+   "skills": [
+    "Chaos Triangular",
+    "Bind Red Trigger",
+    "Happy Bullet Showering"
+   ]
+  },
+  "arresterdra@be": {
+   "en": "Arresterdramon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbbe_arresterdra",
+   "skills": [
+    "Mach Flicker",
+    "Flog Shot",
+    "Spin Caliber"
+   ]
+  },
+  "gumdra@be": {
+   "en": "Gumdramon",
+   "level": "Child",
+   "attr": "Vaccine",
+   "sprite": "vbbe_gumdra",
+   "skills": [
+    "Ran-gum Break",
+    "Jacked Hammer",
+    "Fire Vortex"
+   ]
+  },
+  "gao@be": {
+   "en": "Gaomon",
+   "level": "Child",
+   "attr": "Data",
+   "sprite": "vbbe_gao",
+   "skills": [
+    "Rolling Upper",
+    "Double Backhand",
+    "Gao Rush"
+   ]
+  },
+  "gaoga@be": {
+   "en": "Gaogamon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbbe_gaoga",
+   "skills": [
+    "Dash Double Claw",
+    "Spiral Blow",
+    "Gaoga Hound"
+   ]
+  },
+  "machgaoga@be": {
+   "en": "Mach Gaogamon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbbe_machgaoga",
+   "skills": [
+    "Gaoga Tornado",
+    "Winning Knuckle",
+    "Howling Cannon"
+   ]
+  },
+  "miragegaoga@be": {
+   "en": "Mirage Gaogamon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbbe_miragegaoga",
+   "skills": [
+    "Double Crescent Mirage",
+    "Full Moon Blaster",
+    "Gale Claw"
+   ]
+  },
+  "diana@be": {
+   "en": "Dianamon",
+   "level": "Ultimate",
+   "attr": "Data",
+   "sprite": "vbbe_diana",
+   "skills": [
+    "Crescent Harken",
+    "Arrow of Artemis",
+    "Goodnight Moon"
+   ]
+  },
+  "cresce@be": {
+   "en": "Crescemon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbbe_cresce",
+   "skills": [
+    "Lunatic Dance",
+    "Ice Archery",
+    "Dark Archery"
+   ]
+  },
+  "grappuleo@be": {
+   "en": "Grappu Leomon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbbe_grappuleo",
+   "skills": [
+    "Lion Beast Wave Slash",
+    "Whirlwind Turbine Kick",
+    "Lion Whirlwind Kick"
+   ]
+  },
+  "apollo@be": {
+   "en": "Apollomon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbbe_apollo",
+   "skills": [
+    "Solblaster",
+    "Phoebus Blow",
+    "Arrow of Apollo"
+   ]
+  },
+  "heavyleo@be": {
+   "en": "Heavy Leomon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbbe_heavyleo",
+   "skills": [
+    "Barrage Sweeper",
+    "Resting Burner",
+    "Sonic Excavator"
+   ]
+  },
+  "fira@be": {
+   "en": "Firamon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbbe_fira",
+   "skills": [
+    "Flame Dive",
+    "Fira Claw",
+    "Fira Bomb"
+   ]
+  },
+  "flare@be": {
+   "en": "Flaremon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbbe_flare",
+   "skills": [
+    "Crimson Beast King Wave",
+    "Crimson Lion Dance",
+    "Purifying Roar"
+   ]
+  },
+  "lekis@be": {
+   "en": "Lekismon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbbe_lekis",
+   "skills": [
+    "Moon Night Kick",
+    "Tear Arrow",
+    "Moon Night Bomb"
+   ]
+  },
+  "leo@be": {
+   "en": "Leomon",
+   "level": "Adult",
+   "attr": "Vaccine",
+   "sprite": "vbbe_leo",
+   "skills": [
+    "Beast King Fist",
+    "Lion King",
+    "Crushing Kick"
+   ]
+  },
+  "asta@be": {
+   "en": "Astamon",
+   "level": "Perfect",
+   "attr": "Virus",
+   "sprite": "vbbe_asta",
+   "skills": [
+    "Hellfire",
+    "Maverick"
+   ]
+  },
+  "corona@be": {
+   "en": "Coronamon",
+   "level": "Child",
+   "attr": "Vaccine",
+   "sprite": "vbbe_corona",
+   "skills": [
+    "Corona Flame",
+    "Corona-knuckle",
+    "Petit Prominence"
+   ]
+  },
+  "luna@be": {
+   "en": "Lunamon",
+   "level": "Child",
+   "attr": "Data",
+   "sprite": "vbbe_luna",
+   "skills": [
+    "Tear Shoot",
+    "Luna Claw",
+    "Lop-ear Ripple"
+   ]
+  },
+  "madleo@be": {
+   "en": "Mad Leomon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbbe_madleo",
+   "skills": [
+    "Beast King Fallen Fist",
+    "Necrotoxic Claw"
+   ]
+  },
+  "phasco@be": {
+   "en": "Phascomon",
+   "level": "Child",
+   "attr": "Virus",
+   "sprite": "vbbe_phasco",
+   "skills": [
+    "Eucalyptus Claw",
+    "Evil Snore"
+   ]
+  },
+  "looga@be": {
+   "en": "Loogamon",
+   "level": "Child",
+   "attr": "Virus",
+   "sprite": "vbbe_looga",
+   "skills": [
+    "Howling Fire",
+    "Spiral Bite"
+   ]
+  },
+  "loogar@be": {
+   "en": "Loogarmon",
+   "level": "Adult",
+   "attr": "Virus",
+   "sprite": "vbbe_loogar",
+   "skills": [
+    "Howling Burner",
+    "Flame Blow"
+   ]
+  },
+  "stiffil@be": {
+   "en": "Stiffilmon",
+   "level": "Perfect",
+   "attr": "Data",
+   "sprite": "vbbe_stiffil",
+   "skills": [
+    "Vermilion Vortex",
+    "Giga Crimson Dive"
+   ]
+  },
+  "fil@be": {
+   "en": "Filmon",
+   "level": "Adult",
+   "attr": "Data",
+   "sprite": "vbbe_fil",
+   "skills": [
+    "Lightning Stinger",
+    "Crimson Slash"
+   ]
+  },
+  "andro@be": {
+   "en": "Andromon",
+   "level": "Perfect",
+   "attr": "Vaccine",
+   "sprite": "vbbe_andro",
+   "skills": [
+    "Gatling Missile",
+    "Spiral Sword",
+    "Weak Slap"
+   ]
+  },
+  "hiandro@be": {
+   "en": "Hi Andromon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbbe_hiandro",
+   "skills": [
+    "Atomic Ray",
+    "Spiral Sword",
+    "Copy Paste"
+   ]
+  },
+  "snatch@be": {
+   "en": "Snatchmon",
+   "level": "Adult",
+   "attr": "Unknown",
+   "sprite": "vbbe_snatch",
+   "skills": [
+    "Ruin Laser",
+    "Tooth-spear",
+    "Fusionize"
+   ]
+  },
+  "destro@be": {
+   "en": "Destromon",
+   "level": "Perfect",
+   "attr": "Unknown",
+   "sprite": "vbbe_destro",
+   "skills": [
+    "Three-Turret Platform",
+    "Juggernaut Blast",
+    "Long-Range Buster Cannon"
+   ]
+  },
+  "heriss@be": {
+   "en": "Herissmon",
+   "level": "Child",
+   "attr": "Data",
+   "sprite": "vbbe_heriss",
+   "skills": [
+    "Lightning Fur",
+    "Kenzan Dive"
+   ]
+  },
+  "dame@be": {
+   "en": "Damemon",
+   "level": "Adult",
+   "attr": "Free",
+   "sprite": "vbbe_dame",
+   "skills": [
+    "Buzzing Fist",
+    "Gun Vulcan",
+    "Boo~st Attack"
+   ]
+  },
+  "bem@be": {
+   "en": "Bemmon",
+   "level": "Child",
+   "attr": "Unknown",
+   "sprite": "vbbe_bem",
+   "skills": [
+    "Deu: \"Knife Claw\"",
+    "Fusionize"
+   ]
+  },
+  "omega_z": {
+   "en": "Omegamon Zwart",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbdm_omega_z",
+   "skills": [
+    "Grey Sword",
+    "Garuru Cannon"
+   ]
+  },
+  "proxima@be": {
+   "en": "Proximamon",
+   "level": "Ultimate",
+   "attr": "Virus",
+   "sprite": "vbbe_proxima",
+   "skills": [
+    "Extinction Cloud",
+    "Light of Re-creation"
+   ]
+  },
+  "gracenova@be": {
+   "en": "Grace Novamon",
+   "level": "Ultimate",
+   "attr": "Vaccine",
+   "sprite": "vbbe_gracenova",
+   "skills": [
+    "Eclipse Finger",
+    "Lat: Calydon Bow"
+   ]
+  }
+ },
+ "next": {
+  "pulse": [
+   "bulk",
+   "exer",
+   "runner",
+   "namake"
+  ],
+  "bulk": [
+   "bout",
+   "shoot",
+   "dive",
+   "tempo",
+   "climb",
+   "pist"
+  ],
+  "bout": [
+   "kazuchi",
+   "shiva",
+   "achilles",
+   "shroud"
+  ],
+  "shoot": [
+   "shiva",
+   "achilles",
+   "shroud"
+  ],
+  "dive": [
+   "shiva",
+   "shroud"
+  ],
+  "tempo": [
+   "kazuchi",
+   "shiva",
+   "achilles",
+   "shroud"
+  ],
+  "climb": [
+   "shiva",
+   "shroud"
+  ],
+  "pist": [
+   "kazuchi",
+   "shiva",
+   "achilles",
+   "shroud"
+  ],
+  "exer": [
+   "shoot",
+   "dive",
+   "tempo",
+   "climb",
+   "pist"
+  ],
+  "runner": [
+   "bout",
+   "shoot",
+   "dive",
+   "tempo",
+   "climb",
+   "pist"
+  ],
+  "namake": [
+   "shoot",
+   "dive",
+   "tempo",
+   "climb",
+   "pist"
+  ],
+  "v": [
+   "vdra",
+   "xv",
+   "fladra",
+   "lighdra",
+   "goldvdra",
+   "magna"
+  ],
+  "vdra": [
+   "aerovdra"
+  ],
+  "aerovdra": [
+   "ulforcevdra"
+  ],
+  "xv": [
+   "aerovdra",
+   "paildra",
+   "dinobee"
+  ],
+  "paildra": [
+   "ulforcevdra"
+  ],
+  "dinobee": [
+   "grankuwaga"
+  ],
+  "fladra": [
+   "aerovdra",
+   "paildra"
+  ],
+  "lighdra": [
+   "paildra",
+   "dinobee"
+  ],
+  "goldvdra": [
+   "aerovdra"
+  ],
+  "magna": [
+   "paildra"
+  ],
+  "agu": [
+   "grey",
+   "monochro",
+   "darktyrano",
+   "devi",
+   "airdra_d@be",
+   "tyrano_d@be",
+   "seadra_d@be",
+   "mera_d@be",
+   "nume_d@be",
+   "geogrey@be"
+  ],
+  "grey": [
+   "metalgrey_va",
+   "vermilli",
+   "skullgrey",
+   "mame_d@be"
+  ],
+  "metalgrey_va": [
+   "wargrey",
+   "victorygrey",
+   "blackwargrey",
+   "omega",
+   "blitzgrey_d@be"
+  ],
+  "vermilli": [
+   "wargrey",
+   "victorygrey",
+   "blackwargrey"
+  ],
+  "skullgrey": [
+   "wargrey",
+   "victorygrey",
+   "blackwargrey"
+  ],
+  "mame_d@be": [
+   "blitzgrey_d@be",
+   "banchomame_d@be"
+  ],
+  "monochro": [
+   "vermilli",
+   "skullgrey"
+  ],
+  "darktyrano": [
+   "metalgrey_va",
+   "vermilli",
+   "skullgrey"
+  ],
+  "devi": [
+   "metalgrey_va",
+   "baal",
+   "vamde",
+   "joker",
+   "fanto",
+   "monzae_d@be"
+  ],
+  "baal": [
+   "noblepump",
+   "beelzebu_2010"
+  ],
+  "vamde": [
+   "pie",
+   "beelzebu_2010",
+   "neovamde",
+   "kuzuha@be",
+   "arcturus@be"
+  ],
+  "joker": [
+   "pie"
+  ],
+  "fanto": [
+   "noblepump",
+   "pie",
+   "neovamde"
+  ],
+  "monzae_d@be": [
+   "shinmonzae_d@be"
+  ],
+  "airdra_d@be": [
+   "metalgrey_va",
+   "mame_d@be",
+   "monzae_d@be"
+  ],
+  "tyrano_d@be": [
+   "metalgrey_va",
+   "mame_d@be",
+   "soloogar@be",
+   "helloogar@be",
+   "mastertyrano@be"
+  ],
+  "soloogar@be": [
+   "fenrilooga@be",
+   "rasen@be"
+  ],
+  "helloogar@be": [
+   "fenrilooga@be"
+  ],
+  "mastertyrano@be": [
+   "rusttyrano@be",
+   "ragna@be"
+  ],
+  "seadra_d@be": [
+   "mame_d@be"
+  ],
+  "mera_d@be": [
+   "mame_d@be"
+  ],
+  "nume_d@be": [
+   "metalgrey_va",
+   "monzae_d@be"
+  ],
+  "geogrey@be": [
+   "rizegrey@be",
+   "wingdra@be",
+   "groundra@be"
+  ],
+  "rizegrey@be": [
+   "shinegrey@be",
+   "slayerdra@be",
+   "exa@be"
+  ],
+  "wingdra@be": [
+   "shinegrey@be",
+   "slayerdra@be",
+   "breakdra@be",
+   "exa@be"
+  ],
+  "groundra@be": [
+   "shinegrey@be",
+   "slayerdra@be",
+   "jes@be",
+   "breakdra@be",
+   "exa@be"
+  ],
+  "gabu": [
+   "garuru",
+   "drimoge",
+   "dorulu"
+  ],
+  "garuru": [
+   "weregaruru",
+   "panda"
+  ],
+  "weregaruru": [
+   "omega",
+   "metalgaruru",
+   "zdgaruru"
+  ],
+  "panda": [
+   "metalgaruru",
+   "zdgaruru"
+  ],
+  "drimoge": [
+   "panda"
+  ],
+  "dorulu": [
+   "weregaruru",
+   "panda"
+  ],
+  "ghost": [
+   "saberdra",
+   "wizar",
+   "devi",
+   "bake"
+  ],
+  "saberdra": [
+   "vamde",
+   "fanto"
+  ],
+  "wizar": [
+   "baal",
+   "pump",
+   "vamde",
+   "joker",
+   "fanto"
+  ],
+  "pump": [
+   "noblepump",
+   "pie",
+   "beelzebu_2010"
+  ],
+  "bake": [
+   "pump",
+   "vamde",
+   "fanto"
+  ],
+  "worm": [
+   "sting",
+   "shadra",
+   "hudie",
+   "goki",
+   "kongou"
+  ],
+  "sting": [
+   "paildra",
+   "dinobee",
+   "jewelbee"
+  ],
+  "jewelbee": [
+   "banchosting",
+   "grankuwaga"
+  ],
+  "shadra": [
+   "dinobee"
+  ],
+  "hudie": [
+   "paildra",
+   "jewelbee"
+  ],
+  "goki": [
+   "dinobee"
+  ],
+  "kongou": [
+   "dinobee"
+  ],
+  "gamma@be": [
+   "betelgamma@be",
+   "kausgamma@be",
+   "wezengamma@be",
+   "gulusgamma@be",
+   "sealsdra@be"
+  ],
+  "betelgamma@be": [
+   "canoweiss@be",
+   "fuma@be",
+   "ghilliedhu@be",
+   "bomber@be",
+   "zanmetsu@be",
+   "regulus@be"
+  ],
+  "canoweiss@be": [
+   "sirius@be",
+   "cannondra@be",
+   "spino@be",
+   "arcturus@be"
+  ],
+  "fuma@be": [
+   "sirius@be",
+   "cannondra@be",
+   "arcturus@be"
+  ],
+  "ghilliedhu@be": [
+   "sirius@be",
+   "cannondra@be",
+   "spino@be",
+   "arcturus@be"
+  ],
+  "bomber@be": [
+   "sirius@be",
+   "spino@be",
+   "kuzuha@be",
+   "arcturus@be"
+  ],
+  "zanmetsu@be": [
+   "sirius@be",
+   "kuzuha@be",
+   "arcturus@be"
+  ],
+  "regulus@be": [
+   "sirius@be",
+   "arcturus@be"
+  ],
+  "kausgamma@be": [
+   "canoweiss@be",
+   "fuma@be",
+   "ghilliedhu@be",
+   "bomber@be",
+   "zanmetsu@be",
+   "regulus@be"
+  ],
+  "wezengamma@be": [
+   "canoweiss@be",
+   "fuma@be",
+   "ghilliedhu@be",
+   "bomber@be",
+   "zanmetsu@be",
+   "regulus@be"
+  ],
+  "gulusgamma@be": [
+   "vamde",
+   "canoweiss@be",
+   "fuma@be",
+   "ghilliedhu@be",
+   "bomber@be",
+   "zanmetsu@be",
+   "regulus@be"
+  ],
+  "sealsdra@be": [
+   "vamde",
+   "fuma@be"
+  ],
+  "boko@be": [
+   "betelgamma@be",
+   "sealsdra@be"
+  ],
+  "koe@be": [
+   "kausgamma@be",
+   "wezengamma@be"
+  ],
+  "beta_d@be": [
+   "devi",
+   "airdra_d@be",
+   "seadra_d@be",
+   "mera_d@be",
+   "nume_d@be"
+  ],
+  "draco@be": [
+   "geogrey@be"
+  ],
+  "hack@be": [
+   "geogrey@be",
+   "baohack@be",
+   "arresterdra@be"
+  ],
+  "baohack@be": [
+   "rizegrey@be",
+   "saviorhack@be",
+   "groundra@be"
+  ],
+  "saviorhack@be": [
+   "slayerdra@be",
+   "jes@be",
+   "breakdra@be",
+   "magnakid@be"
+  ],
+  "arresterdra@be": [
+   "rizegrey@be",
+   "saviorhack@be"
+  ],
+  "gumdra@be": [
+   "baohack@be",
+   "arresterdra@be"
+  ],
+  "gao@be": [
+   "gaoga@be",
+   "fira@be",
+   "lekis@be",
+   "leo@be"
+  ],
+  "gaoga@be": [
+   "machgaoga@be",
+   "cresce@be",
+   "grappuleo@be"
+  ],
+  "machgaoga@be": [
+   "miragegaoga@be",
+   "diana@be"
+  ],
+  "cresce@be": [
+   "miragegaoga@be",
+   "diana@be"
+  ],
+  "grappuleo@be": [
+   "apollo@be",
+   "heavyleo@be"
+  ],
+  "fira@be": [
+   "machgaoga@be",
+   "flare@be"
+  ],
+  "flare@be": [
+   "miragegaoga@be",
+   "apollo@be",
+   "heavyleo@be"
+  ],
+  "lekis@be": [
+   "machgaoga@be",
+   "cresce@be"
+  ],
+  "leo@be": [
+   "machgaoga@be",
+   "flare@be",
+   "grappuleo@be",
+   "asta@be"
+  ],
+  "asta@be": [
+   "heavyleo@be"
+  ],
+  "corona@be": [
+   "gaoga@be",
+   "fira@be",
+   "leo@be"
+  ],
+  "luna@be": [
+   "gaoga@be",
+   "lekis@be",
+   "madleo@be"
+  ],
+  "madleo@be": [
+   "grappuleo@be",
+   "asta@be"
+  ],
+  "phasco@be": [
+   "leo@be",
+   "madleo@be"
+  ],
+  "looga@be": [
+   "tyrano_d@be",
+   "loogar@be",
+   "fil@be",
+   "snatch@be"
+  ],
+  "loogar@be": [
+   "soloogar@be",
+   "stiffil@be",
+   "helloogar@be"
+  ],
+  "stiffil@be": [
+   "rasen@be"
+  ],
+  "fil@be": [
+   "soloogar@be",
+   "stiffil@be",
+   "andro@be"
+  ],
+  "andro@be": [
+   "hiandro@be",
+   "rusttyrano@be"
+  ],
+  "snatch@be": [
+   "helloogar@be",
+   "mastertyrano@be",
+   "destro@be"
+  ],
+  "destro@be": [
+   "hiandro@be",
+   "ragna@be"
+  ],
+  "heriss@be": [
+   "loogar@be",
+   "fil@be",
+   "dame@be"
+  ],
+  "dame@be": [
+   "andro@be",
+   "destro@be"
+  ],
+  "bem@be": [
+   "tyrano_d@be",
+   "dame@be",
+   "snatch@be"
+  ]
+ },
+ "fuse": {
+  "bout": [
+   {
+    "from": "exer",
+    "partner": {
+     "attrs": [
+      "Vaccine",
+      "Free"
+     ],
+     "level": "Adult"
+    }
+   },
+   {
+    "from": "namake",
+    "partner": {
+     "attrs": [
+      "Vaccine",
+      "Free"
+     ],
+     "level": "Adult"
+    }
+   }
+  ],
+  "kazuchi": [
+   {
+    "from": "shoot",
+    "partner": {
+     "keys": [
+      "paildra"
+     ]
+    }
+   },
+   {
+    "from": "dive",
+    "partner": {
+     "attrs": [
+      "Vaccine",
+      "Free"
+     ],
+     "level": "Perfect"
+    }
+   },
+   {
+    "from": "climb",
+    "partner": {
+     "attrs": [
+      "Vaccine",
+      "Free"
+     ],
+     "level": "Perfect"
+    }
+   }
+  ],
+  "achilles": [
+   {
+    "from": "dive",
+    "partner": {
+     "attrs": [
+      "Virus"
+     ],
+     "level": "Perfect"
+    }
+   },
+   {
+    "from": "climb",
+    "partner": {
+     "attrs": [
+      "Data"
+     ],
+     "level": "Perfect"
+    }
+   }
+  ],
+  "paildra": [
+   {
+    "from": "vdra",
+    "partner": {
+     "keys": [
+      "sting"
+     ]
+    }
+   },
+   {
+    "from": "goki",
+    "partner": {
+     "attrs": [
+      "Data"
+     ],
+     "level": "Adult"
+    }
+   }
+  ],
+  "dinobee": [
+   {
+    "from": "vdra",
+    "partner": {
+     "attrs": [
+      "Data",
+      "Free"
+     ],
+     "level": "Adult"
+    }
+   },
+   {
+    "from": "hudie",
+    "partner": {
+     "attrs": [
+      "Vaccine"
+     ],
+     "level": "Adult"
+    }
+   }
+  ],
+  "goldvdra": [
+   {
+    "from": "fladra",
+    "partner": {
+     "attrs": [
+      "Virus"
+     ],
+     "level": "Adult"
+    }
+   }
+  ],
+  "aerovdra": [
+   {
+    "from": "lighdra",
+    "partner": {
+     "attrs": [
+      "Vaccine",
+      "Data"
+     ],
+     "level": "Adult"
+    }
+   }
+  ],
+  "banchosting": [
+   {
+    "from": "paildra",
+    "partner": {
+     "attrs": [
+      "Vaccine",
+      "Virus"
+     ],
+     "level": "Perfect"
+    }
+   },
+   {
+    "from": "dinobee",
+    "partner": {
+     "attrs": [
+      "Data"
+     ],
+     "level": "Perfect"
+    }
+   }
+  ],
+  "grankuwaga": [
+   {
+    "from": "paildra",
+    "partner": {
+     "attrs": [
+      "Data"
+     ],
+     "level": "Perfect"
+    }
+   }
+  ],
+  "ulforcevdra": [
+   {
+    "from": "dinobee",
+    "partner": {
+     "attrs": [
+      "Vaccine",
+      "Virus"
+     ],
+     "level": "Perfect"
+    }
+   }
+  ],
+  "omega_z": [
+   {
+    "from": "vermilli",
+    "partner": {
+     "attrs": [
+      "Virus"
+     ],
+     "level": "Perfect"
+    }
+   },
+   {
+    "from": "skullgrey",
+    "partner": {
+     "attrs": [
+      "Free",
+      "Vaccine"
+     ],
+     "level": "Perfect"
+    }
+   },
+   {
+    "from": "panda",
+    "partner": {
+     "attrs": [
+      "Virus"
+     ],
+     "level": "Perfect"
+    }
+   }
+  ],
+  "weregaruru": [
+   {
+    "from": "drimoge",
+    "partner": {
+     "keys": [
+      "garuru"
+     ]
+    }
+   }
+  ],
+  "baal": [
+   {
+    "from": "saberdra",
+    "partner": {
+     "attrs": [
+      "Data"
+     ],
+     "level": "Adult"
+    }
+   },
+   {
+    "from": "bake",
+    "partner": {
+     "attrs": [
+      "Vaccine"
+     ],
+     "level": "Adult"
+    }
+   }
+  ],
+  "pump": [
+   {
+    "from": "saberdra",
+    "partner": {
+     "attrs": [
+      "Free"
+     ],
+     "level": "Adult"
+    }
+   }
+  ],
+  "joker": [
+   {
+    "from": "saberdra",
+    "partner": {
+     "attrs": [
+      "Virus"
+     ],
+     "level": "Adult"
+    }
+   },
+   {
+    "from": "bake",
+    "partner": {
+     "attrs": [
+      "Free"
+     ],
+     "level": "Adult"
+    }
+   }
+  ],
+  "pie": [
+   {
+    "from": "baal",
+    "partner": {
+     "attrs": [
+      "Data",
+      "Vaccine"
+     ],
+     "level": "Perfect"
+    }
+   }
+  ],
+  "neovamde": [
+   {
+    "from": "baal",
+    "partner": {
+     "keys": [
+      "joker"
+     ]
+    }
+   },
+   {
+    "from": "pump",
+    "partner": {
+     "attrs": [
+      "Virus"
+     ],
+     "level": "Perfect"
+    }
+   },
+   {
+    "from": "joker",
+    "partner": {
+     "keys": [
+      "baal"
+     ]
+    }
+   }
+  ],
+  "noblepump": [
+   {
+    "from": "vamde",
+    "partner": {
+     "attrs": [
+      "Vaccine",
+      "Free"
+     ],
+     "level": "Perfect"
+    }
+   },
+   {
+    "from": "joker",
+    "partner": {
+     "attrs": [
+      "Data"
+     ],
+     "level": "Perfect"
+    }
+   }
+  ],
+  "jewelbee": [
+   {
+    "from": "shadra",
+    "partner": {
+     "attrs": [
+      "Vaccine"
+     ],
+     "level": "Adult"
+    }
+   },
+   {
+    "from": "goki",
+    "partner": {
+     "attrs": [
+      "Vaccine"
+     ],
+     "level": "Adult"
+    }
+   }
+  ],
+  "kongou": [
+   {
+    "from": "hudie",
+    "partner": {
+     "attrs": [
+      "Data"
+     ],
+     "level": "Adult"
+    }
+   }
+  ],
+  "proxima@be": [
+   {
+    "from": "arcturus@be",
+    "partner": {
+     "keys": [
+      "sirius@be"
+     ]
+    }
+   }
+  ],
+  "exa@be": [
+   {
+    "from": "slayerdra@be",
+    "partner": {
+     "keys": [
+      "breakdra@be"
+     ]
+    }
+   }
+  ],
+  "gracenova@be": [
+   {
+    "from": "apollo@be",
+    "partner": {
+     "keys": [
+      "diana@be"
+     ]
+    }
+   },
+   {
+    "from": "diana@be",
+    "partner": {
+     "keys": [
+      "apollo@be"
+     ]
+    }
+   }
+  ]
+ },
+ "starters": [
+  "pulse",
+  "v",
+  "agu",
+  "gabu",
+  "ghost",
+  "worm",
+  "gamma@be",
+  "boko@be",
+  "koe@be",
+  "beta_d@be",
+  "draco@be",
+  "hack@be",
+  "gumdra@be",
+  "gao@be",
+  "corona@be",
+  "luna@be",
+  "phasco@be",
+  "looga@be",
+  "heriss@be",
+  "bem@be"
+ ]
+}

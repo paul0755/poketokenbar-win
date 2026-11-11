@@ -22,7 +22,7 @@
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
-const poke = require("./pokemon");
+const poke = require("./world").pack; // 🌏 지금 세계의 종 데이터(포켓몬이면 pokemon.js 그대로)
 
 const SPECIES = require("./species.json");
 

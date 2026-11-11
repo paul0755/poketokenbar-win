@@ -12,7 +12,7 @@
  * 관장 아이의 성장량은 레벨에서 거꾸로 셈한다. 그래서 모습(1차 · 2차 · 3차 진화)도 레벨을 따라간다.
  */
 const battle = require("./battle");
-const poke = require("./pokemon");
+const poke = require("./world").pack; // 🌏 지금 세계의 종 데이터(포켓몬이면 pokemon.js 그대로)
 const SPECIES = require("./species.json");
 const GYMS = require("./gyms.json");
 const ROAD = require("./road.json");

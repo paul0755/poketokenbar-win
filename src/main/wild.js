@@ -12,7 +12,7 @@
  *
  * 하루 상한은 둔다. 잡은 아이는 공짜 알이다 — 알은 사탕 2개다.
  */
-const poke = require("./pokemon");
+const poke = require("./world").pack; // 🌏 지금 세계의 종 데이터(포켓몬이면 pokemon.js 그대로)
 
 /** 다음 출현까지(분). cap 은 하루 최대 출현 수 */
 const PACE = {

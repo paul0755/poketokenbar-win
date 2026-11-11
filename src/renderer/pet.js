@@ -2,10 +2,10 @@
 const img = document.getElementById("pet");
 const egg = document.getElementById("egg");
 // 알 그림 — 크기는 설정에서, 모양은 맡은 아이에서(전설의 알이면 전설의 알 그림). 바뀔 때만 다시 그린다
-const eggArt = { size: 100, single: false, drawn: "" };
+const eggArt = { size: 100, single: false, egg: null, drawn: "" }; // egg — 🦖 디지타마 무늬
 function drawEgg() {
-  const key = eggArt.size + ":" + eggArt.single;
-  if (key !== eggArt.drawn) { egg.innerHTML = window.eggSvg(eggArt.size, eggArt.single); eggArt.drawn = key; }
+  const key = eggArt.size + ":" + eggArt.single + ":" + JSON.stringify(eggArt.egg);
+  if (key !== eggArt.drawn) { egg.innerHTML = window.eggSvg(eggArt.size, eggArt.single, eggArt.egg); eggArt.drawn = key; }
 }
 drawEgg(); // 초기값. 설정 크기가 오면 다시 그린다
 
@@ -41,6 +41,7 @@ window.ptb.onStats((s) => {
     egg.hidden = true;
   } else {
     eggArt.single = Boolean(mine ? mine.single : s.mon && s.mon.single);
+    eggArt.egg = (mine ? mine.egg : s.mon && s.mon.egg) || null;
     drawEgg();
     img.hidden = true;
     egg.hidden = false;
@@ -74,7 +75,9 @@ const facingDir = () => (img.classList.contains("left") ? 1 : -1);
 
 function useMove(move, isNew) {
   if (!move || drag || img.hidden || duel.on) return; // 끄는 중·알·결투 중이면 쉰다
-  if (window.ptbMoves.play(move, { body: document.getElementById("body"), dir: facingDir(), isNew })) {
+  // 🦖 디지몬의 필살기는 디지털 연출(digifx.js) — 포켓몬 연출(moves.js)과 따로
+  const fx = move.digi && window.ptbDigiFx ? window.ptbDigiFx : window.ptbMoves;
+  if (fx.play(move, { body: document.getElementById("body"), dir: facingDir(), isNew })) {
     mv.lastAt = Date.now();
     scheduleIdle(); // 방금 썼으니 심심풀이는 처음부터 다시 잰다
   }
@@ -97,7 +100,12 @@ function watchMoves(s, mine) {
   // 알은 기술이 없다. 프로필은 알에도 1레벨 기술을 주지만 알이 몸통박치기를 하면 이상하다
   // 쓰는 건 레벨업 넷 + 알기술 + 기술머신으로 가르친 것 전부다
   const pr = mine && mine.stageKey !== "egg" ? mine.profile : null;
-  const moves = pr ? [...(pr.moves || []), ...(pr.eggMoves || []), ...(pr.tmMoves || [])] : [];
+  // 🦖 디지몬은 레벨업 기술 대신 그 모습의 필살기(Digi-API) — 셀수록(단계) 크게
+  const DG_POWER = { baby: 1, mid: 2, final: 3, master: 4 };
+  const digi = mine && mine.stageKey !== "egg" && Array.isArray(mine.skills) && mine.skills.length;
+  const moves = digi
+    ? mine.skills.map((name) => ({ name, digi: true, attr: mine.attr, power: DG_POWER[mine.stageKey] || 1 }))
+    : pr ? [...(pr.moves || []), ...(pr.eggMoves || []), ...(pr.tmMoves || [])] : [];
   mv.moves = moves;
   const names = moves.map((m) => m.name);
 

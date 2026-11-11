@@ -17,7 +17,7 @@
  * 승패를 믿을 이유가 없다.
  */
 const profile = require("./profile");
-const poke = require("./pokemon");
+const poke = require("./world").pack; // 🌏 지금 세계의 종 데이터(포켓몬이면 pokemon.js 그대로)
 
 const SPECIES = require("./species.json");
 const MOVES = require("./moves.json");
