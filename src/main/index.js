@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const usage = require("./usage");
+const ledger = require("./ledger"); // 로그가 지워져도 줄지 않는 누적(tokens.json)
 /*
  * 🌏 세계 — 포켓몬 세계 / 디지털 월드. 켤 때 정한다(world.js). poke 는 그 세계의 종 데이터다 —
  * 포켓몬 세계면 pokemon.js 그대로라 이 파일의 나머지는 세계를 몰라도 된다. 디지털 월드에서만 다른 곳은
@@ -2158,6 +2159,7 @@ let save = {
   twoStageMaster: true, // 2단 진화 라인의 마스터가 9억으로 내려온 뒤의 세이브인가(0.14.4) — 새 세이브는 해당 없음
   candyBonus: 0, // 졸업·한도 달성으로 받은 보너스 사탕
   candyExtra: 0, // 사탕 타임으로 더 쳐 준 토큰 — 사탕을 셀 때만 얹는다
+  candyTokens: undefined, // 사탕을 세는 토큰(늘어난 만큼 쌓음 — 로그가 지워져도 안 준다). 없으면 box.accrue 가 지금 셈으로 채운다
   badges: [], // 딴 체육관 배지(gyms.json 의 id) — 딴 순서대로
   gymWeek: null, // 체육관에서 진 횟수를 센 주(그 주 월요일)
   gymLoss: 0, // 이번 주에 진 횟수 — GYM_TRIES 까지
@@ -2531,9 +2533,11 @@ const growthSpeed = () => Math.max(0.1, (save.growthPct ?? 100) / 100);
 const priceOf = (cost) => Math.max(1, Math.round((cost * (save.pricePct ?? 100)) / 100));
 
 /** 이상한사탕 현황 */
-function candy(total = lastTotal) {
+function candy() {
+  // 세이브에 쌓은 토큰(box.accrue — 로그가 지워져도 줄지 않는다). 아직 없는 세이브만 로그 합계로
+  const base = typeof save.candyTokens === "number" ? save.candyTokens : lastTotal;
   // 사탕 타임에 쓴 몫은 더 쳐 준 만큼(candyExtra) 토큰에 얹어 센다
-  const counted = total + (save.candyExtra ?? 0);
+  const counted = base + (save.candyExtra ?? 0);
   const fromTokens = Math.floor(counted / CANDY_PER);
   const earned = fromTokens + (save.candyBonus ?? 0);
   return {
@@ -2685,8 +2689,10 @@ const natureIndexByName = (name) =>
 
 async function buildStats() {
   const u = usage.collect(save.logRoots || {});
+  // 📒 장부 누적 — 로그 합계(u.total)는 30일 지난 로그가 지워지면 준다. 성장 · 사탕 · 누적 표시는 장부로 센다
+  const book = ledger.update(app.getPath("userData"), u);
   lastUsage = u;
-  lastTotal = u.total;
+  lastTotal = book.total;
 
   // 0.1.x 세이브라면 여기서 한 번 박스로 옮긴다. 옮긴 뒤로는 그냥 지나간다.
   if (box.migrate(save, u.total, natureIndexByName)) {
@@ -2711,7 +2717,7 @@ async function buildStats() {
       }
     }
     hatch(0);
-    if (world.isDigimon && !hadSave) save.candyBonus = -Math.floor((u.total + (save.candyExtra ?? 0)) / CANDY_PER); // 사탕도 0 부터
+    if (world.isDigimon && !hadSave) save.candyTokens = 0; // 💠 비트는 들어온 날부터 — 지난 사용량은 세지 않는다
     writeSave();
   }
 
@@ -2727,7 +2733,7 @@ async function buildStats() {
     mult: burn.mult,
     candy: burning.share(u.events, from, to, sweet) * (sweet.mult - 1),
   });
-  if (box.accrue(save, u.total, fed)) writeSave();
+  if (box.accrue(save, book.total, fed)) writeSave();
   // 🦖 디지몬은 단계를 넘을 때 그 사이 쓴 버릇(Claude · Codex · 밤)으로 다음 모습이 갈린다
   if (poke.branch) {
     let moved = false;
@@ -2749,7 +2755,8 @@ async function buildStats() {
   const still = await poke.spriteWithFallback(mon, CACHE, "still");
   const anim = await poke.spriteWithFallback(mon, CACHE, "anim");
   // events는 한도 계산에만 쓴다. 수천 건을 30초마다 IPC로 보낼 이유가 없다.
-  const { events, ...slim } = u;
+  const { events, ...rest } = u;
+  const slim = { ...rest, total: book.total, sources: book.sources }; // 누적은 장부로 — 줄어 보이지 않게
 
   // 박스 목록. 화면에서 고르고 바꾸려면 각자의 모습이 필요하다.
   const boxList = await Promise.all(
@@ -2836,7 +2843,7 @@ async function buildStats() {
     trayIcon: save.trayIcon ?? "logo",
     petSize: save.petSize,
     moveLevel: save.moveLevel ?? "rare",
-    candy: candy(u.total),
+    candy: candy(),
     update: updateView(),
     news: { version: app.getVersion(), unread: save.newsSeen !== app.getVersion() },
     report: { unread: reportUnread() }, // 📊 아직 안 본 지난 주 리포트
@@ -3657,6 +3664,7 @@ function resetProgress() {
   save.activeId = null;
   save.petIds = [];
   save.lastTotal = lastTotal; // 지금부터 알로 다시 시작
+  save.candyTokens = world.isDigimon ? 0 : lastTotal; // 포켓몬 세계는 예전처럼 남은 로그만큼, 디지털 월드는 0 부터
   save.candySpent = 0;
   save.candyBonus = 0;
   save.candyExtra = 0;

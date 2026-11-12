@@ -152,9 +152,17 @@ function accrue(save, total, burn = null) {
   const now = Date.now();
   save.lastTotal = total;
   save.lastTotalAt = now;
+  /*
+   * 🍬 사탕(💠 비트)을 세는 토큰 — 늘어난 만큼 세이브에 쌓는다.
+   * 예전에는 로그 합계(total)로 바로 셌는데, Claude Code 는 30일 지난 로그를 지운다.
+   * 지워질 때마다 합계가 줄어 사탕이 깎였고, 날마다 지워지는 만큼 쓰면 사탕이 멈춰 보였다.
+   * 처음 보는 세이브는 지금 셈(prev, 없으면 total)에서 이어 가니 가진 사탕이 바뀌지 않는다.
+   */
+  if (typeof save.candyTokens !== "number") save.candyTokens = typeof prev === "number" ? prev : total;
   if (typeof prev !== "number") return 0; // 기준점만 세우고 이번엔 넘어간다
   const delta = Math.max(0, total - prev);
   if (!delta) return 0;
+  save.candyTokens += delta; // 아래 한꺼번에 막는 경우에도 — 예전 셈(로그 합계)도 그건 셌다
 
   const hours = typeof prevAt === "number" ? Math.max(0, (now - prevAt) / 3_600_000) : 0;
   if (delta > BASE_ALLOW + ALLOW_PER_HOUR * hours) {
