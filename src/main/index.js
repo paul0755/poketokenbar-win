@@ -2159,6 +2159,7 @@ let save = {
   twoStageMaster: true, // 2단 진화 라인의 마스터가 9억으로 내려온 뒤의 세이브인가(0.14.4) — 새 세이브는 해당 없음
   candyBonus: 0, // 졸업·한도 달성으로 받은 보너스 사탕
   candyExtra: 0, // 사탕 타임으로 더 쳐 준 토큰 — 사탕을 셀 때만 얹는다
+  candyDebtFix: true, // 로그가 지워져 생긴 사탕 빚을 메웠나(0.15.2) — 새 세이브는 해당 없음
   candyTokens: undefined, // 사탕을 세는 토큰(늘어난 만큼 쌓음 — 로그가 지워져도 안 준다). 없으면 box.accrue 가 지금 셈으로 채운다
   badges: [], // 딴 체육관 배지(gyms.json 의 id) — 딴 순서대로
   gymWeek: null, // 체육관에서 진 횟수를 센 주(그 주 월요일)
@@ -2354,6 +2355,7 @@ function loadSave() {
       if (!loaded.phioneSplit) save.phioneSplit = false; // 옛 세이브 — 아래에서 한 번 옮긴다
       if (!loaded.wildMidFix) save.wildMidFix = false; // 옛 세이브 — 아래에서 한 번 살핀다
       if (!loaded.twoStageMaster) save.twoStageMaster = false; // 옛 세이브 — 9억을 넘긴 2단 진화 아이를 아래에서 졸업시킨다
+      if (!loaded.candyDebtFix) save.candyDebtFix = false; // 옛 세이브 — 로그가 지워져 생긴 사탕 빚을 아래에서 한 번 메운다(0.15.2)
     } catch (e) {
       // 파일은 있는데 깨졌다. 덮어쓰지 않고 따로 치워 둔 뒤 멈춘다.
       loadFailed = true;
@@ -2531,6 +2533,35 @@ let lastTotal = 0; // 마지막으로 읽은 누적 토큰. 사탕 계산에 쓴
 const growthSpeed = () => Math.max(0.1, (save.growthPct ?? 100) / 100);
 /** 난이도를 반영한 상점 가격. 공짜가 되지는 않게 최소 1개. */
 const priceOf = (cost) => Math.max(1, Math.round((cost * (save.pricePct ?? 100)) / 100));
+
+/**
+ * 🍬 사탕 빚 메우기(0.15.2, 한 번만) — 0.15.0 까지는 사탕을 남은 로그 합계로 셌다. Claude Code 가 30일 지난 로그를
+ * 지우면 "번 사탕"이 "쓴 사탕"보다 적어져(빚) 아무리 써도 0개로 보였다. 0.15.1 의 장부는 그 상태에서 이어 가서
+ * 빚이 남았다. 모자란 만큼 보너스로 채워 0에 맞추고, 사과로 DEBT_GIFT 를 더 얹는다. 빚이 없던 세이브는 표시만 한다.
+ * box.accrue 가 candyTokens 를 세운 뒤에 부른다.
+ */
+const DEBT_GIFT = 10;
+function makeGoodCandy() {
+  if (typeof save.candyTokens !== "number") return; // 아직 첫 셈 전 — 다음 갱신에
+  const c = candy();
+  const debt = Math.max(0, c.spent - c.earned);
+  save.candyDebtFix = true;
+  if (debt > 0) {
+    save.candyBonus = (save.candyBonus ?? 0) + debt + DEBT_GIFT;
+    save.candyMakeGood = { debt, gift: DEBT_GIFT, at: Date.now() };
+    console.log(`[candy] 로그가 지워져 생긴 빚 ${debt} 을 메우고 ${DEBT_GIFT} 을 더했습니다`);
+    try {
+      if (save.notifyEnabled && Notification.isSupported()) {
+        new Notification({
+          title: `${CUR.icon} ${CUR.name} ${DEBT_GIFT}개를 드렸습니다`,
+          body: `오래된 로그가 지워질 때 ${battle.josa(CUR.name, "이가")} 깎여 쌓이지 않던 것을 고쳤습니다. 모자랐던 ${debt}개를 채우고 사과로 ${DEBT_GIFT}개를 더했습니다`,
+          silent: false,
+        }).show();
+      }
+    } catch {}
+  }
+  writeSave();
+}
 
 /** 이상한사탕 현황 */
 function candy() {
@@ -2734,6 +2765,7 @@ async function buildStats() {
     candy: burning.share(u.events, from, to, sweet) * (sweet.mult - 1),
   });
   if (box.accrue(save, book.total, fed)) writeSave();
+  if (!save.candyDebtFix) makeGoodCandy();
   // 🦖 디지몬은 단계를 넘을 때 그 사이 쓴 버릇(Claude · Codex · 밤)으로 다음 모습이 갈린다
   if (poke.branch) {
     let moved = false;
