@@ -564,7 +564,8 @@
           // 💎 메가진화 — 컷인(megacut.js) 뒤 3D 그림으로, 빛이 한 번 터진다
           logLine(ev.text, "good");
           const al = r.allies[ev.who];
-          if (!fast && window.ptbMegaCut) await window.ptbMegaCut.play($("bsRoom"), { from: al.url, to: al.megaUrl, name: ev.mega.name, stone: (ev.text.match(/의 (.+?)[이가] 반응/) || [])[1], side: 0 });
+          // 컷인은 내 아이만 — 길드원 여럿이 한꺼번에 메가진화하면 시작부터 컷인이 줄줄이 선다. 길드원은 빛만 터진다
+          if (!fast && al.me && window.ptbMegaCut) await window.ptbMegaCut.play($("bsRoom"), { from: al.url, to: al.megaUrl, name: ev.mega.name, stone: (ev.text.match(/의 (.+?)[이가] 반응/) || [])[1], side: 0 });
           const im = a.el.querySelector("img");
           im.src = r.allies[ev.who].megaUrl;
           im.classList.add("mega");

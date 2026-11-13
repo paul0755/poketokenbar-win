@@ -19,6 +19,7 @@
 const { fighter, effectiveness, damage, josa } = require("./battle");
 const friend = require("./friend");
 const mega = require("./mega");
+const poke = require("./pokemon");
 
 const TYPES = require("./types.json");
 
@@ -104,11 +105,13 @@ function parseTeam(code) {
   }
   const [ver, , , , d] = arr || [];
   if (ver !== 1 || !Array.isArray(d)) return null;
-  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv, plain] = d;
+  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv, plain, stone] = d;
   const mon = { line, nature, shiny: Boolean(shiny), ivs, gender: GENDERS[g], ability, eggMoves, tmMoves };
   if (lv) mon.lvGrown = lv;
   if (plain === 1) mon.plain = true;
   if (friend.validate(mon, grown)) return null;
+  // 💎 지닌 메가스톤(0.16.0~ 의 코드) — 그 라인에 맞지 않으면 돌만 버린다(아이는 그대로 싸운다)
+  if (stone && mega.isStone(stone) && poke.LINES[line] && mega.lineFits(poke.LINES[line].ids, stone)) mon.hold = stone;
   return { mon, grown };
 }
 
@@ -120,8 +123,9 @@ function parseTeam(code) {
  *           bench: [{ mon, grown }] 다른 길드원의 후보 — 앞 아이가 쓰러지면 차례로 그 자리에 나온다
  *   boss    { mon, grown }
  *   opts    { level, bars, megaBudget } — bars: 보스가 시작할 때 남은 칸(소수)
- *           💎 내 아이(a.me)가 a.mega(폼)를 들고 나오면 메가진화한다 — megaBudget(⚡ 메가 에너지)만큼, 한 번에 하나.
- *           메가진화한 아이가 쓰러지고 다음 아이를 내보내면(swap) 그 아이가 다시 할 수 있다. 길드원 · 보스는 하지 않는다
+ *           💎 a.mega(폼)를 들고 나오면 메가진화한다. 자리마다 한 번에 하나 — 메가진화한 아이가 쓰러지고 다음 아이가
+ *           나오면(swap · 후보) 그 아이가 다시 할 수 있다. 내 아이(a.me)는 megaBudget(⚡ 메가 에너지)만큼만,
+ *           길드원의 아이는 에너지 없이(코드에 실린 돌만 있으면 — 친선 결투와 같다). 보스는 하지 않는다
  *
  *   step()   → { log, need, over }   need: 내 아이가 쓰러졌다 — swap 이나 stop 을 기다린다
  *   swap(a)  내 다음 아이를 내보낸다({ mon, grown, owner, member, me: true })
@@ -344,18 +348,19 @@ function start(allies, boss, rng, opts = {}) {
   const alive = () => A.some((f) => f.hp > 0);
   say({ t: "info", who: null, text: `길드원 ${A.length}명의 포켓몬 VS ${nm("b")} Lv.${B.level}` });
 
-  /** 💎 내 아이 i 가 메가진화한다 — 에너지가 남았고, 그 종에 맞는 돌일 때 */
+  /** 💎 아이 i 가 메가진화한다 — 그 종에 맞는 돌일 때. 내 아이는 에너지가 남았을 때만(megaUsed 가 쓴 만큼) */
   let megaUsed = 0;
   const tryMega = (i, form) => {
     const f = A[i];
-    if (!form || form.dex !== f.dexId || megaUsed >= (opts.megaBudget || 0)) return;
+    const me = Boolean(team[i].a.me);
+    if (!form || form.dex !== f.dexId || (me && megaUsed >= (opts.megaBudget || 0))) return;
     const before = f.name;
     if (!mega.evolve(f, form)) return;
-    megaUsed++;
+    if (me) megaUsed++;
     say({ t: "info", who: i, mega: { key: form.key, id: form.id, name: form.name }, text: `${before}의 ${josa(form.stoneName, "이가")} 반응했다!` });
     say({ t: "info", who: i, text: `${josa(before, "은는")} ${form.name}(으)로 메가진화했다!` });
   };
-  if (my >= 0) tryMega(my, team[my].a.mega);
+  team.forEach((x, i) => tryMega(i, x.a.mega)); // 나(0번)부터 자리 순서대로
 
   let turn = 0;
   let stopped = false;
@@ -397,7 +402,7 @@ function start(allies, boss, rng, opts = {}) {
       while (bench[s].length) {
         const nx = bench[s].shift();
         const base = team[cur[s]].a;
-        const a = { mon: nx.mon, grown: nx.grown, owner: base.owner, member: base.member };
+        const a = { mon: nx.mon, grown: nx.grown, owner: base.owner, member: base.member, mega: nx.mega || null };
         const f = fighter(a.mon, a.grown, level);
         if (!f) continue;
         team.push({ a, f, slot: s });
@@ -405,6 +410,7 @@ function start(allies, boss, rng, opts = {}) {
         dealtBy.push(0);
         cur[s] = A.length - 1;
         say({ t: "enter", who: cur[s], slot: s, text: `${a.owner ? a.owner + "의 " : ""}${josa(f.name, "이가")} 나왔다!` });
+        tryMega(cur[s], a.mega);
         break;
       }
     }

@@ -53,12 +53,19 @@
   #pet.left {
     transform: scaleX(-1);
   }
-  /* 💎 메가진화 — 3D 그림(Showdown)은 도트가 아니다. 창 안에서 조금 크게 */
+  /* 💎 메가진화 — 3D 그림(Showdown)은 도트가 아니고, 가로세로 비율이 제각각이다(메가보스만다 217x71,
+     메가레쿠쟈 137x146). 창(정사각형) 전체를 쓰되 위로는 bob(5px)이 뜰 자리를 남긴다.
+     예전엔 scale 1.14 로 키워서 키 큰 메가 26종이 bob 꼭대기에서 머리 5px 이 잘렸다.
+     창 크기 기준이라 vw · vh — #body 는 내용 크기라 % 가 안 먹는다. pet.js 가 넣는 px 보다 앞서야 해서 !important */
   #pet.mega {
     image-rendering: auto;
-    scale: 1.14;
+    width: calc(100vw - 6px) !important;
+    height: calc(100vh - 7px) !important;
+    /* 가로로 넓은 메가(메가보스만다 · 메가피죤투 · 메가라티아스)는 창 폭에 묶여 원래 모습의 절반만 해진다.
+       pet.js megaFit 이 비율만큼 살짝(최대 1.2배) 키운다 — 바닥 가운데 기준이라 날개 끝만 조금 창 밖으로 나간다 */
+    scale: var(--mgs, 1);
     transform-origin: 50% 100%;
-    filter: drop-shadow(0 0 6px rgba(255, 190, 255, 0.6)) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
+    filter: drop-shadow(0 0 3px rgba(255, 190, 255, 0.7)) drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45));
   }
   #egg {
     animation: bob 2.6s ease-in-out infinite;

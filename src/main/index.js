@@ -1070,10 +1070,10 @@ function guildBenchCodes() {
     .slice(0, RAID_LINEUP - 1);
   const rows = pick.map(({ m, grown }) => {
     const p = profile.build(box.withLv(m, sp), grown);
-    return { m, grown, key: [m.id, poke.stageFor(grown, m.line), p ? p.level : 0, (m.tmMoves || []).length, m.nature].join("|") };
+    return { m, grown, key: [m.id, poke.stageFor(grown, m.line), p ? p.level : 0, (m.tmMoves || []).length, m.nature, m.hold || ""].join("|") };
   });
-  const key = rows.map((x) => x.key).join(",") + "|" + save.trainerName;
-  if (guildBench.key !== key) guildBench = { key, codes: rows.map(({ m, grown }) => friend.encode(box.withLv(m, sp), grown, save.trainerName)) };
+  const key = rows.map((x) => x.key).join(",") + "|" + save.trainerName + "|" + megaOn();
+  if (guildBench.key !== key) guildBench = { key, codes: rows.map(({ m, grown }) => friend.encode(codeMon(m), grown, save.trainerName)) };
   return guildBench.codes;
 }
 
@@ -1604,9 +1604,10 @@ async function raidAttack(monId) {
     if (!t) continue;
     // 후보 — 대표가 쓰러지면 차례로 나온다(옛 버전 길드원은 없다)
     const bench = (Array.isArray(x.bench) ? x.bench : []).slice(0, RAID_LINEUP - 1)
-      .map((c, k) => { const b = raidbattle.parseTeam(c); return b && { mon: { id: `raid-${x.id}-${k + 1}`, ...b.mon }, grown: b.grown }; })
+      .map((c, k) => { const b = raidbattle.parseTeam(c); return b && { mon: { id: `raid-${x.id}-${k + 1}`, ...b.mon }, grown: b.grown, mega: mega.stoneForm(b.mon.hold) }; })
       .filter(Boolean);
-    allies.push({ mon: { id: "raid-" + x.id, ...t.mon }, grown: t.grown, owner: x.trainer || "", member: x.id, bench });
+    // 💎 길드원의 아이도 돌을 지녔으면 메가진화한다 — 에너지는 쓰지 않는다(그 사람이 메가진화를 꺼 두었으면 코드에 돌이 없다)
+    allies.push({ mon: { id: "raid-" + x.id, ...t.mon }, grown: t.grown, owner: x.trainer || "", member: x.id, bench, mega: mega.stoneForm(t.mon.hold) });
   }
   const b = raidbattle.start(allies, { mon: raidBoss(s.line), grown: RAID_BOSS_GROWN }, friend.rng(s.seed), { level: 50, bars: s.start / 1000, megaBudget: megaEnergy() });
   if (!b) return { ok: false, reason: "결투를 시작하지 못했습니다" };
