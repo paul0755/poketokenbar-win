@@ -110,6 +110,10 @@
 #bsFoot .warn { color: #ffb347; }
 
 /* 💎 메가진화한 내 아이 — 3D 그림. 3D · 도트 모두 여백 없이 잘린 그림이라 같은 칸을 꽉 채운다 — 키우면 방 왼쪽 벽에서 잘렸다. 크기는 그대로, 빛으로 */
+/* 3D 메가는 그림 판이 옆으로 넓다(메가리자몽Y 201x166 · 메가갸라도스 193x122) — 도트와 같은 정사각형 칸에 넣으면
+   반쪽만 해진다. 칸을 옆으로 넓히고 키도 키운다(2.1배 — 3D 는 날개가 가늘어 도트 옆에서 같은 키여도 작아 보이고,
+   메가진화한 아이는 한눈에 커 보여야 한다). 자리는 boss.js layoutScene 이 이 크기(MEGA_W · MEGA_H)로 비워 둔다 */
+.bs-a img.mega { width: calc(var(--s) * 2.6); height: calc(var(--s) * 2.1); }
 .bs-a img.mega { image-rendering: auto; filter: drop-shadow(0 0 5px rgba(255, 190, 255, .8)) drop-shadow(0 0 2px #fff); }
 .bs-a.megafx::after { content: ""; position: absolute; left: 50%; top: 40%; width: 90%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%;
   background: radial-gradient(circle, #fff 0 18%, rgba(255, 170, 250, .9) 30%, rgba(120, 200, 255, .6) 52%, transparent 70%);

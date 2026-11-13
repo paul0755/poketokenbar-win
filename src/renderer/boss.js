@@ -130,7 +130,12 @@
     const k = n <= 6 ? 0.1 : n <= 10 ? 0.085 : n <= 16 ? 0.07 : 0.056;
     $("bsActors").style.setProperty("--s", Math.round(Math.max(40, w * k)) + "px");
   }
-  window.addEventListener("resize", () => { if (!$("tab-boss").hidden) sizeActors(); });
+  let liveScene = null; // 지금 재생 중인 판 — 창 크기가 바뀌면 자리를 다시 잡는다
+  window.addEventListener("resize", () => {
+    if ($("tab-boss").hidden) return;
+    if (playing && liveScene) layoutScene(liveScene, { allies: [] });
+    else sizeActors();
+  });
 
   /* ---------------- 그리기 ---------------- */
 
@@ -460,22 +465,91 @@
     actors.clear();
     $("bsLog").innerHTML = "";
     const later = new Set(r.log.filter((ev) => ev.t === "enter").map((ev) => ev.who));
-    const first = r.allies.filter((_, i) => !later.has(i));
-    const n = first.length;
-    sizeActors(n);
-    const cols = Math.max(1, Math.ceil(Math.sqrt(n * 1.6)));
-    const rows = Math.ceil(n / cols);
-    const homes = first.map((_, i) => {
-      const c = i % cols;
-      const rw = Math.floor(i / cols);
-      // 왼쪽 끝은 10% — 6% 에서는 맨 왼쪽 아이의 이름표("나 · 메가망나뇽")와 그림이 방 벽에서 잘렸다
-      return [10 + (c + (rw % 2) * 0.5) * (42 / cols), 78 + (rows > 1 ? (rw / (rows - 1)) * 17 : 8)];
-    });
     const B = r.boss;
-    const scene = { team: [], homes, B, bossNow: B.hp, toMilli: (hp) => Math.round((hp / B.bar) * 1000) };
+    const scene = { team: [], homes: [], tagW: [], megaSlots: new Set(), B, bossNow: B.hp, toMilli: (hp) => Math.round((hp / B.bar) * 1000) };
     r.allies.forEach((f, i) => { if (!later.has(i)) enter(scene, f, i); });
+    layoutScene(scene, r);
+    liveScene = scene;
     bossHp(scene.toMilli(B.hp));
     return scene;
+  }
+
+  /**
+   * 자리 잡기 — 아이마다 실제로 차지하는 너비(그림 · 이름표 중 넓은 쪽)를 재서 겹치지 않게 줄을 세운다.
+   * 앞줄(바닥)부터 왼쪽에서 오른쪽으로 채우고, 넘치면 그 위에 줄을 하나 더. 줄이 방 높이를 넘거나
+   * 한 아이도 줄 폭에 안 들어가면 아이 크기(--s)를 줄여 다시 센다.
+   * 메가진화한(이 토막에서 할) 아이의 자리만 메가 크기(MEGA_W × MEGA_H 칸)로 잡는다. 판 도중에 다른 자리에서
+   * 메가진화하면(다음 아이 · 후보) 그때 다시 잡는다 — 아이들이 새 자리로 걸어간다. 미리 비워 두면 보통 아이가 작아졌다.
+   * 이름표는 칸 폭에 맞춰 줄인다(…). 길게 늘어선 이름표끼리 겹치던 것
+   */
+  const MEGA_W = 2.6; // boss.css .bs-a img.mega 와 같다
+  const MEGA_H = 2.1;
+  const STACK = 32; // 그림 아래 이름표 · HP 막대 · 상태 줄
+  const GAP = 8;
+  function layoutScene(scene, r) {
+    const box = $("bsActors");
+    const W = box.clientWidth || 640;
+    const H = box.clientHeight || 360;
+    // 자리마다 지금 서 있는 아이(나중에 나온 아이가 앞 아이를 대신한다)
+    const bySlot = [];
+    scene.team.forEach((a, i) => {
+      if (!a) return;
+      const f = r.allies[i];
+      bySlot[a.slot] = { a, s: a.slot, may: Boolean(f && f.mega) || a.el.querySelector("img").classList.contains("mega") };
+    });
+    for (const x of bySlot) {
+      if (!x) continue;
+      const tg = x.a.el.querySelector(".tg");
+      tg.style.maxWidth = "none";
+      x.tw = tg.offsetWidth;
+    }
+    scene.megaSlots = new Set(bySlot.filter((x) => x && x.may).map((x) => x.s));
+    // 작은 아이가 앞줄, 메가(큰 아이)는 뒷줄 — 뒷줄은 발이 바닥 안쪽(floor)에 서고 몸은 벽 쪽으로 솟는다.
+    // 메가가 앞줄이면 뒷줄이 그만큼 위로 밀려 벽에 떠 있었다
+    const list = bySlot.filter(Boolean).sort((a, b) => a.may - b.may || a.s - b.s);
+    const n = list.length;
+    const x0 = W * 0.02, x1 = W * 0.62; // 오른쪽은 보스 자리
+    const yB = H * 0.97, yT = H * 0.06;
+    const floor = H * 0.66; // 바닥이 시작하는 곳(boss.css 방 그림) 조금 아래 — 어느 줄이든 발은 이보다 아래
+    let s = Math.round(Math.max(24, W * (n <= 6 ? 0.1 : n <= 10 ? 0.085 : n <= 16 ? 0.07 : 0.056)));
+    let rows;
+    for (;;) {
+      rows = [];
+      let row = null;
+      for (const x of list) {
+        const sw = x.may ? s * MEGA_W : s;
+        const sh = x.may ? s * MEGA_H : s;
+        const w = Math.max(sw, Math.min(x.tw, s * 1.4)) + GAP; // 이름표는 칸 1.4개 폭까지 — 넘으면 … 으로
+        if (!row || row.w + w > x1 - x0) { row = { items: [], w: 0, h: 0 }; rows.push(row); }
+        row.items.push({ ...x, w });
+        row.w += w;
+        row.h = Math.max(row.h, sh + STACK);
+      }
+      const front = rows.slice(0, -1).reduce((t, rw) => t + rw.h, 0); // 맨 뒷줄 앞에 선 줄들
+      const last = rows[rows.length - 1];
+      const fits = (!last || (yB - front >= floor && yB - front - last.h >= yT)) && rows.every((rw) => rw.w <= x1 - x0);
+      if (fits || s <= 24) break;
+      s = Math.max(24, Math.round(s * 0.92));
+    }
+    box.style.setProperty("--s", s + "px");
+    let y = yB;
+    for (const rw of rows) {
+      const spare = Math.max(0, (x1 - x0 - rw.w) / rw.items.length); // 남는 폭은 고르게 나눈다
+      let x = x0;
+      for (const it of rw.items) {
+        scene.homes[it.s] = [((x + (it.w + spare) / 2) / W) * 100, (y / H) * 100];
+        scene.tagW[it.s] = Math.max(0, it.w + spare - GAP);
+        x += it.w + spare;
+      }
+      y -= rw.h;
+    }
+    for (const a of scene.team) if (a) placeHome(scene, a);
+  }
+  function placeHome(scene, a) {
+    a.home = scene.homes[a.slot] || scene.homes[0] || [30, 90];
+    const tw = scene.tagW[a.slot];
+    a.el.querySelector(".tg").style.maxWidth = tw ? Math.round(tw) + "px" : "";
+    put(a, ...a.home);
   }
 
   /** 아이 하나를 판에 세운다 */
@@ -484,11 +558,10 @@
     const a = { el: actorEl("p:" + i, f.url, `${f.me ? "나" : f.owner} · ${f.name}`, f.me), hp: f.maxHp, max: f.maxHp };
     actors.set("p:" + i, a); // 끝나면 같이 치운다
     const slot = f.slot ?? i;
-    a.home = scene.homes[slot] || scene.homes[0]; // 뒤에 나온 아이는 쓰러진 아이의 자리에
     // 그 자리에 쓰러져 있던 아이는 치운다
     scene.team.forEach((x, k) => { if (x && k !== i && x.slot === slot) x.el.classList.add("gone"); });
     a.slot = slot;
-    put(a, ...a.home);
+    placeHome(scene, a); // 뒤에 나온 아이는 쓰러진 아이의 자리에(판을 차릴 때는 layoutScene 이 다시 세운다)
     scene.team[i] = a;
     return a;
   }
@@ -515,7 +588,7 @@
       if (ev.t === "turn") {
         bossTurn = false;
         logLine(ev.text, "turn");
-        if (!fast) for (const x of team) if (x && x.hp > 0 && Math.random() < 0.5) put(x, x.home[0] + rand(-3, 3), x.home[1] + rand(-3, 3));
+        if (!fast) for (const x of team) if (x && x.hp > 0 && Math.random() < 0.5) put(x, x.home[0], x.home[1] - rand(0, 1.5));
         await wait(250);
       } else if (ev.t === "move") {
         logLine(ev.text, "mv");
@@ -569,6 +642,7 @@
           const im = a.el.querySelector("img");
           im.src = r.allies[ev.who].megaUrl;
           im.classList.add("mega");
+          if (!scene.megaSlots.has(a.slot)) layoutScene(scene, r);
           a.el.classList.remove("megafx");
           void a.el.offsetWidth;
           a.el.classList.add("megafx");
