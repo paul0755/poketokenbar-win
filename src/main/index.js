@@ -19,6 +19,7 @@ const notify = require("./notify");
 const update = require("./update");
 const backup = require("./backup");
 const battle = require("./battle");
+const mega = require("./mega"); // 💎 메가진화
 const wild = require("./wild");
 const friend = require("./friend");
 const raidbattle = require("./raidbattle");
@@ -365,7 +366,7 @@ const berryBag = () =>
  * level 이 50이면 둘 다 Lv.50 으로 맞춘다. 실제 레벨로 붙이면 Lv.6 과 Lv.60 이
  * 한 방에 끝나서 볼 게 없다 — 그래서 기본은 맞추기다. 그 외 값은 받지 않는다.
  */
-function startBattle(idA, idB, level) {
+async function startBattle(idA, idB, level) {
   const a = box.find(save.box, idA);
   const b = box.find(save.box, idB);
   if (!a || !b) return { ok: false, reason: "없는 아이입니다" };
@@ -373,8 +374,15 @@ function startBattle(idA, idB, level) {
   const ga = box.effOf(a, growthSpeed());
   const gb = box.effOf(b, growthSpeed());
   if (!poke.stageFor(ga) || !poke.stageFor(gb)) return { ok: false, reason: "알은 싸울 수 없습니다" };
-  const r = battle.run(box.withLv(a, growthSpeed()), ga, box.withLv(b, growthSpeed()), gb, Math.random, { level: level === 50 ? 50 : null });
+  // 💎 둘 다 내 아이다 — 메가진화 한 번에 에너지 하나씩. 하나뿐이면 왼쪽(A)이 먼저
+  const fa = megaFormOf(a, ga);
+  const fb = megaFormOf(b, gb);
+  const sa = fa && megaEnergy() >= 1 ? { form: fa } : null;
+  const sb = fb && megaEnergy() - (sa ? 1 : 0) >= 1 ? { form: fb } : null;
+  const r = battle.run(box.withLv(a, growthSpeed()), ga, box.withLv(b, growthSpeed()), gb, Math.random, { level: level === 50 ? 50 : null, mega: [sa, sb] });
   if (!r) return { ok: false, reason: "결투를 시작하지 못했습니다" };
+  spendMega(r.fighters.filter((f) => f.mega).length);
+  await megaArt(r.fighters);
 
   // 전적은 개체에 남긴다. 놓아주면 같이 사라진다
   if (r.winner != null) {
@@ -396,8 +404,109 @@ function startBattle(idA, idB, level) {
   }
   writeSave();
   refresh(true);
-  return { ok: true, ...r, reward, rewardsLeft: battleRewardsLeft() };
+  return { ok: true, ...r, reward, rewardsLeft: battleRewardsLeft(), megaEnergy: megaEnergy() };
 }
+
+/* ---------------- 💎 메가진화 (mega.js) ---------------- */
+
+/*
+ * ⚡ 메가 에너지 — 장부(tokens.json)가 늘어난 만큼 megaAcc 에 쌓아 PER_CHARGE 마다 하나, MAX 개까지.
+ * 처음엔 0개. 가득 차 있는 동안 쓴 토큰은 쌓이지 않는다("모아 두는" 게 아니라 "다시 차는" 것).
+ * 포켓몬 세계에만 있다 — 디지털 월드에 가 있던 동안 쓴 토큰도 돌아오면 장부로 따라잡는다.
+ */
+const megaOn = () => !world.isDigimon && save.megaOn !== false;
+const megaEnergy = () => (world.isDigimon ? 0 : Math.max(0, Math.min(mega.MAX, save.megaEnergy || 0)));
+function megaCharge(total) {
+  if (world.isDigimon) return false;
+  if (typeof save.megaLast !== "number") { save.megaLast = total; return false; }
+  const d = Math.max(0, total - save.megaLast);
+  save.megaLast = total;
+  if (!d) return false;
+  let e = megaEnergy();
+  if (e >= mega.MAX) { save.megaAcc = 0; return false; }
+  let acc = (save.megaAcc || 0) + d;
+  const was = e;
+  while (acc >= mega.PER_CHARGE && e < mega.MAX) { acc -= mega.PER_CHARGE; e++; }
+  save.megaEnergy = e;
+  save.megaAcc = e >= mega.MAX ? 0 : acc;
+  return e !== was;
+}
+function spendMega(n) {
+  if (!n) return;
+  save.megaEnergy = Math.max(0, megaEnergy() - n);
+}
+/** 이 아이가 지금 메가진화할 수 있는 폼 — 맞는 돌을 지녔고, 그 종의 모습이고, 메가진화 쓰기가 켜져 있을 때 */
+function megaFormOf(m, grown) {
+  if (!megaOn() || !m || !mega.isStone(m.hold)) return null;
+  const d = poke.describe(grown ?? box.effOf(m, growthSpeed()), m.line, poke.look(m));
+  return mega.formFor(m.hold, d.dexId);
+}
+/** 메가 폼 그림(Showdown 3D) — 앞모습 · 뒷모습 */
+async function megaUrl(id, shiny, back = false) {
+  const p = await poke.spriteWithFallback({ dexId: id, isShiny: Boolean(shiny) }, CACHE, back ? "3dback" : "3d").catch(() => null);
+  return p ? pathToFileURL(p).href : null;
+}
+/** 결투 결과의 fighters 에 메가 그림을 붙인다(megaUrl · megaBackUrl) */
+async function megaArt(fighters) {
+  await Promise.all((fighters || []).map(async (f) => {
+    if (!f || !f.mega) return;
+    [f.megaUrl, f.megaBackUrl] = await Promise.all([megaUrl(f.mega.id, f.mega.shiny), megaUrl(f.mega.id, f.mega.shiny, true)]);
+  }));
+}
+/** 친선 · 실시간 · 길드 결투 코드에 싣는 꼴 — 메가진화를 꺼 두었으면 돌을 싣지 않는다 */
+const codeMon = (m) => ({ ...box.withLv(m, growthSpeed()), megaOff: !megaOn() });
+
+function megaToggle(on) {
+  if (world.isDigimon) return { ok: false, reason: "디지털 월드에는 메가진화가 없습니다" };
+  save.megaOn = Boolean(on);
+  guildTeam = { key: "", code: "" }; // 길드에 올린 대표 코드도 다시
+  writeSave();
+  refresh(true);
+  pushShop();
+  return { ok: true, on: save.megaOn };
+}
+
+/** 화면에 보일 메가 상태 */
+const megaView = () =>
+  world.isDigimon ? null : {
+    energy: megaEnergy(), max: mega.MAX, on: save.megaOn !== false,
+    acc: Math.round(save.megaAcc || 0), per: mega.PER_CHARGE, price: priceOf(mega.STONE_PRICE),
+    pet: megaPetLeft(), petMinutes: mega.PET_MINUTES, petTokens: mega.PET_TOKENS,
+  };
+
+/*
+ * 바탕화면 펫의 메가진화 — 🔥 버닝 타임에 10분 안에 PET_TOKENS 를 쓰면 10분 동안, 맞는 돌을 지닌 펫이 메가진화한다.
+ * 에너지는 쓰지 않는다(보여 주기). 시각은 세이브에 두지 않는다 — 껐다 켜면 끝난다.
+ */
+let megaPetUntil = 0;
+const megaPetLeft = () => Math.max(0, megaPetUntil - Date.now());
+function megaPetTick(events, burnOn) {
+  if (world.isDigimon || !megaOn() || !burnOn) return;
+  const now = Date.now();
+  const since = now - mega.PET_MINUTES * 60_000;
+  let n = 0;
+  for (const e of events || []) if (e.t > since && e.t <= now) n += e.n;
+  if (n < mega.PET_TOKENS) return;
+  const fresh = megaPetUntil <= now;
+  megaPetUntil = now + mega.PET_MINUTES * 60_000;
+  if (fresh) console.log(`[mega] 버닝 타임 ${Math.round(n / 1e6)}M — 펫 메가진화 ${mega.PET_MINUTES}분`);
+}
+
+/** 박스 한 칸의 메가 정보 — 지닌 돌, 지금 메가진화할 수 있는 폼, 펫이 메가진화 중이면 그 그림 */
+async function megaBox(m, d) {
+  if (world.isDigimon || !d.dexId) return null;
+  const ids = (poke.LINES[m.line] || {}).ids || [];
+  const fits = megaBag().filter((x) => ids.includes(x.dex)).map(({ id, name, n }) => ({ id, name, n })); // 가방에 있는, 이 아이가 지닐 수 있는 돌
+  const f = mega.stoneForm(m.hold);
+  if (!f) return fits.length ? { id: null, fits } : null;
+  const ready = d.dexId === f.dex;
+  const pet = ready && megaOn() && megaPetLeft() > 0 ? await megaUrl(f.id, d.isShiny) : null;
+  return { id: m.hold, stone: f.stoneName, form: f.name, ready, petUrl: pet, fits };
+}
+
+/** 가방의 메가스톤 — { id, name, form, dex, n } */
+const megaBag = () =>
+  world.isDigimon ? [] : mega.FORMS.map((f) => ({ id: mega.itemOf(f), name: f.stoneName, form: f.name, dex: f.dex, n: (save.items || {})[mega.itemOf(f)] || 0 })).filter((x) => x.n > 0);
 
 /* ---------------- 친선 배틀 (friend.js) ---------------- */
 
@@ -408,7 +517,7 @@ function friendRegister(id, trainer) {
   const grown = box.effOf(m, growthSpeed());
   if (!poke.stageFor(grown)) return { ok: false, reason: "알은 등록할 수 없습니다" };
   save.trainerName = String(trainer || "").trim().slice(0, 16);
-  const code = friend.encode(box.withLv(m, growthSpeed()), grown, save.trainerName);
+  const code = friend.encode(codeMon(m), grown, save.trainerName);
   save.friendTeam = { code, monId: id, at: Date.now() };
   writeSave();
   refresh(true);
@@ -449,7 +558,7 @@ function liveRegister(id) {
   if (!m) return { ok: false, reason: "없는 아이입니다" };
   const grown = box.effOf(m, growthSpeed());
   if (!poke.stageFor(grown)) return { ok: false, reason: "알은 싸울 수 없습니다" };
-  liveTeam = { code: friend.encode(box.withLv(m, growthSpeed()), grown, save.trainerName), monId: id };
+  liveTeam = { code: friend.encode(codeMon(m), grown, save.trainerName), monId: id };
   return { ok: true, code: liveTeam.code, name: poke.describe(grown, m.line, poke.look(m)).name };
 }
 
@@ -467,8 +576,11 @@ async function friendBattle(code, opts = {}) {
   const sides = [mine, theirs];
   const L = sides[i];
   const R = sides[j];
-  const r = battle.run(L.mon, L.grown, R.mon, R.grown, friend.rng(friend.seedOf(mine.code, theirs.code)), { level: 50 });
+  // 💎 코드에 실린 메가스톤으로 — 에너지는 쓰지 않는다(상대 PC 의 에너지는 모른다). 맞는 모습이 아니면 battle.run 이 거른다
+  const sp = (x) => (mega.stoneForm(x.mon.hold) ? { form: mega.stoneForm(x.mon.hold) } : null);
+  const r = battle.run(L.mon, L.grown, R.mon, R.grown, friend.rng(friend.seedOf(mine.code, theirs.code)), { level: 50, mega: [sp(L), sp(R)] });
   if (!r) return { ok: false, reason: "결투를 시작하지 못했습니다" };
+  await megaArt(r.fighters);
 
   // 내가 오른쪽이었으면 화면용으로 뒤집는다 — 계산은 그대로, 보는 쪽만 바뀐다
   const flip = i === 1;
@@ -653,9 +765,11 @@ async function fightLeader(g, ids, max, prefix) {
   if (!pick.length || pick.some((m) => !m)) return { ok: false, reason: "함께 싸울 아이를 골라 주세요" };
   const mine = pick.map((m) => ({ m, mon: box.withLv(m, growthSpeed()), grown: box.effOf(m, growthSpeed()) }));
   if (mine.some((x) => !poke.stageFor(x.grown))) return { ok: false, reason: "알은 싸울 수 없습니다" };
+  for (const x of mine) x.mega = megaFormOf(x.m, x.grown); // 💎
 
-  const res = gym.challenge(mine, g);
+  const res = gym.challenge(mine, g, Math.random, { budget: megaEnergy() });
   if (!res) return { ok: false, reason: "결투를 시작하지 못했습니다" };
+  spendMega(res.megaUsed);
 
   // 그림 — 내 쪽은 뒷모습도. 판마다 다시 받지 않게 아이마다 한 번씩
   const foe = g.team.map((_, k) => gym.leaderMon(g, k));
@@ -675,7 +789,8 @@ async function fightLeader(g, ids, max, prefix) {
     prev = [{ a, status: r.end[0].status }, { b, status: r.end[1].status }];
     return { a, b, winner: r.winner, turns: r.turns, fighters, log: r.log };
   });
-  return { ok: true, win: res.win, mine, rounds };
+  await Promise.all(rounds.map((x) => megaArt(x.fighters))); // 같은 그림은 디스크 캐시에서
+  return { ok: true, win: res.win, mine, rounds, megaUsed: res.megaUsed };
 }
 
 /**
@@ -760,7 +875,7 @@ async function tradeSend(id) {
     message: `${battle.josa(name, "을를")} 교환으로 보냅니다.`,
     detail:
       "박스에서 빠지고 교환 코드가 나옵니다. 그 코드를 친구에게 보내세요. 실수였다면 그 코드를 내가 다시 받으면 돌아옵니다." +
-      (HOLD_NAMES[m.hold] ? `\n\n지니고 있는 ${HOLD_NAMES[m.hold]}도 함께 갑니다.` : ""),
+      (holdName(m.hold) ? `\n\n지니고 있는 ${holdName(m.hold)}도 함께 갑니다.` : ""),
   });
   if (r.response !== 0) return { ok: false };
 
@@ -838,6 +953,7 @@ function tradeReceive(code) {
     else save.items = { ...(save.items || {}), everstone: stoneCount() + 1 };
   }
   if (d.item === "shade") m.hold = "shade"; // 같이 온 빛가림돌 — 졸업해도 원래 색
+  if (mega.isStone(d.item)) m.hold = d.item; // 💎 같이 온 메가스톤
   save.box.push(m);
   if (!save.seen.includes(m.line)) save.seen.push(m.line);
   save.maxStage[m.line] = Math.max(save.maxStage[m.line] ?? -1, st);
@@ -934,8 +1050,8 @@ function guildTeamCode() {
   if (!m || isEggMon(m)) return "";
   const grown = box.effOf(m, growthSpeed());
   const p = profile.build(box.withLv(m, growthSpeed()), grown);
-  const key = [m.id, poke.stageFor(grown, m.line), p ? p.level : 0, (m.tmMoves || []).length, m.nature, save.trainerName].join("|");
-  if (guildTeam.key !== key) guildTeam = { key, code: friend.encode(box.withLv(m, growthSpeed()), grown, save.trainerName) };
+  const key = [m.id, poke.stageFor(grown, m.line), p ? p.level : 0, (m.tmMoves || []).length, m.nature, save.trainerName, m.hold || "", megaOn()].join("|");
+  if (guildTeam.key !== key) guildTeam = { key, code: friend.encode(codeMon(m), grown, save.trainerName) };
   return guildTeam.code;
 }
 
@@ -1415,7 +1531,7 @@ const raidSprite = async (dexId, shiny) => {
   const p = await poke.spriteWithFallback({ dexId, isShiny: shiny }, CACHE, "anim").catch(() => null);
   return p ? pathToFileURL(p).href : null;
 };
-const raidAlly = (m) => ({ mon: box.withLv(m, growthSpeed()), grown: box.effOf(m, growthSpeed()), owner: save.trainerName || "나", member: save.guild.memberId, me: true });
+const raidAlly = (m) => ({ mon: box.withLv(m, growthSpeed()), grown: box.effOf(m, growthSpeed()), owner: save.trainerName || "나", member: save.guild.memberId, me: true, mega: megaFormOf(m) });
 const raidFighter = (id) => {
   const m = box.find(save.box, id);
   return m && !isEggMon(m) && poke.stageFor(box.effOf(m, growthSpeed())) ? m : null;
@@ -1426,6 +1542,7 @@ async function raidFinish(L) {
   clearTimeout(L.timer);
   if (raidLive === L) raidLive = null;
   const r = L.b.result();
+  spendMega(r.megaUsed); // 💎 이번 도전에 메가진화한 만큼
   // 주인마다 합친다. 보스를 쓰러뜨렸으면 남은 체력을 다 깎은 것이다 — 반올림이나 보스의 반동으로
   // 모자란 몫은 도전한 나에게(한 점이 남아 보스가 안 쓰러지지 않게)
   const credit = {};
@@ -1452,7 +1569,7 @@ async function raidPack(L, seg) {
   const r = L.b.result();
   const allies = await Promise.all(r.allies.map(async (f, i) => {
     if (!L.urls.has(i)) L.urls.set(i, await raidSprite(f.dexId, f.shiny));
-    return { ...f, url: L.urls.get(i) };
+    return { ...f, url: L.urls.get(i), megaUrl: f.mega ? await megaUrl(f.mega.id, f.shiny) : null };
   }));
   const out = { ok: true, log, allies, need, over, used: [...L.used], limit: RAID_LINEUP, boss: { ...r.boss, url: L.bossUrl, label: `레이드 보스 ${r.boss.name}` } };
   if (over) {
@@ -1491,7 +1608,7 @@ async function raidAttack(monId) {
       .filter(Boolean);
     allies.push({ mon: { id: "raid-" + x.id, ...t.mon }, grown: t.grown, owner: x.trainer || "", member: x.id, bench });
   }
-  const b = raidbattle.start(allies, { mon: raidBoss(s.line), grown: RAID_BOSS_GROWN }, friend.rng(s.seed), { level: 50, bars: s.start / 1000 });
+  const b = raidbattle.start(allies, { mon: raidBoss(s.line), grown: RAID_BOSS_GROWN }, friend.rng(s.seed), { level: 50, bars: s.start / 1000, megaBudget: megaEnergy() });
   if (!b) return { ok: false, reason: "결투를 시작하지 못했습니다" };
   raidLive = { b, g, s, used: [m.id], urls: new Map(), bossUrl: await raidUrl(s.line), timer: null };
   return raidPack(raidLive, b.step());
@@ -1816,7 +1933,7 @@ async function marketList({ id, price } = {}) {
   const name = poke.describe(box.effOf(m, growthSpeed()), m.line, poke.look(m)).name;
   const r = await guildCall(`/${save.guild.code}/market/list`, { ...auth(), mon: monPayload(m), price });
   if (!r.ok) return r;
-  if (m.hold === "shade") holdBack(m); // 빛가림돌은 몰에 실리지 않는다 — 가방으로(변하지않는돌은 같이 간다)
+  if (m.hold === "shade" || mega.isStone(m.hold)) holdBack(m); // 빛가림돌 · 메가스톤은 몰에 실리지 않는다 — 가방으로(변하지않는돌은 같이 간다)
   removeMon(id); // 서버가 맡았다
   return { ok: true, message: `${battle.josa(name, "을를")} 🪙${price}에 올렸습니다. 7일 안에 안 팔리면 돌아옵니다` };
 }
@@ -2036,10 +2153,12 @@ function roomSet(patch = {}) {
 const stoneCount = () => (save.items && save.items.everstone) || 0;
 const shadeCount = () => (save.items && save.items.shade) || 0;
 const HOLD_NAMES = { everstone: "변하지않는돌", shade: "빛가림돌" };
+/** 지닌 도구 이름 — 💎 메가스톤은 mega.json 에서 */
+const holdName = (item) => HOLD_NAMES[item] || (mega.stoneForm(item) || {}).stoneName || null;
 
 /** 지닌 도구를 가방으로 돌려 놓는다(팔기 · 놓아주기 · 몰). 아이에게서 떼지는 않는다 — 곧 박스에서 빠진다 */
 function holdBack(m) {
-  if (!m || !HOLD_NAMES[m.hold]) return;
+  if (!m || !holdName(m.hold)) return;
   save.items = { ...(save.items || {}), [m.hold]: ((save.items || {})[m.hold] || 0) + 1 };
 }
 
@@ -2056,12 +2175,14 @@ function holdBack(m) {
 function toggleStone(id, item = "everstone") {
   const m = box.find(save.box, id);
   if (!m) return { ok: false, reason: "없는 아이입니다" };
-  if (!HOLD_NAMES[item]) return { ok: false, reason: "모르는 도구입니다" };
+  if (!holdName(item)) return { ok: false, reason: "모르는 도구입니다" };
   save.items = save.items || {};
   const now = () => poke.describe(box.effOf(m, growthSpeed()), m.line, poke.look(m));
   const before = now();
   const name = before.name;
-  const itemName = HOLD_NAMES[item];
+  const itemName = holdName(item);
+  const form = mega.stoneForm(item);
+  const base = form ? form.name.replace(/^메가|[XY]$/g, "") : ""; // 메가리자몽X → 리자몽
 
   if (m.hold === item) {
     m.hold = null;
@@ -2072,13 +2193,26 @@ function toggleStone(id, item = "everstone") {
     refresh(true);
     pushShop();
     if (item === "shade") return { ok: true, message: after.isShiny && !before.isShiny ? `빛가림돌을 뺐다 — ${battle.josa(name, "이가")} 이로치로 빛난다!` : `${name}에게서 빛가림돌을 뺐습니다` };
+    if (form) return { ok: true, message: `${name}에게서 ${battle.josa(itemName, "을를")} 뺐습니다` };
     return { ok: true, message: after.name !== name ? `변하지않는돌을 뺐다 — ${battle.josa(name, "이가")} ${after.name}(으)로 진화했다!` : `${name}에게서 변하지않는돌을 뺐습니다` };
   }
 
-  if (HOLD_NAMES[m.hold]) return { ok: false, reason: `${battle.josa(name, "은는")} 이미 ${HOLD_NAMES[m.hold]}을 지니고 있습니다. 먼저 빼 주세요` };
+  if (holdName(m.hold)) return { ok: false, reason: `${battle.josa(name, "은는")} 이미 ${battle.josa(holdName(m.hold), "을를")} 지니고 있습니다. 먼저 빼 주세요` };
   if (!(save.items[item] || 0)) return { ok: false, reason: `${itemName}이 없습니다. 상점에서 살 수 있습니다` };
   const eff = box.effOf(m, growthSpeed());
   if (!poke.stageFor(eff)) return { ok: false, reason: "알에게는 지니게 할 수 없습니다" };
+
+  if (form) {
+    // 💎 그 라인의 아이만 — 진화 전에도 미리 지닐 수 있다. 메가진화는 그 종이 되었을 때
+    if (!mega.lineFits(poke.LINES[m.line].ids, item)) return { ok: false, reason: `${battle.josa(itemName, "은는")} ${base}의 메가스톤입니다` };
+    m.hold = item;
+    save.items[item] = (save.items[item] || 0) - 1;
+    writeSave();
+    refresh(true);
+    pushShop();
+    const ready = before.dexId === form.dex;
+    return { ok: true, message: ready ? `${battle.josa(name, "이가")} ${battle.josa(itemName, "을를")} 지녔다 — 결투에 나가면 ${form.name}(으)로 메가진화합니다` : `${battle.josa(name, "이가")} ${battle.josa(itemName, "을를")} 지녔다. ${base}(으)로 진화하면 메가진화할 수 있습니다` };
+  }
 
   if (item === "shade") {
     if (m.shiny) return { ok: false, reason: `${battle.josa(name, "은는")} 태어날 때부터 이로치라 빛가림돌로 가릴 수 없습니다` };
@@ -2160,6 +2294,10 @@ let save = {
   candyBonus: 0, // 졸업·한도 달성으로 받은 보너스 사탕
   candyExtra: 0, // 사탕 타임으로 더 쳐 준 토큰 — 사탕을 셀 때만 얹는다
   candyDebtFix: true, // 로그가 지워져 생긴 사탕 빚을 메웠나(0.15.2) — 새 세이브는 해당 없음
+  megaOn: true, // 💎 메가진화 쓰기 — 끄면 돌을 지녀도 메가진화하지 않는다(에너지도 안 쓴다)
+  megaEnergy: 0, // ⚡ 메가 에너지(0~mega.MAX)
+  megaAcc: 0, // 다음 에너지까지 쌓인 토큰
+  megaLast: undefined, // 마지막으로 본 장부 누적 — 늘어난 만큼 megaAcc 에. 없으면 지금부터
   candyTokens: undefined, // 사탕을 세는 토큰(늘어난 만큼 쌓음 — 로그가 지워져도 안 준다). 없으면 box.accrue 가 지금 셈으로 채운다
   badges: [], // 딴 체육관 배지(gyms.json 의 id) — 딴 순서대로
   gymWeek: null, // 체육관에서 진 횟수를 센 주(그 주 월요일)
@@ -2604,6 +2742,7 @@ function hatch(minStars = 0, legend = false) {
  * 살 수 있는지 판단은 여기서만 한다 — 렌더러가 보낸 값을 믿지 않는다.
  */
 function buy(itemId) {
+  if (mega.isStone(itemId)) return buyStone(itemId);
   const item = SHOP.find((x) => x.id === itemId);
   if (!item) return { ok: false, reason: "없는 물건" };
   if (item.once && save.charm) return { ok: false, reason: "이미 가지고 있습니다" };
@@ -2669,6 +2808,42 @@ function buy(itemId) {
   pushShop();
   const a = box.active(save);
   return { ok: true, message: msg, shiny: itemId.startsWith("egg") && Boolean(a && a.shiny) };
+}
+
+/** 💎 메가스톤 사기 — 박스에 그 라인의 아이가 있을 때만 판다(54개를 다 늘어놓지 않는다) */
+function buyStone(itemId) {
+  if (world.isDigimon) return { ok: false, reason: "디지털 월드에는 메가스톤이 없습니다" };
+  const f = mega.stoneForm(itemId);
+  if (!stoneShop().some((x) => x.id === itemId)) return { ok: false, reason: "박스에 그 메가스톤을 쓸 아이가 없습니다" };
+  const cost = priceOf(mega.STONE_PRICE);
+  if (candy().left < cost) return { ok: false, reason: CUR.lack };
+  save.candySpent = (save.candySpent ?? 0) + cost;
+  save.items = save.items || {};
+  save.items[itemId] = (save.items[itemId] || 0) + 1;
+  writeSave();
+  refresh(true);
+  pushShop();
+  return { ok: true, message: `${battle.josa(f.stoneName, "을를")} 샀습니다 (가진 수 ${save.items[itemId]}) — 박스 › 상세에서 지니게 하세요` };
+}
+
+/** 💎 상점에 늘어놓을 메가스톤 — 박스에 있는 라인의 것만, 도감 번호 순 */
+function stoneShop() {
+  if (world.isDigimon) return [];
+  const lines = new Set(save.box.filter((m) => !isEggMon(m)).map((m) => m.line));
+  const ids = new Set([...lines].flatMap((l) => (poke.LINES[l] || {}).ids || []).filter(Boolean));
+  const c = candy();
+  const cost = priceOf(mega.STONE_PRICE);
+  return mega.FORMS.filter((f) => ids.has(f.dex)).sort((a, b) => a.dex - b.dex).map((f) => {
+    const id = mega.itemOf(f);
+    const base = f.name.replace(/^메가|[XY]$/g, "");
+    return {
+      id, name: f.stoneName, mega: f.name, cost, icon: "💎",
+      desc: `지닌 ${battle.josa(base, "이가")} 결투에 나가면 ⚡ 메가 에너지 하나로 ${f.name}(으)로 메가진화한다`,
+      have: (save.items || {})[id] || 0,
+      held: save.box.filter((m) => m.hold === id).length,
+      afford: c.left >= cost,
+    };
+  });
 }
 
 /**
@@ -2766,6 +2941,8 @@ async function buildStats() {
   });
   if (box.accrue(save, book.total, fed)) writeSave();
   if (!save.candyDebtFix) makeGoodCandy();
+  if (megaCharge(book.total)) writeSave(); // ⚡ 메가 에너지가 하나 찼다
+  megaPetTick(u.events, burning.status(new Date(), burn).on);
   // 🦖 디지몬은 단계를 넘을 때 그 사이 쓴 버릇(Claude · Codex · 밤)으로 다음 모습이 갈린다
   if (poke.branch) {
     let moved = false;
@@ -2827,6 +3004,7 @@ async function buildStats() {
         // 변하지않는돌. evolveTo — 지금 빼면 무엇으로 진화하나(쌓인 토큰이 문턱을 넘었을 때만)
         stone: m.hold === "everstone",
         shade: m.hold === "shade", // 빛가림돌 — 졸업해도 원래 색
+        mega: await megaBox(m, d), // 💎 지닌 메가스톤 · 지금 메가진화할 수 있나 · 펫 메가 그림
         evolveTo: (() => {
           if (m.hold !== "everstone") return null;
           const f = poke.describe(box.effOf(m, growthSpeed(), true), m.line, poke.look(m));
@@ -2887,6 +3065,8 @@ async function buildStats() {
     berries: berryBag(),
     stones: stoneCount(),
     shades: shadeCount(),
+    megaStones: megaBag(), // 💎 가방의 메가스톤 — 박스 › 상세에서 지니게 한다
+    mega: megaView(),
     room: roomState(),
     guild: save.guild ? { code: save.guild.code, name: save.guild.name, leader: Boolean(save.guild.leader), memberId: save.guild.memberId, gone: save.guild.gone || null, share: save.guildShare !== false } : null,
     burning: burning.status(new Date(), burn),
@@ -3334,6 +3514,7 @@ async function buildDex() {
         graduated: gradCount.get(sp.line) ?? 0,
         owned: ownedIds ? ownedIds.has(sp.dexId) : owned.has(sp.line),
         isPet: petDex.has(sp.dexId),
+        mega: world.isDigimon ? null : mega.formsOf(sp.dexId).map((f) => f.name), // 💎 메가진화하는 종
         url: p ? pathToFileURL(p).href : null,
       };
     }),
@@ -3375,6 +3556,8 @@ function pushShop() {
       have: x.id === "everstone" ? stoneCount() : x.id === "shade" ? shadeCount() : x.ball ? ((save.balls || {})[x.ball] || 0) : undefined,
       afford: c.left >= priceOf(x.cost),
     })),
+    stones: stoneShop(), // 💎 메가스톤
+    mega: megaView(),
   });
 }
 
@@ -4122,9 +4305,19 @@ async function playDuel(send, r) {
       send[ev.side]({ t: "faint" });
       await wait(900);
     } else if (ev.side >= 0) {
+      if (ev.mega) {
+        // 💎 메가진화 — 3D 그림으로 바꾸고 조금 크게
+        const f = r.fighters[ev.side] || {};
+        if (f.megaUrl) send[ev.side]({ t: "transform", url: f.megaUrl, mega: true });
+        send[ev.side]({ t: "say", text: "메가진화!", kind: "up" });
+        await wait(1200);
+        continue;
+      }
       if (ev.transform) {
-        const p = await poke.spriteWithFallback({ dexId: ev.transform.dexId, isShiny: ev.transform.shiny }, CACHE, "anim").catch(() => null);
-        if (p) send[ev.side]({ t: "transform", url: pathToFileURL(p).href });
+        const p = ev.transform.mega
+          ? await poke.spriteWithFallback({ dexId: ev.transform.dexId, isShiny: ev.transform.shiny }, CACHE, "3d").catch(() => null)
+          : await poke.spriteWithFallback({ dexId: ev.transform.dexId, isShiny: ev.transform.shiny }, CACHE, "anim").catch(() => null);
+        if (p) send[ev.side]({ t: "transform", url: pathToFileURL(p).href, mega: Boolean(ev.transform.mega) });
         send[ev.side]({ t: "say", text: "변신!", kind: "up" });
         await wait(900);
         continue;
@@ -4147,7 +4340,7 @@ async function playDuel(send, r) {
  */
 async function desktopBattle(idA, idB, level) {
   if (duel) return { ok: false, reason: "이미 바탕화면에서 결투 중입니다" };
-  const r = startBattle(idA, idB, level);
+  const r = await startBattle(idA, idB, level);
   if (!r.ok) return r;
   const ids = [idA, idB];
   duel = { ids, temp: [] };
@@ -5017,7 +5210,8 @@ app.whenReady().then(async () => {
   ipcMain.handle("room-coins", () => roomCoins());
   ipcMain.handle("statue-image", (_e, dexId) => statueImage(dexId));
   ipcMain.handle("room-set", (_e, patch) => roomSet(patch || {}));
-  ipcMain.handle("toggle-stone", (_e, id, item) => toggleStone(id, item === "shade" ? "shade" : "everstone"));
+  ipcMain.handle("toggle-stone", (_e, id, item) => toggleStone(id, item === "shade" || mega.isStone(item) ? item : "everstone"));
+  ipcMain.handle("mega-toggle", (_e, on) => megaToggle(on));
   ipcMain.handle("feed-berry", (_e, { id, key } = {}) => feedBerry(id, key));
   ipcMain.handle("friend-register", (_e, { id, trainer } = {}) => friendRegister(id, trainer));
   ipcMain.handle("friend-inspect", (_e, code) => friendInspect(code));

@@ -18,6 +18,7 @@
  */
 const { fighter, effectiveness, damage, josa } = require("./battle");
 const friend = require("./friend");
+const mega = require("./mega");
 
 const TYPES = require("./types.json");
 
@@ -118,19 +119,21 @@ function parseTeam(code) {
  *   allies  [{ mon, grown, owner, member, me, bench }]  — 함께 싸우는 아이들(member: 주인의 길드원 번호). 나는 0번
  *           bench: [{ mon, grown }] 다른 길드원의 후보 — 앞 아이가 쓰러지면 차례로 그 자리에 나온다
  *   boss    { mon, grown }
- *   opts    { level, bars }          — bars: 보스가 시작할 때 남은 칸(소수)
+ *   opts    { level, bars, megaBudget } — bars: 보스가 시작할 때 남은 칸(소수)
+ *           💎 내 아이(a.me)가 a.mega(폼)를 들고 나오면 메가진화한다 — megaBudget(⚡ 메가 에너지)만큼, 한 번에 하나.
+ *           메가진화한 아이가 쓰러지고 다음 아이를 내보내면(swap) 그 아이가 다시 할 수 있다. 길드원 · 보스는 하지 않는다
  *
  *   step()   → { log, need, over }   need: 내 아이가 쓰러졌다 — swap 이나 stop 을 기다린다
  *   swap(a)  내 다음 아이를 내보낸다({ mon, grown, owner, member, me: true })
  *   stop()   그만 싸운다 — 다음 step() 이 끝을 낸다
- *   result() → { turns, defeated, dealt, allies, boss }
+ *   result() → { turns, defeated, dealt, allies, boss, megaUsed }
  *
  * 사건(ev)의 who 는 아이 번호(0..) 또는 "b"(보스), 판 전체 글이면 null.
  *   { t: "turn", n, text }
  *   { t: "enter", who, slot, text }  다음 아이가 나왔다(내가 골랐거나 길드원의 후보) — slot 자리에 선다
  *   { t: "move", who, move:{name,typeKey,damageClass,power}, text }
  *   { t: "hp",   who, hp, max, text }
- *   { t: "info", who, text, eff?, status?, transform? }
+ *   { t: "info", who, text, eff?, status?, transform?, mega? }   mega: { key, id, name } 💎
  *   { t: "faint", who, text }
  */
 function start(allies, boss, rng, opts = {}) {
@@ -341,6 +344,19 @@ function start(allies, boss, rng, opts = {}) {
   const alive = () => A.some((f) => f.hp > 0);
   say({ t: "info", who: null, text: `길드원 ${A.length}명의 포켓몬 VS ${nm("b")} Lv.${B.level}` });
 
+  /** 💎 내 아이 i 가 메가진화한다 — 에너지가 남았고, 그 종에 맞는 돌일 때 */
+  let megaUsed = 0;
+  const tryMega = (i, form) => {
+    const f = A[i];
+    if (!form || form.dex !== f.dexId || megaUsed >= (opts.megaBudget || 0)) return;
+    const before = f.name;
+    if (!mega.evolve(f, form)) return;
+    megaUsed++;
+    say({ t: "info", who: i, mega: { key: form.key, id: form.id, name: form.name }, text: `${before}의 ${josa(form.stoneName, "이가")} 반응했다!` });
+    say({ t: "info", who: i, text: `${josa(before, "은는")} ${form.name}(으)로 메가진화했다!` });
+  };
+  if (my >= 0) tryMega(my, team[my].a.mega);
+
   let turn = 0;
   let stopped = false;
   let over = false;
@@ -419,6 +435,7 @@ function start(allies, boss, rng, opts = {}) {
     dealtBy.push(0);
     my = A.length - 1;
     say({ t: "enter", who: my, slot, text: `가랏, ${f.name}!` });
+    tryMega(my, a.mega); // 앞 아이가 쓰러졌으니 이 아이가 메가진화할 수 있다
     return true;
   }
 
@@ -427,7 +444,8 @@ function start(allies, boss, rng, opts = {}) {
     turns: turn,
     defeated: B.hp <= 0,
     dealt: B.hp <= 0 ? per(pool) : Math.max(0, per(pool - B.hp)),
-    allies: A.map((f, i) => ({ id: f.id, name: f.name, owner: team[i].a.owner || "", member: team[i].a.member || null, me: Boolean(team[i].a.me), slot: team[i].slot, dexId: f.dexId, shiny: f.shiny, level: f.level, maxHp: f.maxHp, hp: f.maxHp, dealt: per(dealtBy[i]), left: A[i].hp })),
+    megaUsed,
+    allies: A.map((f, i) => ({ id: f.id, name: f.name, mega: f.mega ? { key: f.mega, id: f.megaId } : null, owner: team[i].a.owner || "", member: team[i].a.member || null, me: Boolean(team[i].a.me), slot: team[i].slot, dexId: f.dexId, shiny: f.shiny, level: f.level, maxHp: f.maxHp, hp: f.maxHp, dealt: per(dealtBy[i]), left: A[i].hp })),
     boss: { id: B.id, name: B.name, dexId: B.dexId, level: B.level, bar, hp: pool, max: pool },
   });
 

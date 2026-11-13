@@ -547,6 +547,12 @@
   .cell.pet { border-color: var(--accent); background: #2a2016; }
   .cell.seenonly img { opacity: .5; }
   .cell .pin { font-size: 8px; color: var(--accent); }
+  .cell { position: relative; }
+  .cell .mg { position: absolute; top: 3px; right: 4px; font-size: 9px; } /* 💎 메가진화하는 종 */
+  .item-hd, #items > .note { grid-column: 1 / -1; }
+  .item-hd { margin: 12px 0 6px; font-size: 12px; font-weight: 700; }
+  .item-hd span { display: block; margin-top: 2px; font-size: 10.5px; font-weight: 400; color: var(--muted); }
+  .item .nm small { font-weight: 400; color: var(--muted); }
   .cell .gr { font-size: 8px; color: var(--green); }
   .empty { grid-column: 1 / -1; padding: 30px 0; text-align: center; color: var(--dim); font-size: 11px; }
 
@@ -622,6 +628,7 @@
 <link rel="stylesheet" href="room.css" />
 <link rel="stylesheet" href="mall.css" />
 <link rel="stylesheet" href="online.css" />
+<link rel="stylesheet" href="megacut.css" />
 <link rel="stylesheet" href="gym.css" />
 <link rel="stylesheet" href="boss.css" />
 <link rel="stylesheet" href="digibattle.css" />
@@ -951,6 +958,7 @@
       <button data-view="trade">🔁 교환</button>
       <span class="c" id="olHint">관장 8명 · 배지 8개</span>
     </div>
+    <div class="megabar" id="megaBar" hidden></div>
 
     <!-- 결투 화면. 실시간 배틀도, 길드원과의 결투도 여기서 재생한다 -->
     <div class="btlshow" id="btlShow" hidden>
@@ -1152,6 +1160,7 @@
 <script src="app.js"></script>
 <script src="moves.js"></script>
 <script src="raidfx.js"></script>
+<script src="megacut.js"></script>
 <script src="battle.js"></script>
 <script src="gymart.js"></script>
 <script src="gym.js"></script>

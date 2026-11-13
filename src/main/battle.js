@@ -7,7 +7,9 @@
  * 숫자는 전부 PokéAPI 에서 받은 것(위력·명중·효과 확률·흡수량)이고, 우리가 정한
  * 건 "어느 기술을 고르나"(AI)뿐이다.
  *
- * 빠진 것: 특성(153개가 저마다 다른 규칙이다), 지닌 물건, 날씨, 교체, PP,
+ * 💎 메가진화는 있다(mega.js) — opts.mega 로 받은 쪽이 첫 턴 전에 타입 · 능력치를 바꾼다.
+ *
+ * 빠진 것: 특성(153개가 저마다 다른 규칙이다), 지닌 물건(메가스톤 말고), 날씨, 교체, PP,
  * 기술 고유 효과(카운터·대타출동처럼 숫자로 안 오는 것). 그런 기술은 효과 없이
  * 지나가고, AI 가 웬만하면 고르지 않는다.
  *
@@ -17,6 +19,7 @@
  * 승패를 믿을 이유가 없다.
  */
 const profile = require("./profile");
+const mega = require("./mega");
 const poke = require("./world").pack; // 🌏 지금 세계의 종 데이터(포켓몬이면 pokemon.js 그대로)
 
 const SPECIES = require("./species.json");
@@ -40,6 +43,7 @@ const TRANSFORM = 144; // 변신 — 메타몽
 function josa(word, pair) {
   const [withF, noF] = [pair[0], pair[1]];
   const c = String(word).charCodeAt(String(word).length - 1);
+  if (/[XY]$/.test(String(word))) return word + noF; // 💎 리자몽나이트X(엑스) · 메가뮤츠Y(와이) — 받침이 없다
   if (c < 0xac00 || c > 0xd7a3) return `${word}${withF}(${noF})`;
   return word + ((c - 0xac00) % 28 ? withF : noF);
 }
@@ -72,6 +76,8 @@ function fighter(mon, grown, level = null) {
     dexId: p.dexId, // 변신하면 상대 모습을 그린다
     shiny: d.isShiny,
     level: level || p.level,
+    ivs: mon.ivs, // 메가진화하면 이걸로 능력치를 다시 센다
+    nature: mon.nature,
     types: s.types,
     stats: st,
     maxHp: st.hp,
@@ -220,6 +226,10 @@ function choose(me, foe, rng, gentle = false) {
  *   { t: "hp",    side, hp, max, text }           데미지·회복·반동·상태이상 피해
  *   { t: "info",  side, text }                    빗나감·상성·급소·랭크·상태이상
  *   { t: "faint", side, text }
+ *   { t: "info",  side, mega:{key,id,name}, text } 💎 메가진화 — 화면은 3D 그림으로 바꾼다
+ *
+ * opts.mega[i] = { form, pre } — i 쪽이 메가진화한다(form 은 mega.json 의 하나).
+ * pre 면 이미 메가진화한 채로 나온다(체육관에서 이긴 아이가 다음 판으로 이어 갈 때) — 사건 없이.
  */
 function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
   const F = [fighter(monA, grownA, opts.level), fighter(monB, grownB, opts.level)];
@@ -235,6 +245,13 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
     if (st.status) { F[i].status = st.status; if (st.status === "sleep") F[i].sleep = 2; }
   });
   const hp0 = F.map((f) => f.hp);
+  const megaNow = []; // 첫 턴 전에 메가진화할 쪽
+  (opts.mega || []).forEach((sp, i) => {
+    if (!sp || !sp.form || !F[i] || sp.form.dex !== F[i].dexId) return;
+    if (sp.pre) { if (mega.evolve(F[i], sp.form)) F[i].megaPre = true; }
+    else megaNow.push([i, sp.form]);
+  });
+  const names0 = F.map((f) => f.name); // 나올 때 이름 — 이어 나온 메가는 메가 이름으로
   const log = [];
   const say = (e) => log.push(e);
   const nm = (i) => F[i].name;
@@ -270,7 +287,7 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
     me.stage = { ...foe.stage };
     me.moves = foe.moves.map((m) => ({ ...m }));
     me.transformed = true;
-    say({ t: "info", side: i, transform: { dexId: foe.dexId, shiny: foe.shiny, side: j }, text: `${josa(nm(i), "은는")} ${nm(j)}(으)로 변신했다!` });
+    say({ t: "info", side: i, transform: { dexId: foe.megaId || foe.dexId, mega: Boolean(foe.megaId), shiny: foe.shiny, side: j }, text: `${josa(nm(i), "은는")} ${nm(j)}(으)로 변신했다!` });
   };
 
   const applyAilment = (i, ail) => {
@@ -388,6 +405,14 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
 
   say({ t: "info", side: -1, text: `${nm(0)} Lv.${F[0].level} VS ${nm(1)} Lv.${F[1].level}` });
 
+  // 💎 메가진화 — 원작처럼 기술을 고르기 전에. 빨라진 스피드로 첫 턴 순서가 정해진다
+  for (const [i, form] of megaNow) {
+    const before = F[i].name;
+    if (!mega.evolve(F[i], form)) continue;
+    say({ t: "info", side: i, mega: { key: form.key, id: form.id, name: form.name }, text: `${before}의 ${josa(form.stoneName, "이가")} 반응했다!` });
+    say({ t: "info", side: i, text: `${josa(before, "은는")} ${form.name}(으)로 메가진화했다!` });
+  }
+
   let turn = 0;
   let stopped = false;
   while (F[0].hp > 0 && F[1].hp > 0 && turn < MAX_TURNS) {
@@ -435,7 +460,10 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
     stopped,
     turns: turn,
     // hp 는 시작할 때 체력 — 이어서 싸우면 가득이 아니다
-    fighters: F.map((f, i) => ({ id: f.id, name: f.name, level: f.level, maxHp: f.maxHp, hp: hp0[i] })),
+    fighters: F.map((f, i) => ({
+      id: f.id, name: names0[i], level: f.level, maxHp: f.maxHp, hp: hp0[i],
+      mega: f.mega ? { key: f.mega, id: f.megaId, name: f.name, pre: Boolean(f.megaPre), shiny: Boolean(f.shiny) } : null, // 💎 메가진화했나
+    })),
     // 끝났을 때 상태. 야생은 이걸 들고 다음 결투·포획으로 간다
     end: F.map((f) => ({ hp: f.hp, max: f.maxHp, status: f.status })),
     log,

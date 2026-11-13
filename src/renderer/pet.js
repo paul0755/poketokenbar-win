@@ -32,9 +32,12 @@ window.ptb.onStats((s) => {
    * 모습이 된다. 못 찾으면(막 놓아준 경우) 키우는 개체로 떨어진다.
    */
   const mine = window.ptb.petId && (s.box || []).find((m) => m.id === window.ptb.petId);
-  const url = mine
+  // 💎 버닝 타임에 몰아 쓰면 메가스톤을 지닌 펫이 잠시 메가진화한다(메인이 petUrl 을 줄 때만)
+  const megaUrl = mine && mine.mega && mine.mega.petUrl;
+  const url = megaUrl || (mine
     ? mine.animUrl || mine.url
-    : s.petAnimUrl || s.petStillUrl || s.animUrl || s.stillUrl;
+    : s.petAnimUrl || s.petStillUrl || s.animUrl || s.stillUrl);
+  if (!duel.on) img.classList.toggle("mega", Boolean(megaUrl));
   if (url) {
     if (img.getAttribute("src") !== url) img.setAttribute("src", url);
     img.hidden = false;

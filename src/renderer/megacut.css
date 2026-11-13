@@ -1,0 +1,68 @@
+/*
+ * 💎 메가진화 컷인(megacut.js). 디지털 월드 필살기 컷인(digibattle.css .fb-cut)과 같은 꼴 —
+ * 비스듬한 띠 · 들어오는 얼굴 · 반대쪽에서 들어오는 이름. 메가진화는 무지개 테두리와 하얀 폭발이 다르다.
+ * 시간은 --d 하나로 맞춘다. % 는 그 안의 시점이다.
+ */
+.mc-cut { position: absolute; inset: 0; z-index: 20; pointer-events: none; overflow: hidden; container-type: inline-size; --d: 2300ms; }
+
+/* 뒤를 살짝 어둡게 — 띠가 눈에 들어오게 */
+.mc-cut::before { content: ""; position: absolute; inset: 0; background: rgba(6, 4, 16, .45); animation: mc-dim var(--d) linear forwards; }
+@keyframes mc-dim { 0% { opacity: 0; } 8%, 90% { opacity: 1; } 100% { opacity: 0; } }
+
+.mc-band { position: absolute; left: -6%; right: -6%; top: 50%; height: 44%; overflow: hidden; transform-origin: 50% 50%;
+  background: linear-gradient(90deg, rgba(10, 6, 24, .95), #2a1450 30%, #123a5c 70%, rgba(10, 6, 24, .95));
+  border-top: 3px solid; border-bottom: 3px solid;
+  border-image: linear-gradient(90deg, #ff5a8a, #ffd84a, #5affb4, #5ab4ff, #c45aff, #ff5a8a) 1;
+  box-shadow: 0 0 24px rgba(200, 120, 255, .55);
+  animation: mc-band var(--d) cubic-bezier(.2, .8, .2, 1) forwards; }
+@keyframes mc-band {
+  0% { transform: translateY(-50%) skewY(-7deg) scaleY(0); }
+  7%, 91% { transform: translateY(-50%) skewY(-7deg) scaleY(1); }
+  100% { transform: translateY(-50%) skewY(-7deg) scaleY(0); }
+}
+@keyframes mc-hue { to { filter: hue-rotate(360deg); } }
+
+/* 띠 안의 흐르는 줄 */
+.mc-ln { position: absolute; inset: 0; opacity: .55;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 22px, rgba(255, 255, 255, .08) 22px 24px),
+    repeating-linear-gradient(0deg, transparent 0 6px, rgba(255, 220, 255, .12) 6px 7px);
+  animation: mc-streak .2s linear infinite, mc-hue 1.2s linear infinite; } /* 색이 도는 건 줄에만 — 띠에 걸면 그림 색까지 돈다 */
+@keyframes mc-streak { to { background-position: -48px 0, 0 7px; } }
+
+/* 얼굴 — 메가진화하는 쪽에서 미끄러져 들어온다(띠의 기울기를 되돌려 똑바로 세운다) */
+.mc-pic { position: absolute; left: 7%; top: 0; bottom: 0; width: 38%; transform: skewY(7deg); animation: mc-in-l var(--d) cubic-bezier(.15, .9, .25, 1) forwards; }
+.mc-cut.right .mc-pic { left: auto; right: 7%; animation-name: mc-in-r; }
+@keyframes mc-in-l { 0% { translate: -120% 0; } 14% { translate: 0 0; } 88% { translate: 6% 0; opacity: 1; } 100% { translate: 10% 0; opacity: 0; } }
+@keyframes mc-in-r { 0% { translate: 120% 0; } 14% { translate: 0 0; } 88% { translate: -6% 0; opacity: 1; } 100% { translate: -10% 0; opacity: 0; } }
+.mc-pic img { position: absolute; left: 50%; bottom: -6%; height: 125%; width: 125%; translate: -50% 0; object-fit: contain; object-position: 50% 100%; }
+.mc-pic img.a { image-rendering: pixelated; animation: mc-a var(--d) steps(1, end) forwards; }
+.mc-pic img.b { image-rendering: auto; opacity: 0; filter: drop-shadow(0 0 6px #fff) drop-shadow(0 0 14px rgba(220, 140, 255, .9)); animation: mc-b var(--d) steps(1, end) forwards; }
+.mc-pic img.b.only { animation: mc-b-only var(--d) ease-out forwards; }
+.mc-cut:not(.right) .mc-pic img { scale: -1 1; } /* 그림은 왼쪽을 본다 — 왼쪽에서 들어오면 띠 가운데를 보게 */
+/* 원래 모습 → 깜빡이며 번갈아 → 메가 모습. 폭발(46%) 뒤로는 메가만 */
+@keyframes mc-a { 0%, 30% { opacity: 1; } 32% { opacity: 0; } 34% { opacity: 1; } 37% { opacity: 0; } 39% { opacity: 1; } 41% { opacity: 0; } 42% { opacity: 1; } 44%, 100% { opacity: 0; } }
+@keyframes mc-b { 0%, 30% { opacity: 0; } 32% { opacity: 1; } 34% { opacity: 0; } 37% { opacity: 1; } 39% { opacity: 0; } 41% { opacity: 1; } 42% { opacity: 0; } 44%, 100% { opacity: 1; } }
+@keyframes mc-b-only { 0%, 40% { opacity: 0; } 48%, 100% { opacity: 1; } }
+
+/* 키스톤 빛 — 얼굴 뒤에서 무지개 구슬이 부풀었다가 터진다 */
+.mc-orb { position: absolute; left: 50%; top: 52%; width: 70%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 12%, rgba(255, 210, 255, .95) 22%, rgba(150, 120, 255, .7) 42%, rgba(80, 200, 255, .35) 58%, transparent 70%);
+  animation: mc-orb var(--d) ease-out forwards; }
+@keyframes mc-orb { 0%, 12% { scale: 0; opacity: 0; } 22% { scale: .5; opacity: .9; } 30% { scale: .45; } 44% { scale: 1.1; opacity: 1; } 56% { scale: 1.6; opacity: 0; } 100% { scale: 1.6; opacity: 0; } }
+
+/* 하얀 폭발 — 장면 전체 */
+.mc-flash { position: absolute; inset: 0; background: radial-gradient(circle at var(--fx, 28%) 50%, #fff 0 25%, rgba(255, 230, 255, .85) 45%, rgba(255, 255, 255, 0) 75%);
+  opacity: 0; animation: mc-flash var(--d) ease-out forwards; }
+.mc-cut.right .mc-flash { --fx: 72%; }
+@keyframes mc-flash { 0%, 43% { opacity: 0; } 46% { opacity: 1; } 60% { opacity: 0; } 100% { opacity: 0; } }
+
+/* 이름 — 반대쪽에서 들어온다 */
+.mc-nm { position: absolute; right: 6%; top: 50%; display: grid; justify-items: end; gap: 3px; max-width: 52%;
+  transform: translateY(-50%) skewY(7deg); animation: mc-nm-r var(--d) cubic-bezier(.15, .9, .25, 1) forwards; }
+.mc-cut.right .mc-nm { right: auto; left: 6%; justify-items: start; animation-name: mc-nm-l; }
+@keyframes mc-nm-r { 0%, 44% { translate: 60% 0; opacity: 0; } 56% { translate: 0 0; opacity: 1; } 90% { translate: -4% 0; opacity: 1; } 100% { translate: -8% 0; opacity: 0; } }
+@keyframes mc-nm-l { 0%, 44% { translate: -60% 0; opacity: 0; } 56% { translate: 0 0; opacity: 1; } 90% { translate: 4% 0; opacity: 1; } 100% { translate: 8% 0; opacity: 0; } }
+.mc-nm small { font: 800 2.7cqw/1 "Pretendard", "Malgun Gothic", sans-serif; letter-spacing: 1px; color: #ffe6ff; white-space: nowrap; }
+.mc-nm b { font: 900 7.4cqw/1.05 "Pretendard", "Malgun Gothic", sans-serif; font-style: italic; color: #fff; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 2px 0 0 #ff5ad0, -2px 0 0 #5ab4ff, 0 0 12px rgba(220, 140, 255, .9); }

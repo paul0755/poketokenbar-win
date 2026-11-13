@@ -55,7 +55,27 @@
     if (!s || !s.box) return;
     last = s;
     liveUi();
+    megaBar(s.mega);
   });
+
+  /* ---------------- 💎 메가진화 — ⚡ 에너지 · 쓰기 켜고 끄기 ---------------- */
+
+  const mfmt = (n) => (n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M" : Math.round(n / 1e3) + "K");
+  function megaBar(m) {
+    const el = $("megaBar");
+    if (!el) return;
+    el.hidden = !m;
+    if (!m) return;
+    const pips = Array.from({ length: m.max }, (_, k) => `<i class="${k < m.energy ? "on" : ""}"></i>`).join("");
+    const next = m.energy >= m.max ? "가득" : `다음까지 ${mfmt(m.per - m.acc)}`;
+    const pet = m.pet > 0 ? ` · <span class="pet">🔥 펫 메가진화 ${Math.ceil(m.pet / 60000)}분</span>` : "";
+    el.innerHTML = `<span class="lab">⚡ 메가 에너지</span><span class="pips">${pips}</span><span class="n">${m.energy}/${m.max} · ${next}${pet}</span>
+      <button id="megaOn" class="${m.on ? "on" : ""}" title="메가스톤을 지닌 아이가 결투에 나가면 에너지 하나로 메가진화합니다(친선 · 실시간 · 길드 결투는 에너지 없이)">${m.on ? "💎 메가진화 쓰기 켜짐" : "💎 메가진화 꺼짐"}</button>`;
+    $("megaOn").onclick = async () => {
+      const r = await window.ptb.megaToggle(!m.on);
+      if (r && !r.ok && window.toast) window.toast(r.reason, "bad");
+    };
+  }
 
   /* ---------------- 포켓몬 카드 · 고르기 ---------------- */
 
@@ -390,6 +410,24 @@
     const back = i === 0 ? f.backUrl : null;
     img.src = back || front;
     img.classList.toggle("flip", i === 0 && !back);
+    img.classList.remove("mega");
+  }
+  /** 💎 메가진화한 모습 — Showdown 3D 그림, 조금 크게 */
+  function setMega(img, i, f) {
+    const back = i === 0 ? f.megaBackUrl : null;
+    const src = back || f.megaUrl;
+    if (!src) return false;
+    img.src = src;
+    img.classList.toggle("flip", i === 0 && !back);
+    img.classList.add("mega");
+    return true;
+  }
+  /** 메가진화 연출 — 빛이 감싸고 터진다 */
+  function megaFx(i) {
+    const b = $("body" + SIDE[i]);
+    b.classList.remove("megafx");
+    void b.offsetWidth;
+    b.classList.add("megafx");
   }
 
   function setSide(i, m, f) {
@@ -401,6 +439,7 @@
     box.querySelector(".st").textContent = AIL_SHORT[f.status] || "";
     // 상대 아이는 내 박스에 없다 — 메인이 그림 주소를 같이 준다
     setImg($("body" + k).querySelector("img"), i, f, m);
+    if (f.mega && f.mega.pre) setMega($("body" + k).querySelector("img"), i, f); // 체육관 — 메가인 채로 이어 나왔다
     $("body" + k).className = "fbody";
     setHp(i, f.hp ?? f.maxHp, f.maxHp, true);
   }
@@ -519,17 +558,32 @@
           line(ev.text, "ft");
           await sleep(700);
         } else {
+          if (ev.mega && ev.side >= 0 && cur) {
+            // 💎 메가진화 — 컷인(megacut.js)이 지나간 뒤 빛에 감싸였다가 3D 모습으로
+            const mf = cur[ev.side];
+            line(ev.text, "good");
+            if (!fast && window.ptbMegaCut) {
+              await window.ptbMegaCut.play($("arena"), { from: mf.url, to: mf.megaUrl, name: ev.mega.name, stone: (ev.text.match(/의 (.+?)[이가] 반응/) || [])[1], side: ev.side });
+            }
+            if (!fast) { megaFx(ev.side); await sleep(450); }
+            setMega($("body" + SIDE[ev.side]).querySelector("img"), ev.side, cur[ev.side]);
+            // 이름 상자도 메가 이름으로 — "친구의 핫삼" → "친구의 메가핫삼"
+            const f = cur[ev.side];
+            $("side" + SIDE[ev.side]).querySelector(".nm").textContent = (f.label || f.name).replace(f.name, ev.mega.name);
+          }
           if (ev.transform && ev.side >= 0 && cur) {
             // 변신 — 상대의 모습을 빌린다. 내 쪽이면 상대의 뒷모습, 상대 쪽이면 내 앞모습
             const theirs = cur[ev.transform.side];
-            setImg($("body" + SIDE[ev.side]).querySelector("img"), ev.side, { url: theirs.url, backUrl: theirs.backUrl }, null);
+            const img = $("body" + SIDE[ev.side]).querySelector("img");
+            setImg(img, ev.side, { url: theirs.url, backUrl: theirs.backUrl }, null);
+            if (ev.transform.mega) setMega(img, ev.side, theirs);
           }
           if (ev.status !== undefined && ev.side >= 0) {
             $("side" + SIDE[ev.side]).querySelector(".st").textContent =
               ev.status && ev.status !== "unconfused" ? AIL_SHORT[ev.status] || "" : "";
           }
-          line(ev.text, ev.side < 0 ? "sys" : ev.eff > 1 ? "good" : ev.eff < 1 ? "bad" : "");
-          await sleep(ev.side < 0 ? 300 : 500);
+          if (!ev.mega) line(ev.text, ev.side < 0 ? "sys" : ev.eff > 1 ? "good" : ev.eff < 1 ? "bad" : ""); // 메가는 컷인 앞에서 적었다
+          await sleep(ev.side < 0 ? 300 : ev.mega ? 700 : 500);
         }
       }
       if (end === true) {

@@ -85,8 +85,9 @@ function attach({ img, body, flipClass }) {
       case "say":
         duelSayText(d.text, d.kind);
         break;
-      case "transform": // 메타몽의 변신 — 상대 모습이 된다
+      case "transform": // 메타몽의 변신 — 상대 모습이 된다. 💎 메가진화도 이 길로(mega)
         if (d.url) img.src = d.url;
+        img.classList.toggle("mega", Boolean(d.mega));
         replay(img, "hit");
         break;
       case "status":
@@ -112,7 +113,7 @@ function attach({ img, body, flipClass }) {
         duel.on = false;
         document.body.classList.remove("duel");
         body.classList.remove("faint", "cheer");
-        img.classList.remove("hit");
+        img.classList.remove("hit", "mega");
         break;
     }
   });

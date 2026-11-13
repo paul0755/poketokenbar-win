@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld("ptb", {
   battle: (a) => ipcRenderer.invoke("battle", a),
   feedBerry: (a) => ipcRenderer.invoke("feed-berry", a),
   toggleStone: (id, item) => ipcRenderer.invoke("toggle-stone", id, item),
+  megaToggle: (on) => ipcRenderer.invoke("mega-toggle", on), // 💎 메가진화 쓰기
   // 미니룸
   roomBuy: (a) => ipcRenderer.invoke("room-buy", a),
   roomCoins: () => ipcRenderer.invoke("room-coins"),

@@ -25,6 +25,7 @@ const path = require("node:path");
 const poke = require("./world").pack; // 🌏 지금 세계의 종 데이터(포켓몬이면 pokemon.js 그대로)
 
 const SPECIES = require("./species.json");
+const mega = require("./mega");
 
 const PREFIX = "PTB1";
 const GENDERS = ["무성", "수컷", "암컷"];
@@ -38,7 +39,7 @@ function dataVersion() {
   if (dv) return dv;
   const h = crypto.createHash("sha1");
   // profile·friend 도 넣는다 — 레벨·기술을 정하는 방식이 바뀌면 같은 코드로 다른 결투가 나온다
-  for (const f of ["species.json", "moves.json", "types.json", "battle.js", "profile.js", "friend.js"]) h.update(fs.readFileSync(path.join(__dirname, f)));
+  for (const f of ["species.json", "moves.json", "types.json", "battle.js", "profile.js", "friend.js", "mega.js", "mega.json"]) h.update(fs.readFileSync(path.join(__dirname, f)));
   return (dv = h.digest("hex").slice(0, 8));
 }
 
@@ -76,6 +77,7 @@ function encode(mon, grown, trainer) {
         Math.round(grown),
         lvOf(mon, grown), // 변하지않는돌을 지녀 모습이 멈춘 아이의 레벨용 성장량. 아니면 0
         plainOf(mon), // 빛가림돌 — 마스터여도 원래 색. 옛 앱은 이 칸을 모르고 넘어간다(이로치로 보인다)
+        megaOf(mon), // 💎 지닌 메가스톤(mega-charizard-x). 없으면 0 — 친선 결투는 에너지 없이 메가진화한다
       ],
     ]),
   ).toString("base64url");
@@ -105,7 +107,8 @@ function encodeTrade(mon, grown, trainer) {
         Math.round(grown),
         String(mon.ot || trainer || "").slice(0, 16),
         mon.caughtAt || null,
-        HOLDS.indexOf(mon.hold) + 1, // 지닌 도구 — 1 변하지않는돌, 2 빛가림돌. 옛 앱은 1 만 알고 나머지는 넘어간다
+        // 지닌 도구 — 1 변하지않는돌, 2 빛가림돌, 💎 메가스톤은 이름 그대로. 옛 앱은 1 만 알고 나머지는 넘어간다
+        mega.isStone(mon.hold) ? mon.hold : HOLDS.indexOf(mon.hold) + 1,
         lvOf(mon, grown),
       ],
     ]),
@@ -132,7 +135,7 @@ function decodeTrade(code) {
   if (lv) mon.lvGrown = lv;
   const why = validate(mon, grown);
   if (why) return { error: "말이 안 되는 값이 들어 있습니다 — " + why };
-  const item = HOLDS[hold - 1] || null;
+  const item = mega.isStone(hold) && mega.lineFits(poke.LINES[line].ids, hold) ? hold : HOLDS[hold - 1] || null;
   if (item === "shade") mon.plain = true; // 받는 쪽이 모습을 그릴 때(이름 · 알림)
   return { code: s, trainer: String(trainer || ""), nonce, mon, grown, ot: String(ot || trainer || ""), caughtAt: caughtAt || null, hold: item === "everstone", item };
 }
@@ -156,17 +159,21 @@ function decode(code) {
   if (data !== dataVersion()) {
     return { error: "앱 버전이 달라 같은 결투가 나오지 않습니다. 둘 다 최신 버전으로 맞춰 주세요.", versionMismatch: true };
   }
-  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv, plain] = d;
+  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv, plain, stone] = d;
   const mon = { line, nature, shiny: Boolean(shiny), ivs, gender: GENDERS[g], ability, eggMoves, tmMoves };
   if (lv) mon.lvGrown = lv;
   if (plain === 1) mon.plain = true;
   const why = validate(mon, grown);
   if (why) return { error: "말이 안 되는 값이 들어 있습니다 — " + why };
+  if (stone && !(mega.isStone(stone) && mega.lineFits(poke.LINES[line].ids, stone))) return { error: "말이 안 되는 값이 들어 있습니다 — 메가스톤" };
+  if (stone) mon.hold = stone;
   return { code: s, trainer: String(trainer || ""), nonce, mon: { id: "friend-" + nonce, ...mon }, grown };
 }
 
 /** 지닐 수 있는 도구 — 교환 코드에는 이 순서 + 1 로 싣는다(0 은 없음) */
 const HOLDS = ["everstone", "shade"];
+/** 💎 친선 코드에 싣는 메가스톤 — 그 라인에 맞는 돌만. 메가진화를 꺼 두었으면(megaOff) 싣지 않는다 */
+const megaOf = (mon) => (!mon.megaOff && mega.isStone(mon.hold) && poke.LINES[mon.line] && mega.lineFits(poke.LINES[mon.line].ids, mon.hold) ? mon.hold : 0);
 /** 빛가림돌을 지녀 마스터가 돼도 빛나지 않는 아이인가 */
 const plainOf = (mon) => (mon.plain || mon.hold === "shade" ? 1 : 0);
 

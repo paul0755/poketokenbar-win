@@ -343,7 +343,8 @@ function renderBox(s) {
         (m.graduated ? '<span class="tag gr">졸업</span>' : "") +
         (m.boost > 0 ? '<span class="tag bo">2배</span>' : "") +
         (m.stone ? '<span class="tag st" title="변하지않는돌을 지니고 있다">🪨</span>' : "") +
-        (m.shade ? '<span class="tag st" title="빛가림돌을 지니고 있다 — 졸업해도 원래 색">🌑</span>' : "");
+        (m.shade ? '<span class="tag st" title="빛가림돌을 지니고 있다 — 졸업해도 원래 색">🌑</span>' : "") +
+        (m.mega && m.mega.id ? `<span class="tag st" title="${eul(m.mega.stone)} 지니고 있다${m.mega.ready ? " — 결투에서 " + m.mega.form + "(으)로 메가진화" : ""}">💎</span>` : "");
       // 돌을 지녔으면 "진화까지 1" 이 영영 안 줄어든다 — 멈춰 있다고 말한다
       const goal = m.stone
         ? m.evolveTo ? `진화 멈춤 — 돌을 빼면 ${m.evolveTo}` : "변하지않는돌 — 진화 멈춤"
@@ -369,6 +370,12 @@ function renderBox(s) {
     })
     .join("");
 }
+
+/** 을/를 — 💎 메가스톤 이름(…나이트를 · 유성의 조각을) */
+const eul = (w) => {
+  const c = String(w).charCodeAt(String(w).length - 1);
+  return w + (c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 ? "을" : "를");
+};
 
 /**
  * 개체 상세.
@@ -440,11 +447,15 @@ function profileHtml(p, m = {}, bag = [], stones = 0, shades = 0) {
       ? `<div class="meta">🌑 <b>빛가림돌</b>을 지니고 있어 졸업해도 이로치로 바뀌지 않습니다. 성장 · 졸업 보상은 그대로입니다.${
           m.stageKey === "master" ? "<br>지금 빼면 이로치로 빛납니다." : ""
         }</div><div class="feed"><button data-stone="${m.id}" data-item="shade">돌 빼기</button></div>`
-      : stones > 0 || canShade
-        ? `<div class="feed">${stones > 0 ? `<button data-stone="${m.id}">🪨 변하지않는돌 지니게 하기 (${stones}개)</button>` : ""}${
-            canShade ? `<button data-stone="${m.id}" data-item="shade">🌑 빛가림돌 지니게 하기 (${shades}개)</button>` : ""
-          }</div>`
-        : '<div class="meta">없음. 진화를 멈추려면 변하지않는돌, 졸업해도 원래 색으로 두려면 빛가림돌을 상점에서 사서 지니게 하세요.</div>';
+      : m.mega && m.mega.id
+        ? `<div class="meta">💎 <b>${m.mega.stone}</b>${eul(m.mega.stone).slice(m.mega.stone.length)} 지니고 있습니다. ${
+            m.mega.ready ? `결투에 나가면 ⚡ 메가 에너지 하나로 <b>${m.mega.form}</b>(으)로 메가진화합니다.` : `${m.mega.form.replace(/^메가|[XY]$/g, "")}(으)로 진화하면 메가진화할 수 있습니다.`
+          }</div><div class="feed"><button data-stone="${m.id}" data-item="${m.mega.id}">돌 빼기</button></div>`
+        : stones > 0 || canShade || (m.mega && m.mega.fits.length)
+          ? `<div class="feed">${stones > 0 ? `<button data-stone="${m.id}">🪨 변하지않는돌 지니게 하기 (${stones}개)</button>` : ""}${
+              canShade ? `<button data-stone="${m.id}" data-item="shade">🌑 빛가림돌 지니게 하기 (${shades}개)</button>` : ""
+            }${((m.mega && m.mega.fits) || []).map((x) => `<button data-stone="${m.id}" data-item="${x.id}">💎 ${x.name} 지니게 하기 (${x.n}개)</button>`).join("")}</div>`
+          : '<div class="meta">없음. 진화를 멈추려면 변하지않는돌, 졸업해도 원래 색으로 두려면 빛가림돌을 상점에서 사서 지니게 하세요.</div>';
 
   return `
     <div class="prof">
@@ -765,8 +776,25 @@ window.ptb.onShop((s) => {
           <button data-id="${it.id}"${dis}>${it.owned ? (it.weekly ? "이번 주 ✓" : "보유") : "구매"}</button>
         </div>`;
     })
-    .join("");
+    .join("") + megaShop(s);
 });
+
+/** 💎 메가스톤 — 박스에 있는 라인의 것만 메인이 보낸다 */
+function megaShop(s) {
+  if (!s.mega) return "";
+  const m = s.mega;
+  const head = `<div class="item-hd">💎 메가스톤 <span>⚡ 메가 에너지 ${m.energy}/${m.max} — 토큰 ${fmt(m.per)}마다 하나 · 메가진화 한 번에 하나${m.on ? "" : " · <b>지금 메가진화 꺼짐</b>(배틀 탭)"}</span></div>`;
+  if (!(s.stones || []).length) return head + '<div class="note">박스에 메가진화하는 포켓몬의 라인이 없습니다. 리자몽 · 갸라도스 · 망나뇽처럼 메가진화하는 아이를 데려오면 그 메가스톤이 여기에 나옵니다.</div>';
+  return head + s.stones.map((it) => `<div class="item">
+      <div class="ic">💎</div>
+      <div class="body">
+        <div class="nm">${it.name} <small>→ ${it.mega}</small></div>
+        <div class="de">${it.desc}</div>
+        <div class="pr">가격 ${cur().icon}${it.cost} · 가진 수 ${it.have}${it.held ? ` · 지닌 아이 ${it.held}` : ""}</div>
+      </div>
+      <button data-id="${it.id}"${it.afford ? "" : " disabled"}>구매</button>
+    </div>`).join("");
+}
 
 $("items").addEventListener("click", async (e) => {
   const btn = e.target.closest("button[data-id]");
@@ -808,9 +836,10 @@ function renderDex() {
           const cls = ["cell", e.owned ? "owned" : "seenonly", e.isPet ? "pet" : ""].join(" ");
           const tip = `${e.name} · ${e.label} · ${e.stage}\n${
             e.owned ? "이 라인을 보유 중입니다" : "만난 기록입니다. 보유 중이 아닙니다"
-          }`;
+          }${e.mega && e.mega.length ? `\n💎 메가진화 — ${e.mega.join(" · ")}` : ""}`;
           return `<div class="${cls}" title="${tip}">
               ${e.isPet ? '<div class="pin">바탕화면</div>' : ""}
+              ${e.mega && e.mega.length ? '<div class="mg">💎</div>' : ""}
               ${e.url ? `<img src="${e.url}" alt="">` : '<div class="q">?</div>'}
               <div class="nm">${e.name}</div>
               ${no}

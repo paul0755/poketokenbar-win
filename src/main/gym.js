@@ -12,6 +12,7 @@
  * 관장 아이의 성장량은 레벨에서 거꾸로 셈한다. 그래서 모습(1차 · 2차 · 3차 진화)도 레벨을 따라간다.
  */
 const battle = require("./battle");
+const mega = require("./mega");
 const poke = require("./world").pack; // 🌏 지금 세계의 종 데이터(포켓몬이면 pokemon.js 그대로)
 const SPECIES = require("./species.json");
 const GYMS = require("./gyms.json");
@@ -32,14 +33,16 @@ function leaderNature(line, grown) {
   return b[1] >= b[3] ? NATURE_ATK : NATURE_SPA;
 }
 
-/** 관장 아이 하나 — battle.fighter 가 받는 모양(raidBoss 와 같다) */
+/** 관장 아이 하나 — battle.fighter 가 받는 모양(raidBoss 와 같다). t.mega 면 💎 메가진화하는 아이(챔피언의 에이스) */
 function leaderMon(g, k) {
   const t = g.team[k];
   const iv = g.iv ?? 20;
   const grown = grownAt(t.lv);
+  const form = t.mega ? mega.formsOf(poke.describe(grown, t.line, {}).dexId)[0] || null : null;
   return {
     mon: { id: `gym-${g.id}-${k}`, line: t.line, nature: leaderNature(t.line, grown), shiny: false, ivs: [iv, iv, iv, iv, iv, iv], gender: "무성", ability: 0, eggMoves: [], tmMoves: [] },
     grown,
+    mega: form,
   };
 }
 
@@ -49,23 +52,36 @@ function leaderMon(g, k) {
  *
  * 무승부(턴이 다 되도록 판정도 못 낸 경우)는 둘 다 물러난다.
  * 판정으로 진 쪽도 쓰러진 것으로 친다 — 그 판은 끝났다.
+ *
+ * 💎 메가진화 — mine[i].mega(폼)가 있는 아이가 나오면 메가진화한다. 한 쪽에 한 번에 하나:
+ * 메가진화한 아이가 이겨서 다음 판으로 가면 메가인 채로(pre), 쓰러지면 다음 아이가 할 수 있다.
+ * 내 쪽은 opts.budget(⚡ 메가 에너지)만큼만. 관장 쪽(챔피언의 에이스)은 에너지가 없고, 메가진화한 내 아이와
+ * 마주쳤을 때만 맞받아 메가진화한다 — 메가를 안 쓰는 사람에게 챔피언이 갑자기 세지지 않게
+ * (Lv.100 여섯 마리 시뮬레이션에서 에이스가 늘 메가진화하면 0.91 → 0.52 로 떨어졌다).
+ * 돌려주는 megaUsed — 내 쪽이 새로 메가진화한 횟수(에너지를 그만큼 쓴다).
  */
-function challenge(mine, g, rng = Math.random) {
+function challenge(mine, g, rng = Math.random, opts = {}) {
   const foe = g.team.map((_, k) => leaderMon(g, k));
   const rounds = [];
   let i = 0, j = 0;
   let stA = null, stB = null; // 다음 판으로 들고 가는 체력 · 상태이상
+  let mA = false, mB = false; // 지금 서 있는 아이가 메가진화해 있나
+  let used = 0;
+  const budget = opts.budget || 0;
   const carry = (e) => ({ hp: e.hp / e.max, status: e.status });
   while (i < mine.length && j < foe.length) {
-    const r = battle.run(mine[i].mon, mine[i].grown, foe[j].mon, foe[j].grown, rng, { init: [stA, stB] });
+    const spA = mine[i].mega ? (mA ? { form: mine[i].mega, pre: true } : used < budget ? { form: mine[i].mega } : null) : null;
+    const spB = foe[j].mega && (mB || spA) ? { form: foe[j].mega, pre: mB } : null;
+    const r = battle.run(mine[i].mon, mine[i].grown, foe[j].mon, foe[j].grown, rng, { init: [stA, stB], mega: [spA, spB] });
     if (!r) return null;
+    if (spA && !spA.pre && r.fighters[0].mega) used++;
     rounds.push({ a: i, b: j, r });
-    if (r.winner === 0) { stA = carry(r.end[0]); stB = null; j++; }
-    else if (r.winner === 1) { stB = carry(r.end[1]); stA = null; i++; }
-    else { stA = stB = null; i++; j++; }
+    if (r.winner === 0) { stA = carry(r.end[0]); stB = null; mA = Boolean(r.fighters[0].mega); mB = false; j++; }
+    else if (r.winner === 1) { stB = carry(r.end[1]); stA = null; mB = Boolean(r.fighters[1].mega); mA = false; i++; }
+    else { stA = stB = null; mA = mB = false; i++; j++; }
   }
   const last = rounds[rounds.length - 1];
-  return { win: j >= foe.length && Boolean(last) && last.r.winner === 0, rounds };
+  return { win: j >= foe.length && Boolean(last) && last.r.winner === 0, rounds, megaUsed: used };
 }
 
 /* ---------------- 🏆 챔피언 로드 ---------------- */
@@ -129,7 +145,7 @@ function roadOf(weekKey) {
   stages.push({
     id: c.id, base: c.id, champ: true, name: c.name, title: c.title, type: c.type, typeName: c.typeName,
     iv: c.iv, intro: c.intro, win: c.win, lose: c.lose,
-    team: [...four.map((line, k) => ({ line, lv: c.lv[k] })), { line: c.ace.line, lv: c.ace.lv }],
+    team: [...four.map((line, k) => ({ line, lv: c.lv[k] })), { line: c.ace.line, lv: c.ace.lv, mega: true }], // 💎 에이스 망나뇽은 메가진화한다
   });
   return stages;
 }

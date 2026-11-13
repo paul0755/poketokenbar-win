@@ -93,13 +93,14 @@ function rollEggMoves(dexId) {
  *
  * 무한의 벽(팬텀) 같은 HP 1 고정 종은 예외지만, 우리 범위엔 없다.
  */
-function statsOf(dexId, level, ivs, natureIndex) {
+function statsOf(dexId, level, ivs, natureIndex, baseOverride = null) {
   const s = SPECIES[dexId];
   if (!s) return null;
+  const B = baseOverride || s.base; // 💎 메가진화 — 메가 폼의 종족값(mega.js)
   const n = poke.NATURES[natureIndex ?? 0] || {};
   const out = {};
   for (let i = 0; i < 6; i++) {
-    const base = s.base[i] ?? 0;
+    const base = B[i] ?? 0;
     const iv = (ivs && ivs[i]) ?? 0;
     const core = Math.floor(((2 * base + iv) * level) / 100);
     if (i === 0) {

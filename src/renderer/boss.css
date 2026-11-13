@@ -108,3 +108,13 @@
 #bsShards select { font: inherit; font-size: 11px; padding: 3px 5px; border-radius: 6px; border: 1px solid var(--line); background: var(--card2); color: var(--text); max-width: 150px; }
 #bsFoot { font-size: 10px; line-height: 1.55; }
 #bsFoot .warn { color: #ffb347; }
+
+/* 💎 메가진화한 내 아이 — 3D 그림. 3D · 도트 모두 여백 없이 잘린 그림이라 같은 칸을 꽉 채운다 — 키우면 방 왼쪽 벽에서 잘렸다. 크기는 그대로, 빛으로 */
+.bs-a img.mega { image-rendering: auto; filter: drop-shadow(0 0 5px rgba(255, 190, 255, .8)) drop-shadow(0 0 2px #fff); }
+.bs-a.megafx::after { content: ""; position: absolute; left: 50%; top: 40%; width: 90%; aspect-ratio: 1; translate: -50% -50%; border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 18%, rgba(255, 170, 250, .9) 30%, rgba(120, 200, 255, .6) 52%, transparent 70%);
+  animation: bsmega 1s ease-out forwards; pointer-events: none; }
+@keyframes bsmega { 0% { scale: .2; opacity: 0; } 30% { scale: 1; opacity: 1; } 100% { scale: 1.7; opacity: 0; } }
+.bs-a.act img.mega { filter: drop-shadow(0 0 4px #ffd24a) drop-shadow(0 0 5px rgba(255, 190, 255, .8)); }
+/* 💎 메가진화 컷인 — 아이들(z = 서 있는 높이 × 10) · 보스(900) · 체력 띠(2000) · 연출(2500) 위로, 숫자 팝(3000) 아래 */
+#bsRoom .mc-cut { z-index: 2800; }

@@ -353,18 +353,22 @@ const BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/p
  * kind "still" — 정적 PNG. 트레이 아이콘용(nativeImage는 GIF를 움직이지 못한다)
  * kind "anim"  — 5세대 흑백 애니메이션 GIF. 팝오버·펫용
  * kind "back"  — 같은 GIF 의 뒷모습. 결투 화면에서 내 쪽은 뒤에서 본다(앞에 상대, 뒤에 나)
+ * kind "3d" · "3dback" — 💎 메가진화(mega.js). Showdown 의 3D 모델 GIF. 흑백 도트에는 메가 폼이 없다
  */
 async function spritePath(dexId, cacheDir, { kind = "still", shiny = false } = {}) {
   if (!dexId) return null;
   fs.mkdirSync(cacheDir, { recursive: true });
-  const gif = kind === "anim" || kind === "back";
+  const sd = kind === "3d" || kind === "3dback";
+  const gif = kind === "anim" || kind === "back" || sd;
   const name = `${dexId}${shiny ? "-shiny" : ""}.${gif ? "gif" : "png"}`;
   const file = path.join(cacheDir, gif ? `${kind}-${name}` : name);
   if (fs.existsSync(file) && fs.statSync(file).size > 0) return file;
 
-  const url = gif
-    ? `${BASE}/versions/generation-v/black-white/animated/${kind === "back" ? "back/" : ""}${shiny ? "shiny/" : ""}${dexId}.gif`
-    : `${BASE}/${shiny ? "shiny/" : ""}${dexId}.png`;
+  const url = sd
+    ? `${BASE}/other/showdown/${kind === "3dback" ? "back/" : ""}${shiny ? "shiny/" : ""}${dexId}.gif`
+    : gif
+      ? `${BASE}/versions/generation-v/black-white/animated/${kind === "back" ? "back/" : ""}${shiny ? "shiny/" : ""}${dexId}.gif`
+      : `${BASE}/${shiny ? "shiny/" : ""}${dexId}.png`;
 
   // 타임아웃이 없으면 네트워크가 먹통일 때 호출부가 영영 resolve되지 않는다.
   const res = await fetch(url, { signal: AbortSignal.timeout(8000) });

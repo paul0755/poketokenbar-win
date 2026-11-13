@@ -53,6 +53,13 @@
   #pet.left {
     transform: scaleX(-1);
   }
+  /* 💎 메가진화 — 3D 그림(Showdown)은 도트가 아니다. 창 안에서 조금 크게 */
+  #pet.mega {
+    image-rendering: auto;
+    scale: 1.14;
+    transform-origin: 50% 100%;
+    filter: drop-shadow(0 0 6px rgba(255, 190, 255, 0.6)) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
+  }
   #egg {
     animation: bob 2.6s ease-in-out infinite;
     pointer-events: none;

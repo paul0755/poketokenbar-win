@@ -468,7 +468,8 @@
     const homes = first.map((_, i) => {
       const c = i % cols;
       const rw = Math.floor(i / cols);
-      return [6 + (c + (rw % 2) * 0.5) * (46 / cols), 78 + (rows > 1 ? (rw / (rows - 1)) * 17 : 8)];
+      // 왼쪽 끝은 10% — 6% 에서는 맨 왼쪽 아이의 이름표("나 · 메가망나뇽")와 그림이 방 벽에서 잘렸다
+      return [10 + (c + (rw % 2) * 0.5) * (42 / cols), 78 + (rows > 1 ? (rw / (rows - 1)) * 17 : 8)];
     });
     const B = r.boss;
     const scene = { team: [], homes, B, bossNow: B.hp, toMilli: (hp) => Math.round((hp / B.bar) * 1000) };
@@ -559,7 +560,20 @@
       } else {
         if (a && ev.status !== undefined) a.el.querySelector(".st").textContent = ev.status && ev.status !== "unconfused" ? AIL[ev.status] || "" : "";
         if (a && ev.transform) a.el.querySelector("img").src = $("bsBossImg").src;
-        logLine(ev.text, ev.who == null ? "sys" : ev.eff > 1 ? "good" : ev.eff < 1 ? "bad" : "");
+        if (a && ev.mega && r.allies[ev.who] && r.allies[ev.who].megaUrl) {
+          // 💎 메가진화 — 컷인(megacut.js) 뒤 3D 그림으로, 빛이 한 번 터진다
+          logLine(ev.text, "good");
+          const al = r.allies[ev.who];
+          if (!fast && window.ptbMegaCut) await window.ptbMegaCut.play($("bsRoom"), { from: al.url, to: al.megaUrl, name: ev.mega.name, stone: (ev.text.match(/의 (.+?)[이가] 반응/) || [])[1], side: 0 });
+          const im = a.el.querySelector("img");
+          im.src = r.allies[ev.who].megaUrl;
+          im.classList.add("mega");
+          a.el.classList.remove("megafx");
+          void a.el.offsetWidth;
+          a.el.classList.add("megafx");
+          await wait(500);
+        }
+        if (!(a && ev.mega)) logLine(ev.text, ev.who == null ? "sys" : ev.eff > 1 ? "good" : ev.eff < 1 ? "bad" : "");
         await wait(ev.who == null ? 300 : 160);
       }
     }
