@@ -473,6 +473,7 @@
   .boxchip.on { color: #fff; background: #c43a6a; border-color: #c43a6a; }
   .boxfavn { margin-left: auto; font-size: 10px; color: var(--dim); }
   .bx .pic img { width: 50px; height: 50px; object-fit: contain; image-rendering: pixelated; }
+  .bx .pic img.mega { image-rendering: auto; filter: drop-shadow(0 0 2px rgba(255,190,255,.8)); } /* 💎 마스터 메가 — Showdown 3D 그림 */
   .bx .info { flex: 1; min-width: 0; }
   .bx .nm { font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 5px; }
   .bx .nm .tag {
@@ -528,6 +529,52 @@
   .mv { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; font-size: 10px; }
   .mv .n { flex: 1; font-weight: 600; }
   .mv .p { color: var(--muted); }
+  /* 💿 기술 관리 */
+  .mv .src { font-size: 8.5px; color: var(--dim); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: 0 4px; }
+  .mv .src.new { color: #fff; background: #e0525f; border-color: #e0525f; font-weight: 700; }
+  .bx .nm .tag.mvn { background: #e0525f; color: #fff; }
+  .prof h5.mvh { display: flex; align-items: center; gap: 6px; }
+  /* 버튼은 상세의 다른 버튼(.feed button · .bx .acts button)과 같은 꼴 — 펼친 동안은 .on(강조색) */
+  .mvedit {
+    margin-left: auto; padding: 3px 9px; font: inherit; font-size: 9.5px; font-weight: 600; color: var(--text);
+    background: #2b2e37; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; white-space: nowrap;
+  }
+  .mvedit:hover { border-color: var(--accent); }
+  .mvedit.on { color: #14151a; background: var(--accent); border-color: var(--accent); }
+  .mvpick input { accent-color: var(--accent); }
+  .mvpick .feed { margin-top: 6px; }
+  .mvpick .feed button { background: #353945; } /* 패널 바탕(살짝 밝다) 위라 한 단계 밝게 — 안 그러면 글자만 떠 보인다 */
+  .mvpick .feed button:hover { border-color: var(--accent); }
+  .mvpick .feed button[data-mvsave] { color: #14151a; background: var(--accent); border-color: var(--accent); }
+  .mvpick .feed button:disabled { opacity: .4; cursor: not-allowed; }
+  .mvpick { margin: 4px 0 6px; padding: 7px 8px; border-radius: 9px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); }
+  .mv.pick { cursor: pointer; padding: 2px 4px; border-radius: 6px; opacity: .6; }
+  .mv.pick.on { opacity: 1; background: rgba(255,203,5,.09); }
+  .mv.pick input { margin: 0; }
+  /* 🗑 기술 잊기 — 줄 끝의 작은 버튼. 한 번 누르면 빨갛게 "잊기?" */
+  .mvrow { display: flex; align-items: center; gap: 5px; margin-bottom: 3px; }
+  .mvrow .mv.pick { flex: 1; min-width: 0; margin-bottom: 0; }
+  .mvdel {
+    flex-shrink: 0; padding: 2px 7px; font: inherit; font-size: 9px; font-weight: 600; color: var(--muted);
+    background: #353945; border: 1px solid var(--line); border-radius: 6px; cursor: pointer;
+  }
+  .mvdel:hover { color: var(--red); border-color: var(--red); }
+  .mvdel.ask { color: #fff; background: var(--red); border-color: var(--red); }
+  .mvgone { margin-top: 6px; }
+  /* 정렬 — 배운 순 · 위력 순 · 타입별 · 고른 것 위로 */
+  .mvsort { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 7px; }
+  .mvsort button {
+    padding: 2px 8px; font: inherit; font-size: 9.5px; font-weight: 600; color: var(--muted);
+    background: #353945; border: 1px solid var(--line); border-radius: 99px; cursor: pointer;
+  }
+  .mvsort button:hover { color: var(--text); }
+  .mvsort button.on { color: #14151a; background: var(--accent); border-color: var(--accent); }
+  .mvsort button[data-mvfirst] { margin-left: auto; }
+  .mvgone button {
+    margin-left: 4px; padding: 2px 8px; font: inherit; font-size: 9.5px; font-weight: 600; color: var(--text);
+    background: #353945; border: 1px solid var(--line); border-radius: 7px; cursor: pointer;
+  }
+  .mvgone button:hover { border-color: var(--accent); }
   .prof .abil { font-size: 10px; color: var(--muted); line-height: 1.5; }
   .prof .abil b { color: var(--text); }
 

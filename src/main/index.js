@@ -374,14 +374,17 @@ async function startBattle(idA, idB, level) {
   const ga = box.effOf(a, growthSpeed());
   const gb = box.effOf(b, growthSpeed());
   if (!poke.stageFor(ga) || !poke.stageFor(gb)) return { ok: false, reason: "알은 싸울 수 없습니다" };
-  // 💎 둘 다 내 아이다 — 메가진화 한 번에 에너지 하나씩. 하나뿐이면 왼쪽(A)이 먼저
+  // 💎 둘 다 내 아이다 — 메가진화 한 번에 에너지 하나씩. 하나뿐이면 왼쪽(A)이 먼저.
+  // 마스터는 늘 메가진화해 있다 — 에너지 없이 메가인 채로 나온다(pre)
   const fa = megaFormOf(a, ga);
   const fb = megaFormOf(b, gb);
-  const sa = fa && megaEnergy() >= 1 ? { form: fa } : null;
-  const sb = fb && megaEnergy() - (sa ? 1 : 0) >= 1 ? { form: fb } : null;
+  const pa = Boolean(fa) && megaPerm(ga, a.line);
+  const pb = Boolean(fb) && megaPerm(gb, b.line);
+  const sa = fa && (pa || megaEnergy() >= 1) ? { form: fa, pre: pa } : null;
+  const sb = fb && (pb || megaEnergy() - (sa && !pa ? 1 : 0) >= 1) ? { form: fb, pre: pb } : null;
   const r = battle.run(box.withLv(a, growthSpeed()), ga, box.withLv(b, growthSpeed()), gb, Math.random, { level: level === 50 ? 50 : null, mega: [sa, sb] });
   if (!r) return { ok: false, reason: "결투를 시작하지 못했습니다" };
-  spendMega(r.fighters.filter((f) => f.mega).length);
+  spendMega(r.fighters.filter((f) => f.mega && !f.mega.pre).length);
   await megaArt(r.fighters);
 
   // 전적은 개체에 남긴다. 놓아주면 같이 사라진다
@@ -441,6 +444,8 @@ function megaFormOf(m, grown) {
   const d = poke.describe(grown ?? box.effOf(m, growthSpeed()), m.line, poke.look(m));
   return mega.formFor(m.hold, d.dexId);
 }
+/** 마스터(졸업)까지 컸나 — 맞는 돌을 지닌 마스터는 늘 메가진화해 있다(에너지 없이 · 메가인 채로 나온다) */
+const megaPerm = (grown, line) => !world.isDigimon && poke.isMaster(grown, line);
 /** 메가 폼 그림(Showdown 3D) — 앞모습 · 뒷모습 */
 async function megaUrl(id, shiny, back = false) {
   const p = await poke.spriteWithFallback({ dexId: id, isShiny: Boolean(shiny) }, CACHE, back ? "3dback" : "3d").catch(() => null);
@@ -492,7 +497,10 @@ function megaPetTick(events, burnOn) {
   if (fresh) console.log(`[mega] 버닝 타임 ${Math.round(n / 1e6)}M — 펫 메가진화 ${mega.PET_MINUTES}분`);
 }
 
-/** 박스 한 칸의 메가 정보 — 지닌 돌, 지금 메가진화할 수 있는 폼, 펫이 메가진화 중이면 그 그림 */
+/**
+ * 박스 한 칸의 메가 정보 — 지닌 돌, 지금 메가진화할 수 있는 폼, 펫이 메가진화 중이면 그 그림(petUrl).
+ * perm — 마스터라 늘 메가진화해 있다. 펫 창 · 박스 그림이 늘 메가(petUrl)
+ */
 async function megaBox(m, d) {
   if (world.isDigimon || !d.dexId) return null;
   const ids = (poke.LINES[m.line] || {}).ids || [];
@@ -500,8 +508,9 @@ async function megaBox(m, d) {
   const f = mega.stoneForm(m.hold);
   if (!f) return fits.length ? { id: null, fits } : null;
   const ready = d.dexId === f.dex;
-  const pet = ready && megaOn() && megaPetLeft() > 0 ? await megaUrl(f.id, d.isShiny) : null;
-  return { id: m.hold, stone: f.stoneName, form: f.name, ready, petUrl: pet, fits };
+  const perm = ready && megaOn() && d.stage.key === "master";
+  const pet = perm || (ready && megaOn() && megaPetLeft() > 0) ? await megaUrl(f.id, d.isShiny) : null;
+  return { id: m.hold, stone: f.stoneName, form: f.name, ready, perm, petUrl: pet, fits };
 }
 
 /** 가방의 메가스톤 — { id, name, form, dex, n } */
@@ -577,7 +586,7 @@ async function friendBattle(code, opts = {}) {
   const L = sides[i];
   const R = sides[j];
   // 💎 코드에 실린 메가스톤으로 — 에너지는 쓰지 않는다(상대 PC 의 에너지는 모른다). 맞는 모습이 아니면 battle.run 이 거른다
-  const sp = (x) => (mega.stoneForm(x.mon.hold) ? { form: mega.stoneForm(x.mon.hold) } : null);
+  const sp = (x) => (mega.stoneForm(x.mon.hold) ? { form: mega.stoneForm(x.mon.hold), pre: megaPerm(x.grown, x.mon.line) } : null);
   const r = battle.run(L.mon, L.grown, R.mon, R.grown, friend.rng(friend.seedOf(mine.code, theirs.code)), { level: 50, mega: [sp(L), sp(R)] });
   if (!r) return { ok: false, reason: "결투를 시작하지 못했습니다" };
   await megaArt(r.fighters);
@@ -765,7 +774,10 @@ async function fightLeader(g, ids, max, prefix) {
   if (!pick.length || pick.some((m) => !m)) return { ok: false, reason: "함께 싸울 아이를 골라 주세요" };
   const mine = pick.map((m) => ({ m, mon: box.withLv(m, growthSpeed()), grown: box.effOf(m, growthSpeed()) }));
   if (mine.some((x) => !poke.stageFor(x.grown))) return { ok: false, reason: "알은 싸울 수 없습니다" };
-  for (const x of mine) x.mega = megaFormOf(x.m, x.grown); // 💎
+  for (const x of mine) {
+    x.mega = megaFormOf(x.m, x.grown); // 💎
+    x.perm = Boolean(x.mega) && megaPerm(x.grown, x.m.line); // 마스터 — 늘 메가(에너지 없이)
+  }
 
   const res = gym.challenge(mine, g, Math.random, { budget: megaEnergy() });
   if (!res) return { ok: false, reason: "결투를 시작하지 못했습니다" };
@@ -1050,7 +1062,7 @@ function guildTeamCode() {
   if (!m || isEggMon(m)) return "";
   const grown = box.effOf(m, growthSpeed());
   const p = profile.build(box.withLv(m, growthSpeed()), grown);
-  const key = [m.id, poke.stageFor(grown, m.line), p ? p.level : 0, (m.tmMoves || []).length, m.nature, save.trainerName, m.hold || "", megaOn()].join("|");
+  const key = [m.id, poke.stageFor(grown, m.line), p ? p.level : 0, (m.tmMoves || []).length, (m.moveSet || []).join("."), (m.moveForgot || []).join("."), m.nature, save.trainerName, m.hold || "", megaOn()].join("|");
   if (guildTeam.key !== key) guildTeam = { key, code: friend.encode(codeMon(m), grown, save.trainerName) };
   return guildTeam.code;
 }
@@ -1070,7 +1082,7 @@ function guildBenchCodes() {
     .slice(0, RAID_LINEUP - 1);
   const rows = pick.map(({ m, grown }) => {
     const p = profile.build(box.withLv(m, sp), grown);
-    return { m, grown, key: [m.id, poke.stageFor(grown, m.line), p ? p.level : 0, (m.tmMoves || []).length, m.nature, m.hold || ""].join("|") };
+    return { m, grown, key: [m.id, poke.stageFor(grown, m.line), p ? p.level : 0, (m.tmMoves || []).length, (m.moveSet || []).join("."), (m.moveForgot || []).join("."), m.nature, m.hold || ""].join("|") };
   });
   const key = rows.map((x) => x.key).join(",") + "|" + save.trainerName + "|" + megaOn();
   if (guildBench.key !== key) guildBench = { key, codes: rows.map(({ m, grown }) => friend.encode(codeMon(m), grown, save.trainerName)) };
@@ -1569,7 +1581,8 @@ async function raidPack(L, seg) {
   const r = L.b.result();
   const allies = await Promise.all(r.allies.map(async (f, i) => {
     if (!L.urls.has(i)) L.urls.set(i, await raidSprite(f.dexId, f.shiny));
-    return { ...f, url: L.urls.get(i), megaUrl: f.mega ? await megaUrl(f.mega.id, f.shiny) : null };
+    const mu = f.mega ? await megaUrl(f.mega.id, f.shiny) : null;
+    return { ...f, url: f.mega && f.mega.pre && mu ? mu : L.urls.get(i), megaUrl: mu }; // 💎 마스터는 메가인 채로 나온다
   }));
   const out = { ok: true, log, allies, need, over, used: [...L.used], limit: RAID_LINEUP, boss: { ...r.boss, url: L.bossUrl, label: `레이드 보스 ${r.boss.name}` } };
   if (over) {
@@ -2173,6 +2186,75 @@ function holdBack(m) {
  * 빛가림돌(shade) — 성장은 그대로. 마스터(졸업)가 돼도 이로치로 바뀌지 않을 뿐이다(pokemon.look).
  * 졸업 기록 · 사탕 보상도 그대로다. 태어난 이로치는 가릴 수 없다.
  */
+/**
+ * 💿 기술 관리 — 결투 · 펫이 쓸 기술을 넷까지 고른다(profile.movePool 가운데서). ids 가 비었거나 null 이면 자동으로
+ * (최근에 배운 레벨업 넷 + 기술머신 전부). 패시브스킬(알기술)은 늘 쓴다
+ */
+function setMoves(id, ids) {
+  const m = box.find(save.box, id);
+  if (!m || isEggMon(m)) return { ok: false, reason: "알은 기술이 없습니다" };
+  if (world.isDigimon) return { ok: false, reason: "디지털 월드에는 기술 관리가 없습니다" };
+  const grown = box.effOf(m, growthSpeed());
+  const mon = box.withLv(m, growthSpeed());
+  const name = poke.describe(grown, m.line, poke.look(m)).name;
+  if (!Array.isArray(ids) || !ids.length) {
+    delete m.moveSet;
+    delete m.moveSeen;
+    writeSave();
+    refresh(true);
+    return { ok: true, message: `${name}의 기술을 자동으로 — 최근에 배운 레벨업 기술 넷과 기술머신을 모두 씁니다` };
+  }
+  const pool = new Map(profile.movePool(mon, grown).map((x) => [x.id, x]));
+  const pick = [...new Set(ids.map(Number))].filter((x) => pool.has(x));
+  if (!pick.length || pick.length !== new Set(ids).size) return { ok: false, reason: "떠올릴 수 없는 기술이 있습니다" };
+  if (pick.length > profile.MOVE_SET_MAX) return { ok: false, reason: `기술은 ${profile.MOVE_SET_MAX}개까지 고릅니다` };
+  m.moveSet = pick;
+  m.moveSeen = [...pool.keys()]; // 지금 떠올릴 수 있는 것 — 이 뒤에 배우는 기술이 NEW(넷이 덜 찼으면 바로 쓴다)
+  writeSave();
+  refresh(true);
+  return { ok: true, message: `${name}의 기술을 ${pick.length}개로 정했습니다` };
+}
+
+/**
+ * 🗑 기술 잊기 — 기술머신으로 배운 것은 지운다(다시 사면 또 배울 수 있다). 레벨업 기술은 잊은 목록(moveForgot)에 넣는다
+ * (되살리기로 돌아온다). 패시브스킬은 타고난 것이라 못 잊는다. 마지막 하나는 남긴다 — 기술이 없으면 싸우지 못한다
+ */
+function forgetMove(id, moveId) {
+  const m = box.find(save.box, id);
+  if (!m || isEggMon(m)) return { ok: false, reason: "알은 기술이 없습니다" };
+  if (world.isDigimon) return { ok: false, reason: "디지털 월드에는 기술 관리가 없습니다" };
+  const mv = Number(moveId);
+  if ((m.eggMoves || []).includes(mv)) return { ok: false, reason: "패시브스킬은 타고난 기술이라 잊을 수 없습니다" };
+  const grown = box.effOf(m, growthSpeed());
+  const mon = box.withLv(m, growthSpeed());
+  const p = profile.build(mon, grown);
+  const x = p && p.pool.find((y) => y.id === mv);
+  if (!x) return { ok: false, reason: "이 아이가 아는 기술이 아닙니다" };
+  if (p.pool.length <= 1) return { ok: false, reason: "기술이 하나뿐이라 잊을 수 없습니다" };
+  if (x.src === "tm") m.tmMoves = (m.tmMoves || []).filter((y) => y !== mv);
+  else m.moveForgot = [...new Set([...(m.moveForgot || []), mv])];
+  if (Array.isArray(m.moveSet)) {
+    m.moveSet = m.moveSet.filter((y) => y !== mv);
+    if (!m.moveSet.length) { delete m.moveSet; delete m.moveSeen; } // 고른 기술을 다 잊었으면 자동으로
+  }
+  writeSave();
+  refresh(true);
+  const name = poke.describe(grown, m.line, poke.look(m)).name;
+  return { ok: true, message: `${name}이(가) ${x.name}을(를) 잊었습니다 — ${x.src === "tm" ? "기술머신으로 다시 배울 수 있습니다" : "기술 관리에서 되살릴 수 있습니다"}` };
+}
+
+/** 🗑 잊은 레벨업 기술을 모두 되살린다. 고른 기술이 있으면 NEW 로 세지 않는다(원래 알던 기술) */
+function restoreMoves(id) {
+  const m = box.find(save.box, id);
+  if (!m || !Array.isArray(m.moveForgot) || !m.moveForgot.length) return { ok: false, reason: "잊은 기술이 없습니다" };
+  const back = m.moveForgot;
+  delete m.moveForgot;
+  if (Array.isArray(m.moveSeen)) m.moveSeen = [...new Set([...m.moveSeen, ...back])];
+  writeSave();
+  refresh(true);
+  return { ok: true, message: `잊은 기술 ${back.length}개를 되살렸습니다` };
+}
+
 function toggleStone(id, item = "everstone") {
   const m = box.find(save.box, id);
   if (!m) return { ok: false, reason: "없는 아이입니다" };
@@ -2250,7 +2332,7 @@ const SHOP_ALL = [
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
   { id: "everstone", name: "변하지않는돌", cost: 3, desc: "지닌 아이는 진화하지 않는다. 박스 › 상세에서 지니게 하거나 뺀다. 빼면 돌아온다", icon: "🪨" },
   { id: "shade", name: "빛가림돌", cost: 3, desc: "지닌 아이는 졸업(마스터)해도 이로치로 바뀌지 않는다. 태어난 이로치는 그대로. 박스 › 상세에서 지니게 하거나 뺀다", icon: "🌑" },
-  { id: "tm", name: "기술머신", cost: 3, desc: "키우는 아이가 배울 수 있는 기술머신 기술 하나를 가르친다", icon: "💿" },
+  { id: "tm", name: "기술머신", cost: 3, desc: "키우는 아이에게 어울리는 기술머신 기술 하나를 가르친다 — 자기 타입 · 강한 쪽 공격 · 아직 없는 타입부터. 쓸 기술은 박스 › 상세 › 기술 관리에서 고른다", icon: "💿" },
   { id: "great-ball", name: "슈퍼볼 3개", cost: 1, desc: "야생 포켓몬이 1.5배 잘 잡힌다", icon: "🔵", ball: "great" },
   { id: "ultra-ball", name: "하이퍼볼 3개", cost: 2, desc: "야생 포켓몬이 2배 잘 잡힌다", icon: "🟡", ball: "ultra" },
   { id: "master-ball", name: "마스터볼", cost: 40, desc: "던지면 반드시 잡힌다. 전설도. 한 주에 1개만 살 수 있다", icon: "🟣", ball: "master", weekly: "masterWeek" },
@@ -2775,12 +2857,19 @@ function buy(itemId) {
     const eff = box.effOf(a, growthSpeed());
     // 알에게는 가르칠 수 없다. 기술을 쓰지도 않는다
     if (!a || poke.stageFor(eff) === 0) { save.candySpent -= cost; return { ok: false, reason: "알에게는 가르칠 수 없습니다" }; }
-    const pool = profile.tmCandidates(box.withLv(a, growthSpeed()), eff);
-    if (!pool.length) { save.candySpent -= cost; return { ok: false, reason: "더 배울 수 있는 기술머신이 없습니다" }; }
-    const id = pool[Math.floor(Math.random() * pool.length)];
+    // 💿 어울리는 기술부터(profile.tmPick) — 자속 · 강한 쪽 공격 · 아직 없는 타입
+    const pick = profile.tmPick(box.withLv(a, growthSpeed()), eff);
+    if (!pick) { save.candySpent -= cost; return { ok: false, reason: "더 배울 수 있는 기술머신이 없습니다" }; }
+    const id = pick.id;
     a.tmMoves = [...(a.tmMoves || []), id];
-    const learned = profile.build(box.withLv(a, growthSpeed()), eff).tmMoves.find((m) => m.id === id);
-    msg = poke.describe(eff, a.line, poke.look(a)).name + "이(가) " + (learned ? learned.name : "새 기술") + "을(를) 배웠습니다";
+    // 기술을 골라 쓰는 중이면 — 자리가 남았으면 바로 쓴다(새로 배운 기술은 cleanMoveSet 이 채운다).
+    // 넷이 다 찼으면 NEW 로 남아 기술 관리에서 바꿔 넣는다
+    const set = profile.cleanMoveSet(box.withLv(a, growthSpeed()), eff);
+    let note = "";
+    if (set && !set.includes(id)) note = " — 쓰는 기술이 넷이라 박스 › 기술 관리에서 바꿔 넣으세요(NEW)";
+    const learned = profile.build(box.withLv(a, growthSpeed()), eff).pool.find((m) => m.id === id);
+    const info = learned ? ` (${learned.type}${learned.power ? " · 위력 " + learned.power : " · 변화"}${pick.why.length ? " · " + pick.why.join(" · ") : ""})` : "";
+    msg = poke.describe(eff, a.line, poke.look(a)).name + "이(가) " + (learned ? learned.name : "새 기술") + "을(를) 배웠습니다" + info + note;
   } else if (itemId === "great-ball" || itemId === "ultra-ball") {
     const key = itemId === "great-ball" ? "great" : "ultra";
     save.balls = save.balls || { great: 0, ultra: 0 };
@@ -2839,7 +2928,7 @@ function stoneShop() {
     const base = f.name.replace(/^메가|[XY]$/g, "");
     return {
       id, name: f.stoneName, mega: f.name, cost, icon: "💎",
-      desc: `지닌 ${battle.josa(base, "이가")} 결투에 나가면 ⚡ 메가 에너지 하나로 ${f.name}(으)로 메가진화한다`,
+      desc: `지닌 ${battle.josa(base, "이가")} 결투에 나가면 ⚡ 메가 에너지 하나로 ${f.name}(으)로 메가진화한다. 마스터면 에너지 없이 늘 메가진화해 있다`,
       have: (save.items || {})[id] || 0,
       held: save.box.filter((m) => m.hold === id).length,
       afford: c.left >= cost,
@@ -4890,9 +4979,11 @@ async function wildBattle(petId) {
   W.walkId = (W.walkId || 0) + 1; // 걷던 걸음을 멈춘다
   // 야생의 개체값·성격은 처음 싸울 때 정해 두고 계속 쓴다 — 잡으면 이 아이가 박스에 들어간다
   W.mon = W.mon || box.make(W.line, W.nature, W.shiny);
+  const pf = megaFormOf(pm, grown); // 💎 마스터 펫은 늘 메가진화해 있다(펫 창 그림도 메가) — 에너지 없이
   const r = battle.run(box.withLv(pm, growthSpeed()), grown, W.mon, WILD_GROWN, Math.random, {
     level: 50,
     gentle: 0,
+    mega: [pf && megaPerm(grown, pm.line) ? { form: pf, pre: true } : null, null],
     init: [null, W.state || null],
     stop: (F) => F[1].hp <= F[1].maxHp * 0.4,
   });
@@ -5211,6 +5302,9 @@ app.whenReady().then(async () => {
   ipcMain.handle("room-coins", () => roomCoins());
   ipcMain.handle("statue-image", (_e, dexId) => statueImage(dexId));
   ipcMain.handle("room-set", (_e, patch) => roomSet(patch || {}));
+  ipcMain.handle("set-moves", (_e, id, ids) => setMoves(id, ids));
+  ipcMain.handle("forget-move", (_e, id, moveId) => forgetMove(id, moveId));
+  ipcMain.handle("restore-moves", (_e, id) => restoreMoves(id));
   ipcMain.handle("toggle-stone", (_e, id, item) => toggleStone(id, item === "shade" || mega.isStone(item) ? item : "everstone"));
   ipcMain.handle("mega-toggle", (_e, on) => megaToggle(on));
   ipcMain.handle("feed-berry", (_e, { id, key } = {}) => feedBerry(id, key));

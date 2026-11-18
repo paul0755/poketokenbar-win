@@ -115,16 +115,18 @@ function watchMoves(s, mine) {
   const paceChanged = pace !== mv.pace;
   mv.pace = pace;
   // 알은 기술이 없다. 프로필은 알에도 1레벨 기술을 주지만 알이 몸통박치기를 하면 이상하다
-  // 쓰는 건 레벨업 넷 + 알기술 + 기술머신으로 가르친 것 전부다
+  // 쓰는 건 결투와 같다(profile.active) — 기술 관리에서 고른 넷 + 알기술. 고르지 않았으면 레벨업 넷 + 알기술 + 기술머신 전부
   const pr = mine && mine.stageKey !== "egg" ? mine.profile : null;
   // 🦖 디지몬은 레벨업 기술 대신 그 모습의 필살기(Digi-API) — 셀수록(단계) 크게
   const DG_POWER = { baby: 1, mid: 2, final: 3, master: 4 };
   const digi = mine && mine.stageKey !== "egg" && Array.isArray(mine.skills) && mine.skills.length;
   const moves = digi
     ? mine.skills.map((name) => ({ name, digi: true, attr: mine.attr, power: DG_POWER[mine.stageKey] || 1 }))
-    : pr ? [...(pr.moves || []), ...(pr.eggMoves || []), ...(pr.tmMoves || [])] : [];
+    : pr ? pr.active || [...(pr.moves || []), ...(pr.eggMoves || []), ...(pr.tmMoves || [])] : []; // 💿 결투와 같은 기술(기술 관리)
   mv.moves = moves;
   const names = moves.map((m) => m.name);
+  // 💿 지금까지 배운 기술머신 전부(쓰든 안 쓰든) — 기술 관리에서 옛 기술머신 기술을 골라 넣어도 "NEW" 가 아니다
+  const tmIds = pr ? (pr.tmMoves || []).map((m) => m.id) : [];
 
   if (!pace || !mine) {
     clearTimeout(mv.idleTimer);
@@ -133,6 +135,7 @@ function watchMoves(s, mine) {
     mv.grown = mine ? mine.grown : null;
     mv.level = mine && mine.profile ? mine.profile.level : null;
     mv.names = names;
+    mv.tmIds = tmIds;
     mv.ready = true;
     return;
   }
@@ -147,7 +150,7 @@ function watchMoves(s, mine) {
     // 레벨업 기술은 지난번 레벨과 이번 레벨 사이에 배우는 것만, 기술머신은 방금 가르친 것을 새것으로 친다.
     // 알기술은 태어날 때부터 안다 — 업데이트로 처음 채워질 때 "NEW"가 뜨면 거짓말이다
     const learned = moves.find(
-      (m) => !mv.names.includes(m.name) && (m.src === "tm" || (mv.level != null && m.level > mv.level)),
+      (m) => !mv.names.includes(m.name) && (m.src === "tm" ? !(mv.tmIds || []).includes(m.id) : mv.level != null && m.level > mv.level),
     );
     if (learned) useMove(learned, true);
     else if (mine.active && mv.grown != null && mine.grown > mv.grown && Date.now() - mv.lastAt >= pace.gap) {
@@ -158,6 +161,7 @@ function watchMoves(s, mine) {
   mv.grown = mine.grown;
   mv.level = mine.profile ? mine.profile.level : null;
   mv.names = names;
+  mv.tmIds = tmIds;
   mv.ready = true;
   if (paceChanged || !mv.idleTimer) scheduleIdle();
 }

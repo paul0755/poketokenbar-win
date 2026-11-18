@@ -45,6 +45,9 @@ contextBridge.exposeInMainWorld("ptb", {
   battle: (a) => ipcRenderer.invoke("battle", a),
   feedBerry: (a) => ipcRenderer.invoke("feed-berry", a),
   toggleStone: (id, item) => ipcRenderer.invoke("toggle-stone", id, item),
+  setMoves: (id, ids) => ipcRenderer.invoke("set-moves", id, ids), // 💿 기술 관리 — ids 가 비면 자동
+  forgetMove: (id, moveId) => ipcRenderer.invoke("forget-move", id, moveId), // 🗑 기술 잊기
+  restoreMoves: (id) => ipcRenderer.invoke("restore-moves", id), // 🗑 잊은 레벨업 기술 되살리기
   megaToggle: (on) => ipcRenderer.invoke("mega-toggle", on), // 💎 메가진화 쓰기
   // 미니룸
   roomBuy: (a) => ipcRenderer.invoke("room-buy", a),

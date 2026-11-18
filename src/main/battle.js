@@ -49,8 +49,8 @@ function josa(word, pair) {
 }
 
 /**
- * 박스의 개체 하나를 싸울 수 있는 꼴로. 기술은 펫이 쓰는 것과 같다 —
- * 레벨업 넷 + 패시브스킬(알기술) + 기술머신.
+ * 박스의 개체 하나를 싸울 수 있는 꼴로. 기술은 펫이 쓰는 것과 같다(profile.activeMoveIds) —
+ * 💿 기술 관리에서 고른 넷 + 패시브스킬(알기술). 고르지 않았으면 레벨업 넷 + 패시브스킬 + 기술머신.
  *
  * level 을 주면 그 레벨로 맞춘다 — 원작 배틀시설의 "Lv.50 고정"과 같다.
  * 능력치만 그 레벨로 다시 계산하고 기술은 아는 그대로 둔다. 개체값·성격은
@@ -60,12 +60,7 @@ function fighter(mon, grown, level = null) {
   const p = profile.build(mon, grown);
   if (!p) return null;
   const s = SPECIES[p.dexId];
-  const ids = [
-    ...(s.moves || []).filter(([, lv]) => lv <= p.level).slice(-4).map(([id]) => id),
-    ...(mon.eggMoves || []),
-    ...(mon.tmMoves || []),
-  ];
-  const moves = [...new Set(ids)].filter((id) => MOVES[id]).map((id) => ({ id, ...MOVES[id] }));
+  const moves = profile.activeMoveIds(mon, grown).map((id) => ({ id, ...MOVES[id] }));
   const st = level
     ? profile.statsOf(p.dexId, level, mon.ivs, mon.nature)
     : Object.fromEntries(p.stats.map((x) => [x.key, x.value]));

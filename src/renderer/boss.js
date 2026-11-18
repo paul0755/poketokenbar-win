@@ -556,6 +556,7 @@
   function enter(scene, f, i) {
     if (scene.team[i]) return scene.team[i];
     const a = { el: actorEl("p:" + i, f.url, `${f.me ? "나" : f.owner} · ${f.name}`, f.me), hp: f.maxHp, max: f.maxHp };
+    if (f.mega && f.mega.pre) a.el.querySelector("img").classList.add("mega"); // 💎 마스터 — 메가인 채로(url 이 메가 그림)
     actors.set("p:" + i, a); // 끝나면 같이 치운다
     const slot = f.slot ?? i;
     // 그 자리에 쓰러져 있던 아이는 치운다

@@ -282,6 +282,26 @@ function renderHome(s) {
  * "얘를 띄우려면 어디로 가야 하지"를 매번 생각하게 된다.
  */
 let openProfile = null; // 펼쳐 둔 개체 id
+// 💿 기술 관리 — 펼쳐 둔 아이와 고르는 중인 기술(저장 전). 박스가 다시 그려져도 고르던 것이 남게 여기 둔다
+let moveDraft = null; // { id, ids: Set }
+// 💿 기술 관리 목록 정렬 — learn(배운 순) · power(위력 순) · type(타입별). first: 고른 것을 위로. 이 PC 에만 기억한다
+let moveSort = { by: "learn", first: false };
+try { Object.assign(moveSort, JSON.parse(localStorage.getItem("ptb.moveSort") || "{}")); } catch {}
+const saveMoveSort = () => { try { localStorage.setItem("ptb.moveSort", JSON.stringify(moveSort)); } catch {} };
+/** 정렬한 목록 — 배운 순은 메인이 준 그대로(레벨업은 배운 레벨 순, 기술머신은 가르친 순) */
+function sortPool(pool, picked) {
+  const pw = (x) => (x.power || 0) * ((x.accuracy || 100) / 100);
+  const by = {
+    learn: () => 0,
+    power: (a, b) => pw(b) - pw(a) || (a.damageClass === "status") - (b.damageClass === "status"),
+    type: (a, b) => String(a.type || "").localeCompare(String(b.type || ""), "ko") || pw(b) - pw(a),
+  }[moveSort.by] || (() => 0);
+  return pool
+    .map((x, i) => ({ x, i }))
+    .sort((a, b) => (moveSort.first ? picked.has(b.x.id) - picked.has(a.x.id) : 0) || by(a.x, b.x) || a.i - b.i)
+    .map((y) => y.x);
+}
+let forgetAsk = null; // 🗑 한 번 누른 "잊기" — { id, move }. 한 번 더 눌러야 잊는다(놓아주기와 같은 두 번 누르기)
 
 /*
  * 정렬 · 즐겨찾기만 보기. 고른 정렬은 이 PC 에 기억한다 — 못 읽으면 기본(받은 순).
@@ -344,7 +364,8 @@ function renderBox(s) {
         (m.boost > 0 ? '<span class="tag bo">2배</span>' : "") +
         (m.stone ? '<span class="tag st" title="변하지않는돌을 지니고 있다">🪨</span>' : "") +
         (m.shade ? '<span class="tag st" title="빛가림돌을 지니고 있다 — 졸업해도 원래 색">🌑</span>' : "") +
-        (m.mega && m.mega.id ? `<span class="tag st" title="${eul(m.mega.stone)} 지니고 있다${m.mega.ready ? " — 결투에서 " + m.mega.form + "(으)로 메가진화" : ""}">💎</span>` : "");
+        (m.profile && m.profile.moveNew ? `<span class="tag mvn" title="새로 배운 기술 ${m.profile.moveNew}개 — 상세 › 💿 기술 관리에서 넣는다">💿NEW</span>` : "") +
+        (m.mega && m.mega.id ? `<span class="tag st" title="${eul(m.mega.stone)} 지니고 있다${m.mega.perm ? " — 마스터라 늘 " + m.mega.form : m.mega.ready ? " — 결투에서 " + m.mega.form + "(으)로 메가진화" : ""}">💎</span>` : "");
       // 돌을 지녔으면 "진화까지 1" 이 영영 안 줄어든다 — 멈춰 있다고 말한다
       const goal = m.stone
         ? m.evolveTo ? `진화 멈춤 — 돌을 빼면 ${m.evolveTo}` : "변하지않는돌 — 진화 멈춤"
@@ -353,7 +374,7 @@ function renderBox(s) {
       const lv = p ? `Lv.${p.level} · ` : m.lv ? `Lv.${m.lv} · ` : ""; // 🦖 디지몬은 프로필 없이 레벨만
       return `
         <div class="bx ${m.active ? "act" : ""} ${m.fav ? "fv" : ""}" data-id="${m.id}">
-          <div class="pic"><button class="fav ${m.fav ? "on" : ""}" data-fav="${m.id}" title="${m.fav ? "즐겨찾기 풀기" : "즐겨찾기 — 위쪽에 모으고, 놓아주기 · 팔기를 막습니다"}">${m.fav ? "♥" : "♡"}</button>${m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50, m.single, m.egg)}</div>
+          <div class="pic"><button class="fav ${m.fav ? "on" : ""}" data-fav="${m.id}" title="${m.fav ? "즐겨찾기 풀기" : "즐겨찾기 — 위쪽에 모으고, 놓아주기 · 팔기를 막습니다"}">${m.fav ? "♥" : "♡"}</button>${m.mega && m.mega.perm && m.mega.petUrl ? `<img class="mega" src="${m.mega.petUrl}" alt="">` : m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50, m.single, m.egg)}</div>
           <div class="info" title="눌러서 상세 보기">
             <div class="nm">${m.name}${m.shiny ? " ★" : ""}${tags}</div>
             <div class="sub">${lv}${m.stars ? "★".repeat(m.stars) + " " : ""}${m.stage}${m.nature ? " · " + m.nature : ""}</div>
@@ -410,16 +431,44 @@ function profileHtml(p, m = {}, bag = [], stones = 0, shades = 0) {
           <span class="n">${m.name}</span>
           <span class="p">${m.power ? "위력 " + m.power : m.damageClass === "status" ? "변화" : "—"}</span>
         </div>`;
-  const moves = p.moves.length
-    ? p.moves.map(mvRow).join("")
+  // 💿 쓰는 기술 — 결투 · 펫이 쓰는 것(p.active). 패시브스킬은 아래에 따로, 늘 쓴다
+  const SRC = { level: "레벨", tm: "기술머신" };
+  const srcTag = (m) =>
+    (m.fresh ? '<span class="src new" title="기술을 고른 뒤에 새로 배웠다">NEW</span>' : "") +
+    (SRC[m.src] ? `<span class="src">${m.src === "level" && m.level ? "Lv." + m.level : SRC[m.src]}</span>` : "");
+  const mvRow2 = (m) => mvRow(m).replace('<span class="p">', srcTag(m) + '<span class="p">');
+  const using = (p.active || p.moves || []).filter((m) => m.src !== "egg");
+  const moves = using.length
+    ? using.map(mvRow2).join("")
     : '<div class="meta">아직 배운 기술이 없습니다.</div>';
-  // 레벨업 넷과 섞지 않는다. 어디서 배운 기술인지가 원작에서도 중요한 구분이다
-  // 원작의 알기술(eggMoves)이다. 화면에서는 "태어날 때부터 지닌 기술"이라는 뜻으로 패시브스킬이라 부른다
-  const eggMoves = (p.eggMoves || []).length ? `<h5>패시브스킬</h5>${p.eggMoves.map(mvRow).join("")}` : "";
-  const tmMoves = (p.tmMoves || []).length
-    ? `<h5>기술머신</h5>${p.tmMoves.map(mvRow).join("")}`
+  const pool = p.pool || [];
+  const idle = pool.filter((x) => !x.on).length;
+  const editing = moveDraft && moveDraft.id === m.id;
+  const moveHead = `<h5 class="mvh">기술 — 결투 · 펫이 쓰는 기술 · ${p.moveSet ? "고른 기술" : "자동"}${
+    pool.length ? ` <button class="mvedit${editing ? " on" : ""}" data-mvedit="${m.id}">${editing ? "닫기" : "💿 기술 관리"}</button>` : ""}</h5>`;
+  const idleNote = !editing && p.moveNew
+    ? `<div class="meta">🆕 고른 뒤에 새로 배운 기술 <b>${p.moveNew}개</b> — 쓰는 기술이 넷이라 아직 안 씁니다. 💿 기술 관리에서 바꿔 넣으세요.</div>`
+    : !editing && idle ? `<div class="meta">떠올릴 수 있지만 안 쓰는 기술 ${idle}개 — 💿 기술 관리에서 바꿉니다.</div>` : "";
+  // 고르기 — 떠올릴 수 있는 기술(지금까지 배운 레벨업 기술 · 기술머신) 가운데 넷까지
+  const editor = editing
+    ? `<div class="mvpick" data-id="${m.id}">
+        <div class="meta">결투 · 펫이 쓸 기술을 <b>${p.moveMax}개까지</b> 고르세요. 패시브스킬은 따로 늘 씁니다. 자동으로 두면 최근에 배운 레벨업 기술 넷과 기술머신을 모두 씁니다.</div>
+        <div class="mvsort">${[["learn", "배운 순"], ["power", "위력 순"], ["type", "타입별"]].map(([k, t]) =>
+          `<button data-mvsort="${k}" class="${moveSort.by === k ? "on" : ""}">${t}</button>`).join("")}<button data-mvfirst class="${moveSort.first ? "on" : ""}">고른 것 위로</button></div>
+        ${sortPool(pool, moveDraft.ids).map((x) => {
+          const ask = forgetAsk && forgetAsk.id === m.id && forgetAsk.move === x.id;
+          return `<div class="mvrow"><label class="mv pick ${moveDraft.ids.has(x.id) ? "on" : ""}"><input type="checkbox" data-mvpick="${x.id}" ${moveDraft.ids.has(x.id) ? "checked" : ""}>
+          <span class="ty t-${x.typeKey || "normal"}">${x.type || "?"}</span><span class="n">${x.name}</span>${srcTag(x)}<span class="p">${x.power ? "위력 " + x.power : x.damageClass === "status" ? "변화" : "—"}</span></label><button class="mvdel${ask ? " ask" : ""}" data-mvforget="${x.id}" title="${
+            x.src === "tm" ? "잊기 — 기술머신으로 다시 배울 수 있다" : "잊기 — 아래 되살리기로 돌아온다"}">${ask ? "잊기?" : "잊기"}</button></div>`;
+        }).join("")}
+        ${(p.forgot || []).length ? `<div class="meta mvgone">🗑 잊은 기술 — ${p.forgot.map((x) => x.name).join(" · ")} <button data-mvrestore="${m.id}">되살리기</button></div>` : ""}
+        <div class="feed"><button data-mvsave="${m.id}" ${moveDraft.ids.size ? "" : "disabled"}>고른 ${moveDraft.ids.size}/${p.moveMax}개로 쓰기</button><button data-mvauto="${m.id}">자동으로</button></div>
+      </div>`
     : "";
-  const tmLeft = p.tmLeft ? `<div class="meta">상점의 기술머신으로 ${p.tmLeft}개를 더 가르칠 수 있습니다.</div>` : "";
+  // 원작의 알기술(eggMoves)이다. 화면에서는 "태어날 때부터 지닌 기술"이라는 뜻으로 패시브스킬이라 부른다
+  const eggMoves = (p.eggMoves || []).length ? `<h5>패시브스킬 — 늘 쓴다</h5>${p.eggMoves.map(mvRow).join("")}` : "";
+  const tmMoves = "";
+  const tmLeft = p.tmLeft ? `<div class="meta">상점의 기술머신으로 ${p.tmLeft}개를 더 가르칠 수 있습니다 — 이 아이에게 어울리는 기술부터 배웁니다.</div>` : "";
 
   // 나무열매. 좋아하는/싫어하는 맛을 미리 보여 준다 — 원작에서는 몰라서 헤매는 부분이다
   const FL = { spicy: "매운맛", dry: "떫은맛", sweet: "단맛", bitter: "쓴맛", sour: "신맛" };
@@ -449,7 +498,11 @@ function profileHtml(p, m = {}, bag = [], stones = 0, shades = 0) {
         }</div><div class="feed"><button data-stone="${m.id}" data-item="shade">돌 빼기</button></div>`
       : m.mega && m.mega.id
         ? `<div class="meta">💎 <b>${m.mega.stone}</b>${eul(m.mega.stone).slice(m.mega.stone.length)} 지니고 있습니다. ${
-            m.mega.ready ? `결투에 나가면 ⚡ 메가 에너지 하나로 <b>${m.mega.form}</b>(으)로 메가진화합니다.` : `${m.mega.form.replace(/^메가|[XY]$/g, "")}(으)로 진화하면 메가진화할 수 있습니다.`
+            m.mega.perm
+              ? `마스터라 늘 <b>${m.mega.form}</b>(으)로 메가진화해 있습니다 — 결투 · 바탕화면 펫 모두. ⚡ 에너지를 쓰지 않습니다.`
+              : m.mega.ready
+                ? `결투에 나가면 ⚡ 메가 에너지 하나로 <b>${m.mega.form}</b>(으)로 메가진화합니다. 마스터가 되면 늘 메가진화해 있습니다.`
+                : `${m.mega.form.replace(/^메가|[XY]$/g, "")}(으)로 진화하면 메가진화할 수 있습니다.`
           }</div><div class="feed"><button data-stone="${m.id}" data-item="${m.mega.id}">돌 빼기</button></div>`
         : stones > 0 || canShade || (m.mega && m.mega.fits.length)
           ? `<div class="feed">${stones > 0 ? `<button data-stone="${m.id}">🪨 변하지않는돌 지니게 하기 (${stones}개)</button>` : ""}${
@@ -470,8 +523,10 @@ function profileHtml(p, m = {}, bag = [], stones = 0, shades = 0) {
       </div>
       <h5>능력치 — 개체값 합계 ${p.ivTotal}/${p.ivMax}</h5>
       ${stats}
-      <h5>기술</h5>
+      ${moveHead}
       ${moves}
+      ${idleNote}
+      ${editor}
       ${eggMoves}
       ${tmMoves}
       ${tmLeft}
@@ -505,6 +560,77 @@ $("boxList").addEventListener("click", async (e) => {
   if (fb) {
     const r = await window.ptb.feedBerry({ id: fb.dataset.id, key: fb.dataset.feed });
     toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
+    return;
+  }
+
+  // 💿 기술 관리
+  const me = e.target.closest("button[data-mvedit]");
+  if (me) {
+    const id = me.dataset.mvedit;
+    if (moveDraft && moveDraft.id === id) moveDraft = null;
+    else {
+      const row = lastStats && (lastStats.box || []).find((x) => x.id === id);
+      const p = row && row.profile;
+      // 고른 기술이 있으면 그것, 자동이면 지금 쓰는 레벨업 넷부터
+      const start = p ? (p.moveSet || (p.moves || []).map((x) => x.id)).slice(0, p.moveMax || 4) : [];
+      moveDraft = { id, ids: new Set(start) };
+    }
+    if (lastStats) renderBox(lastStats);
+    return;
+  }
+  // 정렬
+  const so = e.target.closest("button[data-mvsort], button[data-mvfirst]");
+  if (so) {
+    if (so.dataset.mvsort) moveSort.by = so.dataset.mvsort;
+    else moveSort.first = !moveSort.first;
+    saveMoveSort();
+    if (lastStats) renderBox(lastStats);
+    return;
+  }
+  // 🗑 기술 잊기 — 한 번 누르면 "잊기?", 한 번 더 누르면 잊는다
+  const mf = e.target.closest("button[data-mvforget]");
+  if (mf && moveDraft) {
+    const mid = Number(mf.dataset.mvforget);
+    if (!(forgetAsk && forgetAsk.id === moveDraft.id && forgetAsk.move === mid)) {
+      forgetAsk = { id: moveDraft.id, move: mid };
+      if (lastStats) renderBox(lastStats);
+      return;
+    }
+    forgetAsk = null;
+    const r = await window.ptb.forgetMove(moveDraft.id, mid);
+    toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
+    if (r.ok) moveDraft.ids.delete(mid);
+    if (lastStats) renderBox(lastStats);
+    return;
+  }
+  const mr = e.target.closest("button[data-mvrestore]");
+  if (mr) {
+    const r = await window.ptb.restoreMoves(mr.dataset.mvrestore);
+    toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
+    return;
+  }
+  const mp = e.target.closest("input[data-mvpick]");
+  if (mp && moveDraft) {
+    forgetAsk = null;
+    const mid = Number(mp.dataset.mvpick);
+    const row = lastStats && (lastStats.box || []).find((x) => x.id === moveDraft.id);
+    const max = (row && row.profile && row.profile.moveMax) || 4;
+    if (mp.checked && moveDraft.ids.size >= max) {
+      mp.checked = false;
+      toast(`기술은 ${max}개까지 고릅니다 — 하나를 먼저 빼 주세요`, "bad");
+      return;
+    }
+    if (mp.checked) moveDraft.ids.add(mid);
+    else moveDraft.ids.delete(mid);
+    if (lastStats) renderBox(lastStats);
+    return;
+  }
+  const ms = e.target.closest("button[data-mvsave], button[data-mvauto]");
+  if (ms) {
+    const id = ms.dataset.mvsave || ms.dataset.mvauto;
+    const r = await window.ptb.setMoves(id, ms.dataset.mvsave ? [...(moveDraft ? moveDraft.ids : [])] : null);
+    toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
+    if (r.ok) { moveDraft = null; if (lastStats) renderBox(lastStats); }
     return;
   }
 
@@ -783,7 +909,7 @@ window.ptb.onShop((s) => {
 function megaShop(s) {
   if (!s.mega) return "";
   const m = s.mega;
-  const head = `<div class="item-hd">💎 메가스톤 <span>⚡ 메가 에너지 ${m.energy}/${m.max} — 토큰 ${fmt(m.per)}마다 하나 · 메가진화 한 번에 하나${m.on ? "" : " · <b>지금 메가진화 꺼짐</b>(배틀 탭)"}</span></div>`;
+  const head = `<div class="item-hd">💎 메가스톤 <span>⚡ 메가 에너지 ${m.energy}/${m.max} — 토큰 ${fmt(m.per)}마다 하나 · 메가진화 한 번에 하나 · 마스터는 에너지 없이 늘 메가${m.on ? "" : " · <b>지금 메가진화 꺼짐</b>(배틀 탭)"}</span></div>`;
   if (!(s.stones || []).length) return head + '<div class="note">박스에 메가진화하는 포켓몬의 라인이 없습니다. 리자몽 · 갸라도스 · 망나뇽처럼 메가진화하는 아이를 데려오면 그 메가스톤이 여기에 나옵니다.</div>';
   return head + s.stones.map((it) => `<div class="item">
       <div class="ic">💎</div>

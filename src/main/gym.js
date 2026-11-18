@@ -59,6 +59,7 @@ function leaderMon(g, k) {
  * 마주쳤을 때만 맞받아 메가진화한다 — 메가를 안 쓰는 사람에게 챔피언이 갑자기 세지지 않게
  * (Lv.100 여섯 마리 시뮬레이션에서 에이스가 늘 메가진화하면 0.91 → 0.52 로 떨어졌다).
  * 돌려주는 megaUsed — 내 쪽이 새로 메가진화한 횟수(에너지를 그만큼 쓴다).
+ * mine[i].perm — 마스터라 늘 메가진화해 있다. 에너지 없이 메가인 채로 나온다(pre)
  */
 function challenge(mine, g, rng = Math.random, opts = {}) {
   const foe = g.team.map((_, k) => leaderMon(g, k));
@@ -70,7 +71,7 @@ function challenge(mine, g, rng = Math.random, opts = {}) {
   const budget = opts.budget || 0;
   const carry = (e) => ({ hp: e.hp / e.max, status: e.status });
   while (i < mine.length && j < foe.length) {
-    const spA = mine[i].mega ? (mA ? { form: mine[i].mega, pre: true } : used < budget ? { form: mine[i].mega } : null) : null;
+    const spA = mine[i].mega ? (mA || mine[i].perm ? { form: mine[i].mega, pre: true } : used < budget ? { form: mine[i].mega } : null) : null;
     const spB = foe[j].mega && (mB || spA) ? { form: foe[j].mega, pre: mB } : null;
     const r = battle.run(mine[i].mon, mine[i].grown, foe[j].mon, foe[j].grown, rng, { init: [stA, stB], mega: [spA, spB] });
     if (!r) return null;

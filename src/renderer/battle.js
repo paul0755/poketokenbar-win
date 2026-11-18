@@ -70,7 +70,7 @@
     const next = m.energy >= m.max ? "가득" : `다음까지 ${mfmt(m.per - m.acc)}`;
     const pet = m.pet > 0 ? ` · <span class="pet">🔥 펫 메가진화 ${Math.ceil(m.pet / 60000)}분</span>` : "";
     el.innerHTML = `<span class="lab">⚡ 메가 에너지</span><span class="pips">${pips}</span><span class="n">${m.energy}/${m.max} · ${next}${pet}</span>
-      <button id="megaOn" class="${m.on ? "on" : ""}" title="메가스톤을 지닌 아이가 결투에 나가면 에너지 하나로 메가진화합니다(친선 · 실시간 · 길드 결투는 에너지 없이)">${m.on ? "💎 메가진화 쓰기 켜짐" : "💎 메가진화 꺼짐"}</button>`;
+      <button id="megaOn" class="${m.on ? "on" : ""}" title="메가스톤을 지닌 아이가 결투에 나가면 에너지 하나로 메가진화합니다(친선 · 실시간 · 길드 결투는 에너지 없이). 마스터는 에너지 없이 늘 메가진화해 있습니다">${m.on ? "💎 메가진화 쓰기 켜짐" : "💎 메가진화 꺼짐"}</button>`;
     $("megaOn").onclick = async () => {
       const r = await window.ptb.megaToggle(!m.on);
       if (r && !r.ok && window.toast) window.toast(r.reason, "bad");
@@ -439,7 +439,7 @@
     box.querySelector(".st").textContent = AIL_SHORT[f.status] || "";
     // 상대 아이는 내 박스에 없다 — 메인이 그림 주소를 같이 준다
     setImg($("body" + k).querySelector("img"), i, f, m);
-    if (f.mega && f.mega.pre) setMega($("body" + k).querySelector("img"), i, f); // 체육관 — 메가인 채로 이어 나왔다
+    if (f.mega && f.mega.pre) setMega($("body" + k).querySelector("img"), i, f); // 체육관에서 이어 나왔거나 마스터 — 메가인 채로
     $("body" + k).className = "fbody";
     setHp(i, f.hp ?? f.maxHp, f.maxHp, true);
   }

@@ -203,6 +203,14 @@ function stageFor(total, lineIndex = null) {
 }
 
 /**
+ * 마스터(졸업)까지 컸나.
+ * 💎 마스터가 맞는 메가스톤을 지니면 늘 메가진화해 있다 — ⚡ 에너지 없이, 바탕화면 펫 · 박스 그림도 메가.
+ * 결투 · 레이드에는 메가인 채로 나온다(battle.run 의 pre — 컷인 · "반응했다" 없이. 판 결과는 pre 든 아니든 같다).
+ * mega.js · battle.js 는 친선 코드의 버전 지문(friend.js)에 들어가 있어 여기에 둔다
+ */
+const isMaster = (total, lineIndex = null) => stagesOf(lineIndex)[stageFor(total, lineIndex)].key === "master";
+
+/**
  * 변하지않는돌을 지니면 성장이 어디서 멈추나 — 다음에 "종이 바뀌는" 단계 바로 앞.
  *
  * 2단 진화 라인은 1차와 최종이 같은 종이라, 1차에서 최종으로 가는 건 진화가 아니다.
@@ -399,4 +407,4 @@ async function spriteWithFallback(mon, cacheDir, kind) {
  */
 const look = (m) => ({ shiny: Boolean(m && m.shiny), plain: Boolean(m && (m.plain || m.hold === "shade")) });
 
-module.exports = { look, STAGES, TWO_STAGE_MASTER, stagesOf, isTwoStage, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollWild, rollLegend, isSingle, shopPrice, rollShiny, rollNature, stageFor, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };
+module.exports = { look, STAGES, TWO_STAGE_MASTER, stagesOf, isTwoStage, LINES, NATURES, RARITY, SHINY_BASE, rarityOf, rollChance, roll, rollAtLeast, rollWild, rollLegend, isSingle, shopPrice, rollShiny, rollNature, stageFor, isMaster, stoneCap, progress, describe, evolutionTree, spritePath, spriteWithFallback };

@@ -105,11 +105,14 @@ function parseTeam(code) {
   }
   const [ver, , , , d] = arr || [];
   if (ver !== 1 || !Array.isArray(d)) return null;
-  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv, plain, stone] = d;
+  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv, plain, stone, moveSet, forgot] = d;
   const mon = { line, nature, shiny: Boolean(shiny), ivs, gender: GENDERS[g], ability, eggMoves, tmMoves };
   if (lv) mon.lvGrown = lv;
   if (plain === 1) mon.plain = true;
-  if (friend.validate(mon, grown)) return null;
+  if (Array.isArray(moveSet) && moveSet.length) mon.moveSet = moveSet; // 💿 고른 기술
+  if (Array.isArray(forgot) && forgot.length) mon.moveForgot = forgot; // 🗑 잊은 레벨업 기술
+  // 고른 기술 · 잊은 기술만 틀렸으면 그것만 버리고 자동으로
+  if (friend.validate(mon, grown)) { delete mon.moveSet; delete mon.moveForgot; if (friend.validate(mon, grown)) return null; }
   // 💎 지닌 메가스톤(0.16.0~ 의 코드) — 그 라인에 맞지 않으면 돌만 버린다(아이는 그대로 싸운다)
   if (stone && mega.isStone(stone) && poke.LINES[line] && mega.lineFits(poke.LINES[line].ids, stone)) mon.hold = stone;
   return { mon, grown };
@@ -348,12 +351,20 @@ function start(allies, boss, rng, opts = {}) {
   const alive = () => A.some((f) => f.hp > 0);
   say({ t: "info", who: null, text: `길드원 ${A.length}명의 포켓몬 VS ${nm("b")} Lv.${B.level}` });
 
-  /** 💎 아이 i 가 메가진화한다 — 그 종에 맞는 돌일 때. 내 아이는 에너지가 남았을 때만(megaUsed 가 쓴 만큼) */
+  /**
+   * 💎 아이 i 가 메가진화한다 — 그 종에 맞는 돌일 때. 내 아이는 에너지가 남았을 때만(megaUsed 가 쓴 만큼).
+   * 마스터는 늘 메가진화해 있다 — 에너지 없이, 사건 없이 메가인 채로 나온다(allies[i].mega.pre)
+   */
   let megaUsed = 0;
   const tryMega = (i, form) => {
     const f = A[i];
     const me = Boolean(team[i].a.me);
-    if (!form || form.dex !== f.dexId || (me && megaUsed >= (opts.megaBudget || 0))) return;
+    if (!form || form.dex !== f.dexId) return;
+    if (poke.isMaster(team[i].a.grown, team[i].a.mon.line)) {
+      if (mega.evolve(f, form)) f.megaPre = true;
+      return;
+    }
+    if (me && megaUsed >= (opts.megaBudget || 0)) return;
     const before = f.name;
     if (!mega.evolve(f, form)) return;
     if (me) megaUsed++;
@@ -451,7 +462,7 @@ function start(allies, boss, rng, opts = {}) {
     defeated: B.hp <= 0,
     dealt: B.hp <= 0 ? per(pool) : Math.max(0, per(pool - B.hp)),
     megaUsed,
-    allies: A.map((f, i) => ({ id: f.id, name: f.name, mega: f.mega ? { key: f.mega, id: f.megaId } : null, owner: team[i].a.owner || "", member: team[i].a.member || null, me: Boolean(team[i].a.me), slot: team[i].slot, dexId: f.dexId, shiny: f.shiny, level: f.level, maxHp: f.maxHp, hp: f.maxHp, dealt: per(dealtBy[i]), left: A[i].hp })),
+    allies: A.map((f, i) => ({ id: f.id, name: f.name, mega: f.mega ? { key: f.mega, id: f.megaId, pre: Boolean(f.megaPre) } : null, owner: team[i].a.owner || "", member: team[i].a.member || null, me: Boolean(team[i].a.me), slot: team[i].slot, dexId: f.dexId, shiny: f.shiny, level: f.level, maxHp: f.maxHp, hp: f.maxHp, dealt: per(dealtBy[i]), left: A[i].hp })),
     boss: { id: B.id, name: B.name, dexId: B.dexId, level: B.level, bar, hp: pool, max: pool },
   });
 

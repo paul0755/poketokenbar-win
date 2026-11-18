@@ -26,6 +26,7 @@ const poke = require("./world").pack; // 🌏 지금 세계의 종 데이터(포
 
 const SPECIES = require("./species.json");
 const mega = require("./mega");
+const profile = require("./profile");
 
 const PREFIX = "PTB1";
 const GENDERS = ["무성", "수컷", "암컷"];
@@ -78,6 +79,8 @@ function encode(mon, grown, trainer) {
         lvOf(mon, grown), // 변하지않는돌을 지녀 모습이 멈춘 아이의 레벨용 성장량. 아니면 0
         plainOf(mon), // 빛가림돌 — 마스터여도 원래 색. 옛 앱은 이 칸을 모르고 넘어간다(이로치로 보인다)
         megaOf(mon), // 💎 지닌 메가스톤(mega-charizard-x). 없으면 0 — 친선 결투는 에너지 없이 메가진화한다
+        moveSetOf(mon, grown), // 💿 기술 관리에서 고른 기술(넷까지). 없으면 0 — 자동(레벨업 넷 + 기술머신 전부)
+        forgotOf(mon, grown), // 🗑 잊은 레벨업 기술. 없으면 0 — 자동일 때 그 기술을 빼고 넷을 센다
       ],
     ]),
   ).toString("base64url");
@@ -159,10 +162,12 @@ function decode(code) {
   if (data !== dataVersion()) {
     return { error: "앱 버전이 달라 같은 결투가 나오지 않습니다. 둘 다 최신 버전으로 맞춰 주세요.", versionMismatch: true };
   }
-  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv, plain, stone] = d;
+  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, lv, plain, stone, moveSet, forgot] = d;
   const mon = { line, nature, shiny: Boolean(shiny), ivs, gender: GENDERS[g], ability, eggMoves, tmMoves };
   if (lv) mon.lvGrown = lv;
   if (plain === 1) mon.plain = true;
+  if (moveSet) mon.moveSet = moveSet; // 💿 고른 기술(validate 가 거른다)
+  if (forgot) mon.moveForgot = forgot; // 🗑 잊은 레벨업 기술
   const why = validate(mon, grown);
   if (why) return { error: "말이 안 되는 값이 들어 있습니다 — " + why };
   if (stone && !(mega.isStone(stone) && mega.lineFits(poke.LINES[line].ids, stone))) return { error: "말이 안 되는 값이 들어 있습니다 — 메가스톤" };
@@ -172,6 +177,11 @@ function decode(code) {
 
 /** 지닐 수 있는 도구 — 교환 코드에는 이 순서 + 1 로 싣는다(0 은 없음) */
 const HOLDS = ["everstone", "shade"];
+/** 💿 친선 코드에 싣는 고른 기술 — 지금 쓸 수 있는 것만. 없으면 0 */
+const moveSetOf = (mon, grown) => profile.cleanMoveSet(mon, grown) || 0;
+/** 🗑 친선 코드에 싣는 잊은 레벨업 기술. 없으면 0 */
+const forgotOf = (mon, grown) => { const f = profile.cleanForgot(mon, grown); return f.length ? f : 0; };
+
 /** 💎 친선 코드에 싣는 메가스톤 — 그 라인에 맞는 돌만. 메가진화를 꺼 두었으면(megaOff) 싣지 않는다 */
 const megaOf = (mon) => (!mon.megaOff && mega.isStone(mon.hold) && poke.LINES[mon.line] && mega.lineFits(poke.LINES[mon.line].ids, mon.hold) ? mon.hold : 0);
 /** 빛가림돌을 지녀 마스터가 돼도 빛나지 않는 아이인가 */
@@ -202,6 +212,16 @@ function validate(mon, grown) {
   // 기술머신은 라인의 어느 모습에서 배웠든 된다 — 진화 전에 배운 기술을 들고 간다
   const tm = new Set(L.ids.filter(Boolean).flatMap((id) => (SPECIES[id] || {}).tm || []));
   if (!Array.isArray(mon.tmMoves) || mon.tmMoves.length > 100 || !mon.tmMoves.every((id) => tm.has(id))) return "기술머신";
+  // 🗑 잊은 기술 — 그 아이가 배웠던 레벨업 기술만
+  if (mon.moveForgot != null) {
+    const lv = profile.levelPool(mon, grown);
+    if (!Array.isArray(mon.moveForgot) || mon.moveForgot.length > 200 || !mon.moveForgot.every((id) => lv.has(id))) return "잊은 기술";
+  }
+  // 💿 고른 기술 — 그 아이가 떠올릴 수 있는 기술(레벨업 · 기술머신) 가운데 넷까지
+  if (mon.moveSet != null) {
+    const pool = new Set(profile.movePool(mon, grown).map((x) => x.id));
+    if (!Array.isArray(mon.moveSet) || mon.moveSet.length > profile.MOVE_SET_MAX || !mon.moveSet.every((id) => pool.has(id))) return "기술";
+  }
   return null;
 }
 
