@@ -285,9 +285,12 @@ function showQuiet() {
   const on = $("quietOn").checked;
   $("quietFrom").disabled = $("quietTo").disabled = !on;
   const f = Number($("quietFrom").value), t = Number($("quietTo").value);
-  // 같은 시각을 고르면 비어 있는 구간이다 — 켰는데 아무 일도 없으면 고장처럼 보이니 말해 준다
-  $("quietNote").textContent = on && f === t
-    ? "시작과 끝이 같으면 방해 금지가 적용되지 않습니다. 시간을 다르게 골라 주세요."
+  // 같은 시각을 고르면 비어 있는 구간이다 — 켰는데 아무 일도 없으면 고장처럼 보이니 말해 준다(눈에 띄게 — warn)
+  const empty = on && f === t;
+  $("quietNote").classList.toggle("warn", empty);
+  $("quietFrom").classList.toggle("bad", empty); $("quietTo").classList.toggle("bad", empty);
+  $("quietNote").textContent = empty
+    ? "⚠️ 시작과 끝이 같으면 방해 금지가 적용되지 않습니다. 시간을 다르게 골라 주세요."
     : `회의·발표 중에 튀어나오면 곤란할 때. 자정을 넘겨도 됩니다(예: 오후 10시 ~ 오전 8시). "지금 불러오기"처럼 직접 부르는 건 막지 않습니다.`;
 }
 const sendQuiet = () => {
@@ -312,11 +315,19 @@ function showBurn() {
   const b = burnValue();
   for (const id of ["burnMult", "burnWeekdays", "burnS0", "burnS1"]) $(id).disabled = !b.enabled;
   for (const i of [0, 1]) $("burnF" + i).disabled = $("burnT" + i).disabled = !b.enabled || !b.spans[i].on;
-  const empty = b.spans.some((s) => s.on && s.from === s.to);
+  /*
+   * 시작과 끝이 같은 구간(예: 오전 12시 ~ 자정)은 빈 구간이라 버닝이 아니다(burning.js inSpan).
+   * "하루 종일"로 알고 고르기 쉬워서 — 처음엔 회색 작은 글씨로만 말해 아무도 못 봤다 — 어느 구간인지 짚고,
+   * 그 시각 칸을 빨갛게, 문구를 주황으로 띄우고, 하루 종일 쓰는 법을 같이 알려 준다
+   */
+  const bad = b.spans.map((s, i) => b.enabled && s.on && s.from === s.to ? ["코어 타임", "야근 시간"][i] : null);
+  for (const i of [0, 1]) { $("burnF" + i).classList.toggle("bad", !!bad[i]); $("burnT" + i).classList.toggle("bad", !!bad[i]); }
+  const empty = bad.some(Boolean);
+  $("burnNote").classList.toggle("warn", empty);
   $("burnNote").textContent = !b.enabled
     ? "정해 둔 시간에 쓴 토큰은 성장을 몇 배로 쳐 줍니다. 꺼져 있습니다."
     : empty
-      ? "시작과 끝이 같은 구간은 적용되지 않습니다. 시간을 다르게 골라 주세요."
+      ? `⚠️ ${bad.filter(Boolean).join(" · ")}: 시작과 끝이 같아 이 구간은 버닝타임이 아닙니다. 하루 종일로 하려면 두 구간을 오전 12시 ~ 오후 12시 · 오후 12시 ~ 자정처럼 나눠 주세요.`
       : `이 시간에 쓴 토큰은 키우는 아이가 ${b.mult}배로 자랍니다. 기록마다 쓴 시각을 보고 나눠서, 앱을 꺼 둔 동안 쓴 것도 제 시간대대로 칩니다. 자정을 넘겨도 됩니다. 나무열매(2배)와 겹치면 더해집니다(${b.mult + 1}배). 사탕은 그대로입니다.`;
 }
 const sendBurn = () => {
