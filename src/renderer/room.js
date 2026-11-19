@@ -476,32 +476,86 @@
     btn(135, 47, 3, 4);
   }
 
-  function drawDexFrame(g, dg) {
+  /** 🦖 디지털 월드의 도감 자리 — 금테 안의 디지바이스(도트). 포켓몬 방은 dexFrameSvg */
+  function drawDexFrame(g) {
     box(g, 100, 24, 32, 26, "#e2b93b", "#8a6a12", "#ffe28a", "#b8901e");
     R(g, 103, 27, 26, 20, "#fffaf0");
-    if (dg) return void drawDigivice(g);
-    oval(g, 116, 33, 4, 4, "#e53935", -4, -1); oval(g, 116, 33, 4, 4, "#fafafa", 0, 4);
-    R(g, 112, 33, 9, 1, "#222"); R(g, 115, 32, 3, 3, "#222"); R(g, 116, 33, 1, 1, "#fff");
-  }
-
-  // 1·10·30·100승마다 배지가 하나씩 빛난다
-  const BADGE_AT = [1, 10, 30, 100];
-  function drawBadges(g, wins) {
-    box(g, 138, 28, 46, 22, "#2b1d19", "#1a110e", "#4e342e");
-    const lit = BADGE_AT.filter((n) => wins >= n).length;
-    const cols = [["#b0bec5", "#eceff1"], ["#ffca28", "#fff3c4"], ["#4fc3f7", "#d6f2ff"], ["#ef5350", "#ffcdd2"]];
-    cols.forEach(([c, hi], i) => {
-      const bx = 142 + i * 10, by = 33;
-      if (i < lit) { oval(g, bx + 3, by + 4, 3, 4, c); R(g, bx + 2, by + 2, 1, 2, hi); }
-      else oval(g, bx + 3, by + 4, 3, 4, "#3a2a24");
-    });
+    drawDigivice(g);
   }
 
   /*
-   * 🏟️ 체육관 배지 진열장 — 결투 배지 진열장 아래, 포스터 앞까지(56 × 32).
+   * 🏅 결투 배지 진열장 — 1·10·30·100승마다 메달이 하나씩 걸린다(동 · 은 · 금 · 루비).
+   * 체육관 배지 진열장 바로 위, 같은 폭(56). 캔버스에는 상자 · 남색 벨벳 · 메달 거는 못만 그리고
+   * 메달은 SVG(duelMedal)로 위에 얹는다(render 의 rm-dub) — 10px 남짓한 도트로는 메달 모양이 안 나온다.
+   * 100승이면 테가 금빛이 된다
+   */
+  const BADGE_AT = [1, 10, 30, 100];
+  const DUB = { x: 136, y: 24, w: 56, h: 26 };
+  function drawBadges(g, wins) {
+    const { x, y, w, h } = DUB;
+    if (wins >= 100) box(g, x, y, w, h, "#16204a", "#7a5608", "#ffe07a", "#c49000"); // 금테
+    else box(g, x, y, w, h, "#16204a", "#1a110e", "#6d4c41", "#2b1d19");
+    R(g, x + 2, y + 2, w - 4, h - 4, "#1c2a5c"); // 벨벳
+    dither(g, x + 2, y + 2, w - 4, h - 4, "#18244f");
+    R(g, x + 2, y + 2, w - 4, 1, "#00000055"); // 위 그늘
+    for (let i = 0; i < 4; i++) {
+      const cx = x + 2 + 6 + i * 13; // 칸 가운데(칸 폭 13)
+      R(g, cx - 1, y + 3, 3, 2, "#c49000"); R(g, cx, y + 3, 1, 1, "#ffe07a"); // 메달 거는 못
+    }
+  }
+
+  // 메달 — [밝은 · 가운데 · 짙은 금속, 리본 바깥 · 리본 가운데 줄]
+  const MEDAL = [
+    { m: ["#ffd9b0", "#cd7f32", "#6e3f14"], rb: ["#2e7d32", "#81c784"] }, // 1승 동
+    { m: ["#ffffff", "#b8c4cc", "#5a6b75"], rb: ["#1565c0", "#90caf9"] }, // 10승 은
+    { m: ["#fff6c2", "#f5b800", "#8a5a00"], rb: ["#c62828", "#ffcdd2"] }, // 30승 금
+    { m: ["#ffd0d6", "#e0213f", "#6d0018"], rb: ["#6a1b9a", "#ffd54f"], rim: ["#fff6c2", "#f5b800", "#8a5a00"] }, // 100승 루비(금테 · 햇살)
+  ];
+  let medalUid = 0;
+  /** 결투 메달 SVG(26 × 40) — 리본에 매단 둥근 메달, 가운데 별. got 이 false 면 점선 자리만 */
+  function duelMedal(i, got) {
+    const RIB_L = "M5 0 H12 L15 19 H9 Z", RIB_R = "M14 0 H21 L17 19 H11 Z";
+    if (!got) {
+      const dash = `fill="rgba(140,150,190,.14)" stroke="rgba(170,180,210,.42)" stroke-width="1.1" stroke-dasharray="2.4 2"`;
+      return `<svg viewBox="0 0 26 40" aria-hidden="true"><path d="M8 1 L13 18 L18 1" fill="none" stroke="rgba(170,180,210,.3)" stroke-width="1.1" stroke-dasharray="2.4 2"/><circle cx="13" cy="28" r="9.5" ${dash}/></svg>`;
+    }
+    const t = MEDAL[i], rim = t.rim || t.m, g = "dm" + ++medalUid;
+    // 별 — 다섯 꼭짓점(바깥 4.6 · 안 2)
+    const star = Array.from({ length: 10 }, (_, k) => {
+      const r = k % 2 ? 2 : 4.6, a = (k / 10) * Math.PI * 2 - Math.PI / 2;
+      return `${(13 + Math.cos(a) * r).toFixed(2)} ${(28.2 + Math.sin(a) * r).toFixed(2)}`;
+    }).join(" L");
+    // 100승은 메달 뒤에 금빛 햇살(12갈래)
+    const rays = t.rim ? `<path d="${Array.from({ length: 24 }, (_, k) => {
+      const r = k % 2 ? 10 : 12, a = (k / 24) * Math.PI * 2;
+      return `${k ? "L" : "M"}${(13 + Math.cos(a) * r).toFixed(2)} ${(28 + Math.sin(a) * r).toFixed(2)}`;
+    }).join(" ")} Z" fill="url(#${g}r)" stroke="${rim[2]}" stroke-width=".6"/>` : "";
+    return `<svg viewBox="0 0 26 40" aria-hidden="true">
+      <defs>
+        <linearGradient id="${g}r" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".25" stop-color="${rim[0]}"/><stop offset=".62" stop-color="${rim[1]}"/><stop offset="1" stop-color="${rim[2]}"/></linearGradient>
+        <linearGradient id="${g}f" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${t.m[0]}"/><stop offset=".55" stop-color="${t.m[1]}"/><stop offset="1" stop-color="${t.m[2]}"/></linearGradient>
+        <radialGradient id="${g}h" cx="34%" cy="26%" r="45%"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".5" stop-color="#fff" stop-opacity=".2"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+        <clipPath id="${g}c"><circle cx="13" cy="28" r="9.5"/></clipPath>
+      </defs>
+      <path d="${RIB_L}" fill="${t.rb[0]}"/><path d="M7.6 0 H9.4 L12.1 19 H10.6 Z" fill="${t.rb[1]}"/>
+      <path d="${RIB_R}" fill="${t.rb[0]}" style="filter:brightness(.82)"/><path d="M16.6 0 H18.4 L15.4 19 H13.9 Z" fill="${t.rb[1]}" opacity=".85"/>
+      <rect x="9" y="17" width="8" height="3" rx="1" fill="${rim[2]}"/><rect x="9.5" y="17.4" width="7" height="1.2" rx=".6" fill="${rim[0]}" opacity=".8"/>
+      ${rays}
+      <circle cx="13" cy="30" r="9.5" fill="${rim[2]}"/>
+      <circle cx="13" cy="28" r="9.5" fill="url(#${g}r)" stroke="${rim[2]}" stroke-width=".8"/>
+      <circle cx="13" cy="28" r="7" fill="url(#${g}f)"/>
+      <circle cx="13" cy="28" r="7" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".8"/>
+      <path d="M${star} Z" transform="translate(0 .7)" fill="#000" opacity=".35"/>
+      <path d="M${star} Z" fill="${t.m[0]}" stroke="#fff" stroke-opacity=".7" stroke-width=".5" stroke-linejoin="round"/>
+      <g clip-path="url(#${g}c)"><ellipse cx="9" cy="23" rx="9" ry="6" fill="url(#${g}h)"/></g>
+    </svg>`;
+  }
+
+  /*
+   * 🏟️ 체육관 배지 진열장 — 결투 메달 진열장(DUB) 아래, 포스터 앞까지(56 × 32).
    * 캔버스에는 상자와 짙은 벨벳 · 배지 자리만 그린다. 배지는 체육관 탭과 같은 그림(gymart.js 의 SVG)을
    * 위에 얹는다(render 의 rm-gyb) — 도트로 줄여 찍으면 배지 모양이 뭉개진다.
-   * 챔피언이 된 적이 있으면 상자 테가 금빛이 된다(위는 결투 배지 진열장이 붙어 있어 트로피 자리가 없다).
+   * 챔피언이 된 적이 있으면 상자 테가 금빛이 된다(위는 결투 메달 진열장이 붙어 있어 트로피 자리가 없다).
    */
   const GYB = { x: 136, y: 56, w: 56, h: 32 };
   const GYM_IDS = ["sprout", "wave", "ember", "spark", "omen", "lantern", "bedrock", "scale"];
@@ -519,50 +573,320 @@
     }
   }
 
-  /** 길드 주간 1위 메달 액자 — 몇 번 했는지는 글자로 얹는다 */
-  function drawMedal(g) {
-    box(g, 100, 56, 32, 30, "#2a3a7a", "#3e2723", "#6d4c41", "#4e342e");
-    R(g, 103, 59, 26, 24, "#2f3f86"); dither(g, 103, 59, 26, 24, "#26357a");
-    R(g, 110, 60, 4, 9, "#e53935"); R(g, 118, 60, 4, 9, "#1e88e5"); // 리본
-    R(g, 112, 66, 8, 3, "#c62828");
-    oval(g, 116, 73, 6, 6, "#c49000"); oval(g, 116, 73, 5, 5, "#ffd54f"); oval(g, 116, 73, 2, 2, "#fff3b0");
-    R(g, 114, 72, 4, 1, "#c49000");
+  /* ================= 벽 장식 SVG =================
+     도감 액자 · 주간 1위 메달 액자 · 졸업 트로피 선반 · 포스터는 결투 메달 · 체육관 배지처럼 입체 SVG 로 그려
+     캔버스 위에 얹는다(render 의 rm-wl). viewBox 가 그림 좌표 그대로라 숫자는 캔버스 좌표에서 x, y 를 뺀 값이다.
+     디지털 월드의 디지바이스 · 간판은 도트 그대로 */
+  let wallUid = 0;
+  const GOLD = (id, dir = 'x1="0" y1="0" x2="1" y2="1"') => `<linearGradient id="${id}" ${dir}><stop offset="0" stop-color="#fff6c2"/><stop offset=".3" stop-color="#ffd54f"/><stop offset=".7" stop-color="#c49000"/><stop offset="1" stop-color="#8a5a00"/></linearGradient>`;
+  const wallSvg = (x, y, w, h, body) => `<div class="rm-wl" style="left:${X(x)}%; top:${Y(y)}%; width:${X(w)}%; height:${Y(h)}%;"><svg viewBox="0 0 ${w} ${h}" aria-hidden="true">${body}</svg></div>`;
+
+  /** 🖼️ 도감 액자(100, 24, 32 × 26) — 금테 · 크림색 대지 · 몬스터볼. 숫자는 글자로 얹는다(116, 41) */
+  function dexFrameSvg() {
+    const p = "wf" + ++wallUid;
+    return wallSvg(100, 24, 32, 26, `<defs>${GOLD(p + "g")}
+      <linearGradient id="${p}m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffdf6"/><stop offset="1" stop-color="#f1e4c4"/></linearGradient>
+      <linearGradient id="${p}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8a80"/><stop offset=".45" stop-color="#e53935"/><stop offset="1" stop-color="#a31515"/></linearGradient>
+      <linearGradient id="${p}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cfd6de"/></linearGradient></defs>
+      <rect x=".3" y=".3" width="31.4" height="25.4" rx="1.2" fill="url(#${p}g)" stroke="#7a5608" stroke-width=".6"/>
+      <rect x="1.5" y="1.5" width="29" height="23" rx=".6" fill="none" stroke="#fff3b0" stroke-opacity=".75" stroke-width=".45"/>
+      <rect x="2.7" y="2.7" width="26.6" height="20.6" fill="#7a5608"/>
+      <rect x="3.1" y="3.1" width="25.8" height="19.8" fill="url(#${p}m)"/>
+      <rect x="3.1" y="3.1" width="25.8" height="1" fill="#000" opacity=".12"/>
+      ${[[1.4, 1.4], [30.6, 1.4], [1.4, 24.6], [30.6, 24.6]].map(([cx, cy]) => `<circle cx="${cx}" cy="${cy}" r=".7" fill="#fff6c2" stroke="#8a5a00" stroke-width=".25"/>`).join("")}
+      <ellipse cx="16.4" cy="14.6" rx="3.8" ry=".7" fill="#000" opacity=".14"/>
+      <path d="M11.4 9.4 A4.6 4.6 0 0 1 20.6 9.4 Z" fill="url(#${p}r)"/>
+      <path d="M11.4 9.4 A4.6 4.6 0 0 0 20.6 9.4 Z" fill="url(#${p}w)"/>
+      <rect x="11.4" y="8.8" width="9.2" height="1.2" fill="#263238"/>
+      <circle cx="16" cy="9.4" r="4.6" fill="none" stroke="#263238" stroke-width=".7"/>
+      <circle cx="16" cy="9.4" r="1.7" fill="#263238"/><circle cx="16" cy="9.4" r="1.15" fill="#fafafa"/><circle cx="16" cy="9.4" r=".55" fill="#fff" stroke="#b0bec5" stroke-width=".2"/>
+      <ellipse cx="13.9" cy="7" rx="1.5" ry=".75" fill="#fff" opacity=".7" transform="rotate(-30 13.9 7)"/>`);
   }
 
-  function drawPoster(g) {
-    const x = 196, y = 18, w = 26, h = 36;
-    R(g, x, y, w, h, "#fff3e0"); R(g, x, y + h - 1, w, 1, "#d7c4a8");
-    R(g, x + 2, y + 2, w - 4, 20, "#8fd3ff");
-    for (let i = 0; i < 12; i++) R(g, x + 4 + i, y + 21 - i, 1, i + 1, i < 4 ? "#ffffff" : "#5b8a6b"); // 왼쪽 산
-    for (let i = 0; i < 9; i++) R(g, x + 22 - i, y + 21 - i, 1, i + 1, "#4a7a5b"); // 오른쪽 산
-    oval(g, x + 19, y + 7, 2, 2, "#ffd54f");
-    R(g, x + 4, y + 26, w - 8, 2, "#8d6e63"); R(g, x + 6, y + 30, w - 12, 1, "#bcaaa4");
-    R(g, x - 1, y - 1, 5, 3, "#fff59d88"); R(g, x + w - 4, y - 1, 5, 3, "#fff59d88"); // 테이프
+  /**
+   * 🏅 길드 주간 1위 메달 액자(100, 56, 32 × 30) — 호두나무 테 · 남색 벨벳 · 월계관 두른 금메달.
+   * 아래 남색 띠(87 ~ 95)에 1위 한 번마다 금빛 사선 줄(호봉 줄)이 하나씩 쌓이고, 다섯 줄이 모이면 별 하나가 된다.
+   * 12번이면 ★★ + 줄 둘. 별은 다섯(25번)까지, 그 위는 별 옆에 작은 + 가 붙는다
+   */
+  function weekMedalSvg(count) {
+    const p = "ww" + ++wallUid;
+    const leaves = [];
+    // 월계관 — 메달(16, 19) 둘레 반지름 7.4, 아래(90°)에서 양옆으로 올라간다. 잎은 둘레를 따라 눕는다
+    for (let k = 0; k < 6; k++) {
+      for (const deg of [112 + k * 22, 68 - k * 22]) {
+        const a = (deg * Math.PI) / 180, x = (16 + Math.cos(a) * 7.4).toFixed(2), y = (19 + Math.sin(a) * 7.4).toFixed(2);
+        leaves.push(`<ellipse cx="${x}" cy="${y}" rx="1.3" ry=".55" fill="${k % 2 ? "#43a047" : "#7cc47f"}" transform="rotate(${deg + 90} ${x} ${y})"/>`);
+      }
+    }
+    // 호봉 띠 — 별(5번마다) 다음 사선 줄(나머지). 가운데 맞춤
+    const stars = Math.min(5, Math.floor(count / 5)), lines = count >= 30 ? 0 : count % 5, more = count >= 30;
+    const SW = 3.8, LW = 1.9, GAP = stars && lines ? 1 : 0;
+    const width = stars * SW + lines * LW + (lines ? 1.1 : 0) + GAP + (more ? 2.4 : 0);
+    let bx = 16 - width / 2;
+    const marks = [];
+    const starPath = (cx, cy, R, r) => Array.from({ length: 10 }, (_, k) => { const a = (k / 10) * Math.PI * 2 - Math.PI / 2, rr = k % 2 ? r : R; return `${k ? "L" : "M"}${(cx + Math.cos(a) * rr).toFixed(2)} ${(cy + Math.sin(a) * rr).toFixed(2)}`; }).join(" ") + " Z";
+    for (let i = 0; i < stars; i++, bx += SW) marks.push(`<path d="${starPath(bx + SW / 2, 35.1, 1.8, .78)}" fill="url(#${p}g)" stroke="#8a5a00" stroke-width=".25"/>`);
+    bx += GAP;
+    for (let i = 0; i < lines; i++, bx += LW) marks.push(`<path d="M${bx.toFixed(2)} 37.6 H${(bx + 1.1).toFixed(2)} L${(bx + 2.2).toFixed(2)} 32.6 H${(bx + 1.1).toFixed(2)} Z" fill="url(#${p}g)" stroke="#8a5a00" stroke-width=".2"/>`);
+    if (more) marks.push(`<path d="M${(bx + 1.2).toFixed(2)} 33.9 V36.3 M${(bx + .1).toFixed(2)} 35.1 H${(bx + 2.3).toFixed(2)}" stroke="#ffd54f" stroke-width=".7"/>`);
+    const band = `<rect x="2" y="31.2" width="28" height="7.6" rx="1" fill="#1c275e" stroke="#0f163a" stroke-width=".4"/>
+      <rect x="2.6" y="31.8" width="26.8" height="6.4" rx=".6" fill="none" stroke="#c49000" stroke-width=".35"/>
+      <rect x="2.6" y="31.8" width="26.8" height="1" fill="#fff" opacity=".08"/>${marks.join("")}`;
+    return wallSvg(100, 56, 32, 40, `<defs>${GOLD(p + "g")}${GOLD(p + "f", 'x1="1" y1="1" x2="0" y2="0"')}
+      <linearGradient id="${p}w" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8d6e63"/><stop offset=".5" stop-color="#5d4037"/><stop offset="1" stop-color="#3e2723"/></linearGradient>
+      <radialGradient id="${p}v" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#3a4ea6"/><stop offset="1" stop-color="#1c275e"/></radialGradient></defs>
+      <rect x=".3" y=".3" width="31.4" height="29.4" rx="1" fill="url(#${p}w)" stroke="#2b1b17" stroke-width=".6"/>
+      <rect x="1.4" y="1.4" width="29.2" height="27.2" fill="none" stroke="#a1887f" stroke-opacity=".6" stroke-width=".4"/>
+      <rect x="2.6" y="2.6" width="26.8" height="24.8" fill="url(#${p}v)"/>
+      <rect x="2.6" y="2.6" width="26.8" height="1" fill="#000" opacity=".25"/>
+      <path d="M10.6 2.6 H14.6 L17.2 13.5 H13.2 Z" fill="#e53935"/><path d="M12 2.6 H13.2 L15.8 13.5 H14.6 Z" fill="#ffcdd2" opacity=".8"/>
+      <path d="M17.4 2.6 H21.4 L18.8 13.5 H14.8 Z" fill="#1e88e5"/><path d="M18.8 2.6 H20 L17.4 13.5 H16.2 Z" fill="#bbdefb" opacity=".8"/>
+      ${leaves.join("")}
+      <circle cx="16" cy="20.2" r="6" fill="#6d4800"/>
+      <circle cx="16" cy="19" r="6" fill="url(#${p}g)" stroke="#8a5a00" stroke-width=".5"/>
+      <circle cx="16" cy="19" r="4.4" fill="url(#${p}f)"/>
+      <text x="16" y="21.6" text-anchor="middle" font-size="7" font-weight="900" font-family="Arial, sans-serif" fill="#7a4a00">1</text>
+      <text x="15.7" y="21.3" text-anchor="middle" font-size="7" font-weight="900" font-family="Arial, sans-serif" fill="#fff6c2">1</text>
+      <ellipse cx="13.8" cy="16.4" rx="2.4" ry="1.3" fill="#fff" opacity=".45" transform="rotate(-30 13.8 16.4)"/>
+      ${band}`);
   }
 
-  function drawTrophies(g, count) {
-    R(g, 232, 58, 76, 4, "#6d4c41"); R(g, 232, 58, 76, 1, "#8d6e63"); R(g, 240, 62, 3, 4, "#4e342e"); R(g, 296, 62, 3, 4, "#4e342e");
+  /** 🏆 졸업 트로피 선반(230, 30, 80 × 36) — 금 트로피 셋까지(첫 것이 가장 크다) · 상장. 상장 위 글자는 따로(292, 44) */
+  function trophySvg(count) {
+    const p = "wt" + ++wallUid;
+    const cup = (cx, k) => `<g transform="translate(${cx} 28) scale(${k}) translate(${-cx} -28)">
+        <rect x="${cx - 4.6}" y="23.4" width="9.2" height="4.6" rx=".5" fill="url(#${p}b)" stroke="#3e2723" stroke-width=".35"/>
+        <rect x="${cx - 2.6}" y="24.9" width="5.2" height="1.6" rx=".3" fill="url(#${p}g)"/>
+        <path d="M${cx - 2.2} 23.4 L${cx - 1} 19.6 H${cx + 1} L${cx + 2.2} 23.4 Z" fill="url(#${p}g)" stroke="#8a5a00" stroke-width=".3"/>
+        <ellipse cx="${cx}" cy="19.4" rx="1.8" ry=".8" fill="url(#${p}g)" stroke="#8a5a00" stroke-width=".3"/>
+        <path d="M${cx - 4.5} 9.6 C${cx - 8.4} 9.4 ${cx - 8.2} 14.8 ${cx - 3.2} 15.2 M${cx + 4.5} 9.6 C${cx + 8.4} 9.4 ${cx + 8.2} 14.8 ${cx + 3.2} 15.2" fill="none" stroke="#c49000" stroke-width="1.1"/>
+        <path d="M${cx - 5.2} 8 H${cx + 5.2} C${cx + 5.2} 14.2 ${cx + 2.6} 18.2 ${cx} 18.6 C${cx - 2.6} 18.2 ${cx - 5.2} 14.2 ${cx - 5.2} 8 Z" fill="url(#${p}c)" stroke="#8a5a00" stroke-width=".4"/>
+        <ellipse cx="${cx}" cy="8" rx="5.2" ry="1.1" fill="#ffe082" stroke="#8a5a00" stroke-width=".35"/>
+        <ellipse cx="${cx}" cy="8.1" rx="4.2" ry=".65" fill="#a87400"/>
+        <path d="M${cx - 3.4} 9.6 C${cx - 3.4} 13 ${cx - 2.2} 15.4 ${cx - 1} 16.4" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width=".8" stroke-linecap="round"/>
+        <path d="M${cx} 10.4 L${cx + .75} 12 L${cx + 2.4} 12.2 L${cx + 1.15} 13.3 L${cx + 1.5} 15 L${cx} 14.1 L${cx - 1.5} 15 L${cx - 1.15} 13.3 L${cx - 2.4} 12.2 L${cx - .75} 12 Z" fill="#fff6c2" stroke="#a87400" stroke-width=".25"/>
+      </g>`;
     const n = Math.min(3, count);
-    for (let i = 0; i < n; i++) {
-      const x = 236 + i * 14, s = i === 0 ? 0 : 2; // 첫 트로피가 가장 크다
-      R(g, x + s, 38 + s, 10 - s * 2, 8 - s, "#ffd54f"); R(g, x + s, 38 + s, 10 - s * 2, 1, "#fff3b0");
-      R(g, x - 2 + s, 39 + s, 2, 3, "#c49000"); R(g, x + 10 - s, 39 + s, 2, 3, "#c49000");
-      R(g, x + 4, 46, 2, 6, "#c49000"); R(g, x + 1, 52, 8, 6, "#8d6e63"); R(g, x + 1, 52, 8, 1, "#a1887f");
-    }
-    box(g, 280, 34, 24, 24, "#eceff1", "#78909c", "#ffffff"); // 상장
-    R(g, 284, 38, 16, 1, "#b0bec5");
+    const cups = Array.from({ length: n }, (_, i) => cup(11 + i * 14, i === 0 ? 1 : 0.82)).join("");
+    return wallSvg(230, 30, 80, 36, `<defs>${GOLD(p + "g")}
+      <linearGradient id="${p}c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c49000"/><stop offset=".22" stop-color="#fff3b0"/><stop offset=".45" stop-color="#ffd54f"/><stop offset=".8" stop-color="#c49000"/><stop offset="1" stop-color="#ffd54f"/></linearGradient>
+      <linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6d4c41"/><stop offset="1" stop-color="#3e2723"/></linearGradient>
+      <linearGradient id="${p}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b08066"/><stop offset=".35" stop-color="#8d6e63"/><stop offset="1" stop-color="#5d4037"/></linearGradient></defs>
+      <path d="M10 31.4 H13 L11.5 36 H10 Z M66 31.4 H69 V36 H67.5 Z" fill="#4e342e"/>
+      <rect x="2" y="28" width="76" height="3.6" rx=".6" fill="url(#${p}s)" stroke="#3e2723" stroke-width=".35"/>
+      <rect x="2.4" y="28.3" width="75.2" height=".6" fill="#d7b49e" opacity=".7"/>
+      <rect x="51" y="5" width="24" height="24" fill="#000" opacity=".18"/>
+      <rect x="50" y="4" width="24" height="24" fill="#fdfaf2" stroke="#9e8a6a" stroke-width=".5"/>
+      <rect x="51.6" y="5.6" width="20.8" height="20.8" fill="none" stroke="#c9a227" stroke-width=".6"/>
+      <rect x="52.4" y="6.4" width="19.2" height="19.2" fill="none" stroke="#c9a227" stroke-width=".25"/>
+      <rect x="56" y="7.6" width="12" height="1.1" rx=".5" fill="#90a4ae"/>
+      <path d="M67.4 23.2 L66.2 27.4 L67.6 26.6 L68.4 27.8 L69 23.6 Z M70.2 23.2 L71.4 27.4 L70 26.6 L69.2 27.8 L68.6 23.6 Z" fill="#c62828"/>
+      <circle cx="68.8" cy="22.4" r="2.4" fill="#e53935" stroke="#8e0000" stroke-width=".35"/>
+      <circle cx="68.8" cy="22.4" r="1.3" fill="none" stroke="#ffcdd2" stroke-width=".35"/>
+      ${cups}`);
   }
 
-  function drawRug(g) {
-    oval(g, 160, 168, 66, 14, "#8e1f1f");
-    oval(g, 160, 168, 63, 12, "#d64545");
-    oval(g, 160, 168, 50, 9, "#c43a3a");
-    for (let i = 0; i < 360; i += 18) {
-      const a = (i * Math.PI) / 180;
-      R(g, Math.round(160 + Math.cos(a) * 56), Math.round(168 + Math.sin(a) * 10.5), 3, 1, "#ffcdd2");
-    }
-    oval(g, 160, 168, 20, 4, "#e05a5a");
+  /** 🖼️ 포스터(196, 18, 26 × 36) — 산 · 해 · 구름 · 새. 위 두 모서리에 테이프 */
+  function posterSvg() {
+    const p = "wp" + ++wallUid;
+    return wallSvg(196, 18, 26, 36, `<defs>
+      <linearGradient id="${p}k" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fb4f5"/><stop offset="1" stop-color="#d6f0ff"/></linearGradient>
+      <linearGradient id="${p}m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6aa985"/><stop offset="1" stop-color="#3f7356"/></linearGradient>
+      <linearGradient id="${p}n" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fb9c9"/><stop offset="1" stop-color="#6b93a6"/></linearGradient>
+      <radialGradient id="${p}s"><stop offset="0" stop-color="#fff59d"/><stop offset=".45" stop-color="#ffd54f"/><stop offset="1" stop-color="#ffd54f" stop-opacity="0"/></radialGradient>
+      <clipPath id="${p}c"><rect x="2" y="2" width="22" height="21"/></clipPath></defs>
+      <rect x=".8" y=".8" width="26" height="36" fill="#000" opacity=".15"/>
+      <rect x="0" y="0" width="26" height="36" fill="#fffaf0" stroke="#d7c4a8" stroke-width=".4"/>
+      <g clip-path="url(#${p}c)">
+        <rect x="2" y="2" width="22" height="21" fill="url(#${p}k)"/>
+        <circle cx="19" cy="7" r="4" fill="url(#${p}s)"/><circle cx="19" cy="7" r="1.8" fill="#fff59d"/>
+        <ellipse cx="7" cy="6.5" rx="3" ry="1.1" fill="#fff" opacity=".9"/><ellipse cx="8.6" cy="5.9" rx="1.8" ry="1" fill="#fff" opacity=".9"/>
+        <path d="M9 9 l1 .8 l1 -.8 M12.4 7.6 l.8 .6 l.8 -.6" fill="none" stroke="#37474f" stroke-width=".4" stroke-linecap="round"/>
+        <path d="M2 23 L2 17 L9 11 L13.5 15 L17 12.5 L24 18 V23 Z" fill="url(#${p}n)"/>
+        <path d="M2 23 V19.5 L7.5 13.5 L16 23 Z" fill="url(#${p}m)"/>
+        <path d="M5.6 15.6 L7.5 13.5 L9.6 15.8 L8.6 15.4 L7.6 16.4 L6.6 15.2 Z" fill="#fff"/>
+        <path d="M10 23 L18.5 15.5 L24 20.5 V23 Z" fill="#4a7a5b"/>
+        <rect x="2" y="21.6" width="22" height="1.4" fill="#7cb342"/>
+      </g>
+      <rect x="2" y="2" width="22" height="21" fill="none" stroke="#bfae92" stroke-width=".4"/>
+      <rect x="5" y="25.6" width="16" height="2" rx=".6" fill="#8d6e63"/>
+      <rect x="7" y="29.4" width="12" height=".9" rx=".4" fill="#bcaaa4"/><rect x="8.5" y="31.6" width="9" height=".8" rx=".4" fill="#d7ccc8"/>
+      <rect x="-1.4" y="-1" width="6.4" height="2.8" fill="#fff59d" opacity=".7" transform="rotate(-14 1.8 .4)"/>
+      <rect x="21" y="-1" width="6.4" height="2.8" fill="#fff59d" opacity=".7" transform="rotate(14 24.2 .4)"/>`);
   }
+
+  /** 🪟 창틀 · 커튼(18, 18, 80 × 62) — 하늘은 캔버스가 그 안(29, 27, 58 × 44)에 그린다(theme · 시간대마다 달라서) */
+  function windowSvg() {
+    const p = "wn" + ++wallUid;
+    const curtain = (x, flip) => {
+      const folds = [1.6, 3.6, 5.6].map((f) => `<path d="M${x + f} 3 C${x + f + (flip ? -.4 : .4)} 20 ${x + f + (flip ? .6 : -.6)} 40 ${x + f + (flip ? -.8 : .8)} 57" fill="none" stroke="#a63d3d" stroke-opacity=".55" stroke-width=".7"/>`).join("");
+      return `<path d="M${x} 2.6 H${x + 8} C${x + 8} 22 ${x + (flip ? 8.6 : 7.4)} 42 ${x + (flip ? 9.6 : 8.6)} 57.4 H${x + (flip ? -1.6 : -.6)} C${x + (flip ? 1 : -1)} 42 ${x} 22 ${x} 2.6 Z" fill="url(#${p}c)" stroke="#8e2f2f" stroke-width=".4"/>${folds}
+        <path d="M${x - .4} 34 Q${x + 4} 36.2 ${x + 8.4} 34 V36 Q${x + 4} 38.2 ${x - .4} 36 Z" fill="#ffd54f" stroke="#a87400" stroke-width=".3"/>`;
+    };
+    return wallSvg(18, 18, 80, 62, `<defs>
+      <linearGradient id="${p}w" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b07a4a"/><stop offset=".5" stop-color="#7a4e2a"/><stop offset="1" stop-color="#5a3518"/></linearGradient>
+      <linearGradient id="${p}c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c85656"/><stop offset=".35" stop-color="#ef7d7d"/><stop offset=".7" stop-color="#d96a6a"/><stop offset="1" stop-color="#b94f4f"/></linearGradient>
+      <linearGradient id="${p}g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".4" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+      <path d="M8 6 H72 V56 H8 Z M11 9 V53 H69 V9 Z" fill="url(#${p}w)" fill-rule="evenodd" stroke="#3e2410" stroke-width=".5"/>
+      <rect x="11" y="9" width="58" height="44" fill="url(#${p}g)"/>
+      <path d="M14 30 L30 12 M18 34 L36 13" stroke="#fff" stroke-opacity=".25" stroke-width="1.6"/>
+      <rect x="11" y="9" width="58" height="1" fill="#000" opacity=".2"/>
+      <rect x="39" y="9" width="2" height="44" fill="#f1e7d6" stroke="#bfae92" stroke-width=".3"/><rect x="11" y="30" width="58" height="2" fill="#f1e7d6" stroke="#bfae92" stroke-width=".3"/>
+      ${curtain(5, false)}${curtain(67, true)}
+      <rect x="2" y="1" width="76" height="2.6" rx="1.3" fill="#5e3a1d"/><rect x="2" y="1.2" width="76" height=".7" rx=".35" fill="#a8743f"/>
+      <circle cx="2" cy="2.3" r="2" fill="#c49000"/><circle cx="78" cy="2.3" r="2" fill="#c49000"/><circle cx="1.4" cy="1.7" r=".6" fill="#fff3b0"/><circle cx="77.4" cy="1.7" r=".6" fill="#fff3b0"/>
+      <rect x="4" y="56" width="72" height="4" rx=".6" fill="url(#${p}w)" stroke="#3e2410" stroke-width=".4"/><rect x="4.4" y="56.3" width="71.2" height=".8" fill="#c99566"/>
+      <rect x="6" y="60" width="68" height="1.2" fill="#000" opacity=".15"/>`);
+  }
+
+  /** 러그(92, 152, 136 × 32) — 바닥에 깔린 타원 무늬 양탄자, 양 끝에 술 */
+  function rugSvg() {
+    const p = "rg" + ++wallUid;
+    const dots = [];
+    for (let i = 0; i < 360; i += 15) {
+      const a = (i * Math.PI) / 180, x = 68 + Math.cos(a) * 56, y = 16 + Math.sin(a) * 10.4;
+      dots.push(`<path d="M${(x - 1.6).toFixed(2)} ${y.toFixed(2)} L${x.toFixed(2)} ${(y - .7).toFixed(2)} L${(x + 1.6).toFixed(2)} ${y.toFixed(2)} L${x.toFixed(2)} ${(y + .7).toFixed(2)} Z" fill="#ffe0b2"/>`);
+    }
+    const fringe = [-1, 1].map((s) => Array.from({ length: 7 }, (_, k) => `<path d="M${68 + s * 65.4} ${10.6 + k * 1.8} h${s * 2.6}" stroke="#f3e5c0" stroke-width=".6"/>`).join("")).join("");
+    return `<div class="rm-wl rug" style="left:${X(92)}%; top:${Y(152)}%; width:${X(136)}%; height:${Y(32)}%;"><svg viewBox="0 0 136 32" aria-hidden="true"><defs>
+      <radialGradient id="${p}a" cx="50%" cy="45%" r="55%"><stop offset="0" stop-color="#ef6b6b"/><stop offset=".7" stop-color="#d64545"/><stop offset="1" stop-color="#b03030"/></radialGradient>
+      <radialGradient id="${p}b" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ffb74d"/><stop offset="1" stop-color="#e0605a"/></radialGradient></defs>
+      ${fringe}
+      <ellipse cx="68" cy="17" rx="66" ry="14" fill="#000" opacity=".18"/>
+      <ellipse cx="68" cy="16" rx="66" ry="14" fill="#7a1a1a"/>
+      <ellipse cx="68" cy="16" rx="63.5" ry="12.4" fill="url(#${p}a)"/>
+      <ellipse cx="68" cy="16" rx="60" ry="11.2" fill="none" stroke="#ffcdd2" stroke-opacity=".6" stroke-width=".5" stroke-dasharray="2 1.4"/>
+      ${dots.join("")}
+      <ellipse cx="68" cy="16" rx="50" ry="8.8" fill="#c43a3a" stroke="#8e1f1f" stroke-width=".5"/>
+      <ellipse cx="68" cy="16" rx="21" ry="4.4" fill="url(#${p}b)" stroke="#8e1f1f" stroke-width=".4"/>
+      <path d="M55 16 L68 13 L81 16 L68 19 Z" fill="#fff3e0" opacity=".75"/>
+      <circle cx="68" cy="16" r="1.4" fill="#8e1f1f"/>
+      <path d="M30 16 L36 14 L42 16 L36 18 Z M94 16 L100 14 L106 16 L100 18 Z" fill="#ffcc80" opacity=".8"/>
+    </svg></div>`;
+  }
+
+  /* ================= 바닥 가구 SVG — 자리 · 크기(w, h)는 FURN 그대로. p 는 그라데이션 id 앞머리 ================= */
+  const WOOD = (id, a = "#c08955", b = "#9c6b3f", c = "#6e4524") => `<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset=".55" stop-color="${b}"/><stop offset="1" stop-color="${c}"/></linearGradient>`;
+  const FURN_SVG = {
+    lamp: (p) => `<defs>
+      <linearGradient id="${p}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e8a94a"/><stop offset=".35" stop-color="#fff3d6"/><stop offset=".7" stop-color="#ffd28a"/><stop offset="1" stop-color="#d9913a"/></linearGradient>
+      <linearGradient id="${p}p" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8d6e63"/><stop offset=".5" stop-color="#c49a7a"/><stop offset="1" stop-color="#4e342e"/></linearGradient>
+      <radialGradient id="${p}g" cx="50%" cy="100%" r="70%"><stop offset="0" stop-color="#fff8e1"/><stop offset="1" stop-color="#fff8e1" stop-opacity="0"/></radialGradient></defs>
+      <rect x="8" y="13" width="2" height="43.5" fill="url(#${p}p)"/>
+      <circle cx="9" cy="35" r="1.1" fill="#c49000"/>
+      <path d="M4.2 .6 H13.8 L17.2 13.4 H.8 Z" fill="url(#${p}s)" stroke="#b8741f" stroke-width=".5" stroke-linejoin="round"/>
+      <path d="M6.6 .8 L5.4 13.2 M9 .8 V13.2 M11.4 .8 L12.6 13.2" stroke="#e0a050" stroke-opacity=".5" stroke-width=".4"/>
+      <ellipse cx="9" cy="13.2" rx="7.6" ry="2.4" fill="url(#${p}g)"/>
+      <rect x=".6" y="12.8" width="16.8" height="1.4" rx=".7" fill="#b8741f"/><rect x="4" y=".2" width="10" height=".9" rx=".45" fill="#b8741f"/>
+      <path d="M4.6 56.4 H13.4 L15.4 59.2 H2.6 Z" fill="#6d4c41" stroke="#3b2621" stroke-width=".35"/>
+      <rect x="1.6" y="59" width="14.8" height="2.8" rx="1.1" fill="#3b2621"/><rect x="2.4" y="59.2" width="13.2" height=".7" rx=".35" fill="#6d4c41"/>`,
+    bed: (p) => `<defs>${WOOD(p + "w")}
+      <linearGradient id="${p}m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dcdcdc"/></linearGradient>
+      <linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fb2f6"/><stop offset=".5" stop-color="#5b8def"/><stop offset="1" stop-color="#3a68c8"/></linearGradient></defs>
+      <ellipse cx="35" cy="35.4" rx="34" ry="1.2" fill="#000" opacity=".2"/>
+      <rect x="8.6" y="31" width="3.2" height="4.8" fill="#5e3a1d"/><rect x="57.6" y="31" width="3.2" height="4.8" fill="#5e3a1d"/>
+      <rect x="6" y="25.6" width="58" height="6" rx="1" fill="url(#${p}w)" stroke="#5e3a1d" stroke-width=".5"/>
+      <rect x="6.4" y="26" width="57.2" height=".8" fill="#d9a46c" opacity=".7"/>
+      <rect x="7" y="16" width="56" height="11" rx="2" fill="url(#${p}m)" stroke="#9e9e9e" stroke-width=".45"/>
+      <rect x="9" y="10.6" width="14.4" height="8.6" rx="3.4" fill="url(#${p}m)" stroke="#bdbdbd" stroke-width=".45"/>
+      <path d="M12 14.6 Q16 13.4 20.4 14.8" fill="none" stroke="#d6d6d6" stroke-width=".5"/>
+      <path d="M24 13 H61.4 Q63.4 13 63.4 15 V28.4 Q63.4 29.6 62 29.6 H24 Z" fill="url(#${p}b)" stroke="#2f5bb5" stroke-width=".5"/>
+      ${[32, 40, 48, 56].map((x) => `<path d="M${x} 13.6 V29" stroke="#3f6fd0" stroke-width=".55" stroke-dasharray="1.2 .8"/>`).join("")}
+      <path d="M24 21 H63" stroke="#3f6fd0" stroke-width=".5" stroke-dasharray="1.2 .8"/>
+      <path d="M24 13 H28.4 V29.6 H24 Z" fill="#f4f4f4" stroke="#bdbdbd" stroke-width=".4"/>
+      <path d="M28 14.4 Q40 13.6 61 14.6" stroke="#fff" stroke-opacity=".45" stroke-width=".8" fill="none"/>
+      <path d="M0 36 V3.4 Q0 .2 4 .2 Q8 .2 8 3.4 V36 Z" fill="url(#${p}w)" stroke="#5e3a1d" stroke-width=".5"/>
+      <rect x="1.8" y="5" width="4.4" height="20" rx="1" fill="none" stroke="#6e4524" stroke-opacity=".6" stroke-width=".5"/>
+      <path d="M62 36 V15 Q62 12 66 12 Q70 12 70 15 V36 Z" fill="url(#${p}w)" stroke="#5e3a1d" stroke-width=".5"/>
+      <circle cx="4" cy="2.4" r=".9" fill="#d9a46c"/><circle cx="66" cy="14.2" r=".9" fill="#d9a46c"/>`,
+    aquarium: (p) => `<defs>${WOOD(p + "w", "#a1887f", "#8d6e63", "#5d4037")}
+      <linearGradient id="${p}a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b6ecff"/><stop offset=".25" stop-color="#5cc0ea"/><stop offset="1" stop-color="#1f7fb0"/></linearGradient>
+      <linearGradient id="${p}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2dea6"/><stop offset="1" stop-color="#c9ad6a"/></linearGradient></defs>
+      <ellipse cx="19" cy="35.4" rx="18" ry="1" fill="#000" opacity=".2"/>
+      <rect x="2" y="26" width="34" height="10" rx=".8" fill="url(#${p}w)" stroke="#4e342e" stroke-width=".45"/>
+      <rect x="4.4" y="28.2" width="13.6" height="6" rx=".5" fill="none" stroke="#4e342e" stroke-opacity=".6" stroke-width=".4"/><rect x="20" y="28.2" width="13.6" height="6" rx=".5" fill="none" stroke="#4e342e" stroke-opacity=".6" stroke-width=".4"/>
+      <circle cx="16.4" cy="31.2" r=".55" fill="#ffd54f"/><circle cx="21.6" cy="31.2" r=".55" fill="#ffd54f"/>
+      <rect x=".3" y=".3" width="37.4" height="26.4" rx="1" fill="url(#${p}a)" stroke="#2b4f66" stroke-width=".6"/>
+      <path d="M1 20.6 Q10 19.4 19 20.8 T37 20.4 V26 H1 Z" fill="url(#${p}s)"/>
+      ${[[5, 10, 1], [8.2, 7, -1], [30, 12, 1], [33.4, 8, -1]].map(([x, h, s]) => `<path d="M${x} 21 C${x + s * 1.6} ${21 - h / 3} ${x - s * 1.6} ${21 - h * 2 / 3} ${x + s * .6} ${21 - h}" fill="none" stroke="#3e9a4a" stroke-width="1.1" stroke-linecap="round"/>`).join("")}
+      <ellipse cx="20" cy="22" rx="3.4" ry="2" fill="#9e9e9e"/><ellipse cx="19.2" cy="21.3" rx="1.6" ry=".7" fill="#d6d6d6"/>
+      <circle cx="26" cy="15" r=".7" fill="none" stroke="#e1f5fe" stroke-width=".35"/><circle cx="26.8" cy="10.6" r=".5" fill="none" stroke="#e1f5fe" stroke-width=".35"/><circle cx="25.6" cy="7" r=".9" fill="none" stroke="#e1f5fe" stroke-width=".35"/>
+      <rect x="1" y="3.4" width="36" height="1" fill="#e1f5fe" opacity=".75"/>
+      <path d="M4 26 L14 1 H18 L8 26 Z" fill="#fff" opacity=".13"/>
+      <rect x="0" y="0" width="38" height="2.6" rx=".8" fill="#2b4f66"/><rect x=".6" y=".4" width="36.8" height=".6" fill="#5b88a3"/>`,
+    tv: (p) => `<defs>
+      <linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#52525e"/><stop offset=".15" stop-color="#34343e"/><stop offset="1" stop-color="#1b1b22"/></linearGradient>
+      <linearGradient id="${p}k" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5ab8f0"/><stop offset="1" stop-color="#c4ecff"/></linearGradient>
+      <linearGradient id="${p}h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fe08f"/><stop offset="1" stop-color="#43a047"/></linearGradient>
+      <clipPath id="${p}c"><rect x="5" y="3" width="30" height="20" rx="1.6"/></clipPath></defs>
+      <ellipse cx="20" cy="37.4" rx="17" ry="1" fill="#000" opacity=".22"/>
+      <rect x="4" y="28" width="32" height="10" rx="1" fill="url(#${p}b)" stroke="#111116" stroke-width=".5"/>
+      <rect x="14" y="30" width="12" height="5" rx=".8" fill="#e8e8e8" stroke="#757575" stroke-width=".4"/><rect x="15" y="31.6" width="7" height="1.4" rx=".4" fill="#9e9e9e"/><circle cx="23.6" cy="32.3" r=".6" fill="#e53935"/>
+      <rect x="2" y="0" width="36" height="28" rx="2.4" fill="url(#${p}b)" stroke="#111116" stroke-width=".5"/>
+      <rect x="4.4" y="2.4" width="31.2" height="21.2" rx="2" fill="#0d0d12"/>
+      <g clip-path="url(#${p}c)">
+        <rect x="5" y="3" width="30" height="20" fill="url(#${p}k)"/>
+        <circle cx="28" cy="8" r="2.6" fill="#ffe082"/><circle cx="28" cy="8" r="4" fill="#ffe082" opacity=".25"/>
+        <path d="M5 16 Q14 13.4 22 15.4 T35 14.6 V23 H5 Z" fill="url(#${p}h)"/>
+        <path d="M10.4 13 A3.2 3.2 0 0 1 16.8 13 Z" fill="#e53935"/><path d="M10.4 13 A3.2 3.2 0 0 0 16.8 13 Z" fill="#fafafa"/>
+        <rect x="10.4" y="12.6" width="6.4" height=".8" fill="#222"/><circle cx="13.6" cy="13" r="1" fill="#222"/><circle cx="13.6" cy="13" r=".55" fill="#fff"/>
+        <path d="M5 3 L19 3 L9 23 H5 Z" fill="#fff" opacity=".12"/>
+      </g>
+      ${[25, 26.2].map((y) => `<rect x="7" y="${y}" width="8" height=".5" rx=".25" fill="#55555f"/><rect x="25" y="${y}" width="8" height=".5" rx=".25" fill="#55555f"/>`).join("")}
+      <circle cx="20" cy="25.6" r=".8" fill="#ff5252"/><circle cx="20" cy="25.6" r="1.6" fill="#ff5252" opacity=".3"/>`,
+    desk: (p) => `<defs>${WOOD(p + "w")}
+      <linearGradient id="${p}m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f7f8"/><stop offset="1" stop-color="#b0bec5"/></linearGradient>
+      <linearGradient id="${p}s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#26325a"/><stop offset="1" stop-color="#121a33"/></linearGradient></defs>
+      <ellipse cx="28" cy="39.4" rx="27" ry="1" fill="#000" opacity=".2"/>
+      <rect x="2" y="22" width="3.2" height="18" fill="#7a5030"/><rect x="50.8" y="22" width="3.2" height="18" fill="#7a5030"/>
+      <rect x="33" y="22.6" width="18" height="10.4" rx=".6" fill="url(#${p}w)" stroke="#5e3a1d" stroke-width=".45"/>
+      <rect x="39.6" y="26.8" width="4.8" height="1.2" rx=".6" fill="#e0c08a" stroke="#8a5a32" stroke-width=".25"/>
+      <rect x="0" y="18" width="56" height="5" rx=".8" fill="url(#${p}w)" stroke="#5e3a1d" stroke-width=".45"/><rect x=".4" y="18.3" width="55.2" height=".8" fill="#e0b07a" opacity=".8"/>
+      <rect x="17.6" y="15.4" width="4.8" height="2.8" fill="#78909c"/>
+      <rect x="6" y="0" width="28" height="16" rx="1.4" fill="url(#${p}m)" stroke="#455a64" stroke-width=".45"/>
+      <rect x="7.8" y="1.8" width="24.4" height="11.6" rx=".8" fill="url(#${p}s)"/>
+      ${[["#7ee787", 3], ["#79c0ff", 6], ["#ffa657", 4], ["#d2a8ff", 7], ["#7ee787", 5]].map(([c, w], i) => `<rect x="${10 + (i % 2) * 2}" y="${3 + i * 2}" width="${w}" height=".9" rx=".45" fill="${c}"/><rect x="${11 + (i % 2) * 2 + w}" y="${3 + i * 2}" width="${3 + ((i * 5) % 6)}" height=".9" rx=".45" fill="#8b949e"/>`).join("")}
+      <path d="M8 2 L17 2 L10.6 13.4 H8 Z" fill="#fff" opacity=".07"/>
+      <rect x="9" y="16" width="22" height="2.2" rx=".6" fill="#eceff1" stroke="#90a4ae" stroke-width=".35"/>
+      ${Array.from({ length: 9 }, (_, i) => `<rect x="${10 + i * 2.3}" y="16.6" width="1.6" height=".9" rx=".2" fill="#cfd8dc"/>`).join("")}
+      <path d="M46 12.4 C49 12.4 49 16.6 46 16.6" fill="none" stroke="#bdbdbd" stroke-width=".9"/>
+      <path d="M40 11 H46 V17 Q46 18 45 18 H41 Q40 18 40 17 Z" fill="#fafafa" stroke="#9e9e9e" stroke-width=".4"/><rect x="40.3" y="12.6" width="5.4" height="1.2" fill="#e57373"/>
+      <path d="M42 9.6 C41 8.4 43 7.6 42 6.2 M44.2 9.4 C43.2 8.2 45.2 7.4 44.2 6" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width=".45" stroke-linecap="round"/>`,
+    shelf: (p) => `<defs>${WOOD(p + "w", "#8d6e63", "#5d4037", "#2a1a16")}
+      <linearGradient id="${p}i" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2e1d18"/><stop offset=".25" stop-color="#4e342e"/><stop offset="1" stop-color="#5d4037"/></linearGradient>
+      <linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c49a7a"/><stop offset="1" stop-color="#8d6e63"/></linearGradient></defs>
+      <rect x=".3" y=".3" width="37.4" height="63.4" rx="1.2" fill="url(#${p}w)" stroke="#1e120e" stroke-width=".5"/>
+      <rect x="3" y="3" width="32" height="58" fill="url(#${p}i)"/>
+      ${[3, 24, 45].map((y) => `<rect x="3" y="${y}" width="32" height="1.6" fill="#000" opacity=".25"/>`).join("")}
+      <rect x="3" y="21" width="32" height="3" fill="url(#${p}b)"/><rect x="3" y="42" width="32" height="3" fill="url(#${p}b)"/>
+      ${[[10, 12, "#eeeeee"], [20, 12, "#ef9a9a"], [30, 12, "#90caf9"], [10, 33, "#a5d6a7"], [20, 33, "#ce93d8"]].map(([cx, cy, c]) => `<ellipse cx="${cx}" cy="${cy + 8.2}" rx="4" ry=".6" fill="#000" opacity=".3"/>
+        <circle cx="${cx}" cy="${cy + 2}" r="4.6" fill="${c}" stroke="#000" stroke-opacity=".3" stroke-width=".4"/>
+        <circle cx="${cx}" cy="${cy + 2}" r="2.8" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width=".4"/>
+        <circle cx="${cx}" cy="${cy + 2}" r="1.1" fill="#4e342e"/><circle cx="${cx}" cy="${cy + 2}" r=".45" fill="#2a1a16"/>
+        <path d="M${cx - 3} ${cy - .2} A3.6 3.6 0 0 1 ${cx} ${cy - 1.6}" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width=".7" stroke-linecap="round"/>`).join("")}
+      ${[["#ffcc80", 3, 14], ["#80cbc4", 4, 12], ["#ef9a9a", 3, 15], ["#9fa8da", 4, 13], ["#fff59d", 3, 11]].reduce((a, [c, w, h]) => { a.s += `<rect x="${a.x}" y="${61 - h}" width="${w}" height="${h}" rx=".4" fill="${c}" stroke="#000" stroke-opacity=".3" stroke-width=".3"/><rect x="${a.x}" y="${61 - h + 2}" width="${w}" height=".8" fill="#000" opacity=".2"/><rect x="${a.x}" y="${61 - h}" width=".6" height="${h}" fill="#fff" opacity=".35"/>`; a.x += w + 1; return a; }, { x: 6, s: "" }).s}
+      <path d="M27 61 L33.6 49.6 L35 50.4 L28.6 61 Z" fill="#ffab91" stroke="#000" stroke-opacity=".3" stroke-width=".3"/>`,
+    plant: (p) => `<defs>
+      <linearGradient id="${p}t" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e07a45"/><stop offset=".4" stop-color="#f09a68"/><stop offset="1" stop-color="#a84418"/></linearGradient>
+      <radialGradient id="${p}l" cx="35%" cy="35%" r="70%"><stop offset="0" stop-color="#9ccc65"/><stop offset="1" stop-color="#4f8a2b"/></radialGradient></defs>
+      <ellipse cx="12" cy="41.4" rx="8" ry=".8" fill="#000" opacity=".22"/>
+      <path d="M4 30.6 H20 L18 41.6 Q17.8 42 17.2 42 H6.8 Q6.2 42 6 41.6 Z" fill="url(#${p}t)" stroke="#8e3a14" stroke-width=".45"/>
+      <rect x="2.6" y="26" width="18.8" height="5" rx="1" fill="url(#${p}t)" stroke="#8e3a14" stroke-width=".45"/>
+      <ellipse cx="12" cy="26.4" rx="8.4" ry="1.1" fill="#5d4037"/>
+      <path d="M12 26.4 C11.4 20 12.8 14 12 8" fill="none" stroke="#4f8a2b" stroke-width="1.6" stroke-linecap="round"/>
+      ${[[6, 16, -20, 5.4], [18, 13, 20, 5.4], [7, 22, -10, 4.4], [17, 21, 14, 4.4]].map(([x, y, r, w]) => `<g transform="rotate(${r} ${x} ${y})"><ellipse cx="${x}" cy="${y}" rx="${w}" ry="2.2" fill="url(#${p}l)" stroke="#3b6b20" stroke-width=".35"/><path d="M${x - w + .8} ${y} H${x + w - .8}" stroke="#d4e8b8" stroke-opacity=".7" stroke-width=".4"/></g>`).join("")}
+      ${[[7, 6, "#e53935"], [17, 4, "#1e88e5"], [12, 2.4, "#fdd835"]].map(([x, y, c]) => `<circle cx="${x}" cy="${y}" r="2.8" fill="${c}" stroke="#000" stroke-opacity=".25" stroke-width=".35"/><circle cx="${x - .9}" cy="${y - .9}" r=".9" fill="#fff" opacity=".75"/>`).join("")}`,
+    cushion: (p) => `<defs>
+      <radialGradient id="${p}r" cx="40%" cy="20%" r="80%"><stop offset="0" stop-color="#ff8a80"/><stop offset=".5" stop-color="#e53935"/><stop offset="1" stop-color="#a31515"/></radialGradient>
+      <radialGradient id="${p}w" cx="40%" cy="10%" r="90%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cfd6de"/></radialGradient>
+      <clipPath id="${p}c"><ellipse cx="14" cy="10" rx="13.4" ry="7.6"/></clipPath></defs>
+      <ellipse cx="14" cy="16" rx="13" ry="1.8" fill="#000" opacity=".22"/>
+      <g clip-path="url(#${p}c)"><rect x="0" y="0" width="28" height="10" fill="url(#${p}r)"/><rect x="0" y="10" width="28" height="9" fill="url(#${p}w)"/><rect x="0" y="9.1" width="28" height="1.8" fill="#212121"/></g>
+      <ellipse cx="14" cy="10" rx="13.4" ry="7.6" fill="none" stroke="#212121" stroke-width=".6"/>
+      <circle cx="14" cy="10" r="3" fill="#212121"/><circle cx="14" cy="10" r="2" fill="#fafafa"/><circle cx="14" cy="10" r="1" fill="#fff" stroke="#bdbdbd" stroke-width=".25"/>
+      <ellipse cx="9" cy="5" rx="3.4" ry="1.2" fill="#fff" opacity=".45" transform="rotate(-12 9 5)"/>
+      ${[[1.4, 10], [26.6, 10], [14, 2.4], [14, 17.6]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".7" fill="#212121"/>`).join("")}`,
+  };
 
   /* ================= 바닥 가구 (하나씩 따로 그린다) ================= */
 
@@ -901,6 +1225,184 @@
   };
   const COIN_ORDER = ["statue", "fireplace", "healer", "arcade", "jukebox", "masterball", "beanbag", "pond", "clock", "neon"];
 
+  /* ================= 코인 가구 SVG — 포켓몬 방. 크기(w, h)는 COIN 그대로 =================
+     움직임은 CSS(room.css 의 cf-*)가 맡는다 — 불꽃 · 음표 · 불빛 · 화면 · 잉어킹. 0.25초 타이머는
+     시계 바늘 · 석상 그림만 고친다(COIN_TICK). 🦖 디지털 월드는 도트 캔버스(COIN.draw) 그대로 */
+  const star5 = (cx, cy, R, r) => Array.from({ length: 10 }, (_, k) => { const a = (k / 10) * Math.PI * 2 - Math.PI / 2, rr = k % 2 ? r : R; return `${k ? "L" : "M"}${(cx + Math.cos(a) * rr).toFixed(2)} ${(cy + Math.sin(a) * rr).toFixed(2)}`; }).join(" ") + " Z";
+  const note = (x, y, c, cls) => `<g class="${cls}"><path d="M${x} ${y} V${y - 6} L${x + 3.4} ${y - 7.2} V${y - 1.4}" fill="none" stroke="${c}" stroke-width=".8"/><ellipse cx="${x - 1}" cy="${y}" rx="1.3" ry="1" fill="${c}"/><ellipse cx="${x + 2.4}" cy="${y - 1.2}" rx="1.3" ry="1" fill="${c}"/></g>`;
+  const COIN_SVG = {
+    clock: (p) => `<defs>
+      <radialGradient id="${p}r" cx="35%" cy="25%" r="80%"><stop offset="0" stop-color="#ff8a80"/><stop offset=".5" stop-color="#e53935"/><stop offset="1" stop-color="#a31515"/></radialGradient>
+      <linearGradient id="${p}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cfd6de"/></linearGradient>
+      <radialGradient id="${p}f" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#fffdf6"/><stop offset="1" stop-color="#efe6d2"/></radialGradient>
+      <clipPath id="${p}c"><circle cx="13" cy="13" r="12"/></clipPath></defs>
+      <circle cx="13.6" cy="13.8" r="12.4" fill="#000" opacity=".2"/>
+      <g clip-path="url(#${p}c)"><rect width="26" height="13" fill="url(#${p}r)"/><rect y="13" width="26" height="13" fill="url(#${p}w)"/><rect y="11.8" width="26" height="2.4" fill="#2a2020"/></g>
+      <circle cx="13" cy="13" r="12" fill="none" stroke="#2a2020" stroke-width=".9"/>
+      <circle cx="13" cy="13" r="8.4" fill="#2a2020"/><circle cx="13" cy="13" r="7.6" fill="url(#${p}f)"/>
+      ${Array.from({ length: 12 }, (_, i) => { const a = (i / 12) * Math.PI * 2, q = i % 3 === 0; return `<line x1="${(13 + Math.sin(a) * (q ? 5.4 : 6.1)).toFixed(2)}" y1="${(13 - Math.cos(a) * (q ? 5.4 : 6.1)).toFixed(2)}" x2="${(13 + Math.sin(a) * 6.8).toFixed(2)}" y2="${(13 - Math.cos(a) * 6.8).toFixed(2)}" stroke="${q ? "#5d4037" : "#b0a090"}" stroke-width="${q ? .8 : .45}" stroke-linecap="round"/>`; }).join("")}
+      <line class="cl-h" x1="13" y1="13.8" x2="13" y2="9" stroke="#e53935" stroke-width="1.2" stroke-linecap="round"/>
+      <line class="cl-m" x1="13" y1="14.4" x2="13" y2="7.2" stroke="#1b1b1b" stroke-width=".8" stroke-linecap="round"/>
+      <circle cx="13" cy="13" r="1.1" fill="#1b1b1b"/><circle cx="13" cy="13" r=".45" fill="#fafafa"/>
+      <ellipse cx="8.4" cy="4.6" rx="3.6" ry="1.4" fill="#fff" opacity=".5" transform="rotate(-25 8.4 4.6)"/>`,
+    neon: (p) => `<defs>
+      <filter id="${p}g" x="-30%" y="-60%" width="160%" height="220%"><feGaussianBlur stdDeviation=".9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2148"/><stop offset="1" stop-color="#120d24"/></linearGradient></defs>
+      <rect x=".3" y=".3" width="49.4" height="19.4" rx="2" fill="url(#${p}b)" stroke="#0d0a1a" stroke-width=".6"/>
+      <rect x="1.2" y="1.2" width="47.6" height="17.6" rx="1.4" fill="none" stroke="#4a3a7a" stroke-width=".4"/>
+      <g class="cf-neon" filter="url(#${p}g)">
+        <path d="M8 15 C2.6 11.4 3 6.6 5.8 6.4 C7 6.3 7.8 7.2 8 8.2 C8.2 7.2 9 6.3 10.2 6.4 C13 6.6 13.4 11.4 8 15 Z" fill="none" stroke="#ff6fb0" stroke-width="1.1" stroke-linejoin="round"/>
+        <text x="31" y="14" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="9.4" letter-spacing=".6" fill="none" stroke="#7ff3ff" stroke-width=".8">POKE</text>
+      </g>
+      ${[[3, 3], [47, 3], [3, 17], [47, 17]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".55" fill="#6a5a9a"/>`).join("")}`,
+    beanbag: (p) => `<defs>
+      <radialGradient id="${p}b" cx="40%" cy="30%" r="75%"><stop offset="0" stop-color="#5fa8ba"/><stop offset=".6" stop-color="#2f6f80"/><stop offset="1" stop-color="#1c4652"/></radialGradient>
+      <radialGradient id="${p}c" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#fff8e6"/><stop offset="1" stop-color="#e2cf9f"/></radialGradient></defs>
+      <ellipse cx="30" cy="33.6" rx="27" ry="2.2" fill="#000" opacity=".22"/>
+      <path d="M9.4 9.6 L13 2.4 L16.6 9 Z M43.4 9 L47 2.4 L50.6 9.6 Z" fill="#2f6f80" stroke="#1c4652" stroke-width=".5" stroke-linejoin="round"/>
+      <path d="M11.6 8 L13 4.8 L14.4 7.8 Z M45.6 7.8 L47 4.8 L48.4 8 Z" fill="#5fa8ba"/>
+      <ellipse cx="30" cy="21" rx="29" ry="13" fill="url(#${p}b)" stroke="#1c4652" stroke-width=".6"/>
+      <ellipse cx="30" cy="25.4" rx="18.4" ry="8.4" fill="url(#${p}c)" stroke="#c9b48a" stroke-width=".5"/>
+      <path d="M21.6 13.6 Q23.6 15 25.6 13.6 M34.4 13.6 Q36.4 15 38.4 13.6" fill="none" stroke="#143943" stroke-width=".8" stroke-linecap="round"/>
+      <path d="M28 17.6 Q30 18.6 32 17.6" fill="none" stroke="#143943" stroke-width=".7" stroke-linecap="round"/>
+      <ellipse cx="19" cy="12" rx="6" ry="2" fill="#fff" opacity=".18" transform="rotate(-15 19 12)"/>
+      <text class="cf-zz" x="44" y="10" font-family="Arial, sans-serif" font-weight="900" font-size="5" fill="#e3f2fd">z</text>
+      <text class="cf-zz b" x="47.4" y="6.6" font-family="Arial, sans-serif" font-weight="900" font-size="3.6" fill="#e3f2fd">z</text>`,
+    jukebox: (p) => `<defs>
+      <linearGradient id="${p}b" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7e2620"/><stop offset=".3" stop-color="#cf5a4f"/><stop offset=".65" stop-color="#b0372f"/><stop offset="1" stop-color="#5a1f1f"/></linearGradient>
+      <linearGradient id="${p}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b2020"/><stop offset="1" stop-color="#1e0e0e"/></linearGradient></defs>
+      ${note(8, 14, "#ffe066", "cf-note")}${note(22, 14, "#ffb3d9", "cf-note b")}
+      <ellipse cx="16" cy="63.4" rx="15" ry=".8" fill="#000" opacity=".25"/>
+      <path d="M.4 63 V31 A15.6 15 0 0 1 31.6 31 V63 Z" fill="url(#${p}b)" stroke="#5a1f1f" stroke-width=".6"/>
+      ${["#ff6b6b", "#ffd54f", "#7ee081", "#5bc0eb", "#b388ff"].map((c, i) => `<path class="cf-arc" style="animation-delay:${(-i * .3).toFixed(1)}s" d="M${4 + i} 32 A${12 - i} ${11.4 - i} 0 0 1 ${28 - i} 32" fill="none" stroke="${c}" stroke-width=".95"/>`).join("")}
+      <path d="M9 32 A7 6.4 0 0 1 23 32 Z" fill="#2a1010"/>
+      <rect x="5.6" y="35.4" width="20.8" height="10" rx="1" fill="#2a1a1a" stroke="#120808" stroke-width=".4"/>
+      <ellipse cx="16" cy="40.4" rx="6.4" ry="2.2" fill="#111"/><ellipse class="cf-spin" cx="16" cy="40.4" rx="6.4" ry="2.2" fill="none" stroke="#444" stroke-width=".3" stroke-dasharray="1 1.2"/><circle cx="16" cy="40.4" r=".9" fill="#e0a040"/>
+      <rect x="6" y="47.4" width="20" height="11" rx=".8" fill="url(#${p}g)"/>
+      ${Array.from({ length: 9 }, (_, i) => `<rect x="${7.2 + i * 2.1}" y="48.4" width="1.1" height="9" rx=".5" fill="#6e2a24"/>`).join("")}
+      <rect x=".4" y="60.4" width="31.2" height="2.6" rx=".6" fill="#3b2020"/><rect x="1" y="31" width="1.4" height="29" fill="#fff" opacity=".18"/>`,
+    arcade: (p) => `<defs>
+      <linearGradient id="${p}b" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#46308a"/><stop offset=".3" stop-color="#8f78dd"/><stop offset=".6" stop-color="#5b3fa8"/><stop offset="1" stop-color="#2a1a5a"/></linearGradient>
+      <linearGradient id="${p}m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b0"/><stop offset="1" stop-color="#e0a800"/></linearGradient>
+      <linearGradient id="${p}s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16285a"/><stop offset="1" stop-color="#070f24"/></linearGradient>
+      <clipPath id="${p}c"><rect x="5" y="13.6" width="18" height="14.4" rx="1"/></clipPath></defs>
+      <ellipse cx="14" cy="55.6" rx="13" ry=".9" fill="#000" opacity=".25"/>
+      <path d="M.4 55.6 V9 L2 7 H26 L27.6 9 V55.6 Z" fill="url(#${p}b)" stroke="#2a1a5a" stroke-width=".6"/>
+      <rect x="2" y=".4" width="24" height="9.4" rx="1.2" fill="url(#${p}m)" stroke="#8a6a12" stroke-width=".5"/>
+      ${[0, 1, 2, 3].map((i) => `<circle class="cf-blink${i % 2 ? " b" : ""}" cx="${7 + i * 5}" cy="5.1" r="1.4" fill="#e53935"/>`).join("")}
+      <rect x="3" y="11.6" width="22" height="18.4" rx="1.4" fill="#111"/>
+      <g clip-path="url(#${p}c)">
+        <rect x="5" y="13.6" width="18" height="14.4" fill="url(#${p}s)"/>
+        ${[[8, 17], [17, 15.4], [12, 19.6], [20, 21.4], [6.4, 23]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r=".3" fill="#fff" opacity=".7"/>`).join("")}
+        <rect x="5" y="25.4" width="18" height=".8" fill="#3d7bff"/>
+        <g class="cf-run"><circle cx="8" cy="23.6" r="1.6" fill="#ffd54f"/><path d="M8 23.6 L9.8 22.6 V24.6 Z" fill="#16285a"/></g>
+        <g class="cf-ufo"><ellipse cx="18" cy="17.4" rx="1.8" ry=".9" fill="#ff5f7a"/><ellipse cx="18" cy="16.8" rx=".9" ry=".7" fill="#ffd1dc"/></g>
+        <text x="6.4" y="16" font-family="Consolas, monospace" font-size="2" font-weight="700" fill="#7ee081">1UP 2400</text>
+      </g>
+      <path d="M5 13.6 L13 13.6 L7 28 H5 Z" fill="#fff" opacity=".06"/>
+      <path d="M.8 31 H27.2 L26.4 39 H1.6 Z" fill="#3a2878" stroke="#21165a" stroke-width=".4"/><rect x="1" y="31" width="26" height=".7" fill="#8f78dd"/>
+      <rect x="7.4" y="31" width="1.2" height="3.4" fill="#222"/><circle cx="8" cy="30.6" r="1.6" fill="#e53935"/><circle cx="7.5" cy="30.1" r=".5" fill="#ff8a80"/>
+      <circle cx="16" cy="35" r="1.2" fill="#4fc3f7" stroke="#0277bd" stroke-width=".3"/><circle cx="20.6" cy="35" r="1.2" fill="#ffd54f" stroke="#a87400" stroke-width=".3"/>
+      <rect x="10.6" y="42.4" width="6.8" height="5.6" rx=".6" fill="#221650"/><rect class="cf-blink" x="13.2" y="43.4" width="1.6" height="3.4" rx=".4" fill="#ff5252"/>
+      <rect x="2" y="50" width="24" height="5" rx=".6" fill="#2a1a5a"/>`,
+    fireplace: (p) => `<defs>
+      <pattern id="${p}k" width="12" height="5" patternUnits="userSpaceOnUse"><rect width="12" height="5" fill="#a1453a"/><rect width="12" height=".8" fill="#7a2f27"/><rect y=".8" width="12" height=".6" fill="#b65a4e"/><rect x="0" width=".7" height="2.6" fill="#7a2f27"/><rect x="6" y="2.5" width=".7" height="2.5" fill="#7a2f27"/><rect y="2.5" width="12" height=".6" fill="#7a2f27"/></pattern>
+      ${WOOD(p + "w", "#a1887f", "#6d4c41", "#3e2723")}
+      <radialGradient id="${p}g" cx="50%" cy="85%" r="65%"><stop offset="0" stop-color="#ffb74d" stop-opacity=".75"/><stop offset="1" stop-color="#ff6f00" stop-opacity="0"/></radialGradient>
+      <linearGradient id="${p}f" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ff6f00"/><stop offset=".6" stop-color="#ffa726"/><stop offset="1" stop-color="#ffd54f"/></linearGradient>
+      <linearGradient id="${p}y" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffd54f"/><stop offset="1" stop-color="#fff6d0"/></linearGradient></defs>
+      <rect x="3" y="6" width="60" height="48" fill="url(#${p}k)" stroke="#5a2018" stroke-width=".4"/>
+      <path d="M14 54 V24 A19 9 0 0 1 52 24 V54 Z" fill="#c8a07a" stroke="#6d4c41" stroke-width=".5"/>
+      <path d="M16 54 V25 A17 7.6 0 0 1 50 25 V54 Z" fill="#1a0d08"/>
+      <rect class="cf-glow" x="16" y="20" width="34" height="34" fill="url(#${p}g)"/>
+      <path class="cf-fire" d="M21 47 C20 41 24 39 23 33 C27 36 26 40 28 41 C28 36 31 33 31 28 C35 33 36 37 35 41 C37 39 38 36 38 34 C42 38 44 42 42 47 Z" fill="url(#${p}f)"/>
+      <path class="cf-fire b" d="M26 47 C25.4 43 28 41 28 37.6 C30.6 40 31.4 42.6 33 43 C33 40.6 35 39 35.6 37.2 C38.4 40.4 39.4 44 38 47 Z" fill="url(#${p}y)"/>
+      <rect x="19" y="45.2" width="28" height="3" rx="1.4" fill="#5d4037" transform="rotate(-4 33 46.7)"/><rect x="22" y="46" width="24" height="2.6" rx="1.3" fill="#4e342e" transform="rotate(5 34 47.3)"/>
+      <rect x="8" y="50" width="50" height="4" rx=".6" fill="#8d8d8d"/><rect x="8" y="50" width="50" height=".9" fill="#c4c4c4"/>
+      <rect x="0" y="0" width="66" height="7" rx="1" fill="url(#${p}w)" stroke="#3e2723" stroke-width=".5"/><rect x=".6" y=".4" width="64.8" height=".9" fill="#bca093"/>
+      <rect x="2" y="7" width="62" height="1.2" fill="#000" opacity=".25"/>`,
+    pond: (p) => `<defs>
+      <radialGradient id="${p}w" cx="50%" cy="35%" r="65%"><stop offset="0" stop-color="#6fd0f5"/><stop offset=".7" stop-color="#3fa7d6"/><stop offset="1" stop-color="#1f6f9a"/></radialGradient>
+      <clipPath id="${p}c"><ellipse cx="39" cy="13" rx="31" ry="8.2"/></clipPath></defs>
+      <ellipse cx="39" cy="15" rx="38" ry="12.6" fill="#000" opacity=".18"/>
+      <ellipse cx="39" cy="13.4" rx="37.4" ry="12.2" fill="#8a8a8a"/>
+      ${Array.from({ length: 18 }, (_, i) => { const a = (i / 18) * Math.PI * 2, x = 39 + Math.cos(a) * 34, y = 13.4 + Math.sin(a) * 10.4; return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="3.6" ry="2.4" fill="${i % 3 ? "#9e9e9e" : "#7a7a7a"}" stroke="#5f5f5f" stroke-width=".35"/><ellipse cx="${(x - .8).toFixed(1)}" cy="${(y - .8).toFixed(1)}" rx="1.4" ry=".7" fill="#d6d6d6" opacity=".7"/>`; }).join("")}
+      <ellipse cx="39" cy="13" rx="31" ry="8.2" fill="url(#${p}w)" stroke="#2f6f8f" stroke-width=".4"/>
+      <g clip-path="url(#${p}c)">
+        ${[[22, 11], [46, 16], [33, 9]].map(([x, y], i) => `<ellipse class="cf-ripple" style="animation-delay:${-i * 1.1}s" cx="${x}" cy="${y}" rx="4" ry="1.2" fill="none" stroke="#e1f5fe" stroke-width=".45"/>`).join("")}
+        <g class="cf-karp">
+          <path d="M18 13 C20 10 27 9.6 30 12.4 C27 15.6 20 15.4 18 13 Z" fill="#ff7043" stroke="#c43e1a" stroke-width=".35"/>
+          <path d="M18.6 13 L14.6 10.4 L15.6 13 L14.6 15.6 Z" fill="#ffb199" stroke="#c43e1a" stroke-width=".3"/>
+          <path d="M22 10.4 L23.6 7.8 L25.6 10.2 Z" fill="#ffd54f"/>
+          <path d="M23.4 14.6 L24.4 16.6 L25.8 14.8 Z" fill="#ffe082"/>
+          <circle cx="27.6" cy="12" r=".9" fill="#fff"/><circle cx="27.8" cy="12" r=".4" fill="#222"/>
+          <path d="M29.6 12.8 Q31.4 13.8 30.4 15" fill="none" stroke="#ffe082" stroke-width=".4"/>
+        </g>
+        <path d="M4 9 Q39 3 74 9" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width=".8"/>
+      </g>
+      <path d="M58 12 A4.2 2.4 0 1 1 61.6 10.8 L58 12 Z" fill="#4caf50" stroke="#2e7d32" stroke-width=".35"/>
+      <circle cx="56.6" cy="11.4" r="1.2" fill="#ff8fb1"/><circle cx="56.6" cy="11.4" r=".5" fill="#fff59d"/>`,
+    healer: (p) => `<defs>
+      <linearGradient id="${p}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d6d6d6"/></linearGradient>
+      <linearGradient id="${p}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6f60"/><stop offset="1" stop-color="#c62828"/></linearGradient>
+      <linearGradient id="${p}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f5f7f8"/><stop offset="1" stop-color="#b0bec5"/></linearGradient></defs>
+      <ellipse cx="26" cy="43.6" rx="25" ry=".9" fill="#000" opacity=".22"/>
+      <rect x=".3" y="18" width="51.4" height="25.6" rx="1.6" fill="url(#${p}b)" stroke="#9e9e9e" stroke-width=".5"/>
+      <rect x=".8" y="25.6" width="50.4" height="4.4" fill="url(#${p}r)"/><rect x=".8" y="25.6" width="50.4" height=".7" fill="#ff8a80"/>
+      <path d="M24 32 H28 V35 H31 V39 H28 V42 H24 V39 H21 V35 H24 Z" fill="url(#${p}r)" stroke="#a31515" stroke-width=".3"/>
+      <rect x="4" y="10" width="44" height="10" rx="1.4" fill="url(#${p}t)" stroke="#78909c" stroke-width=".45"/>
+      ${Array.from({ length: 6 }, (_, i) => { const x = 9 + i * 7; return `<g class="cf-ball" style="animation-delay:${(i * .25).toFixed(2)}s"><circle cx="${x}" cy="15" r="2.8" fill="#555"/><path d="M${x - 2.3} 15 A2.3 2.3 0 0 1 ${x + 2.3} 15 Z" fill="#e53935"/><path d="M${x - 2.3} 15 A2.3 2.3 0 0 0 ${x + 2.3} 15 Z" fill="#f4f4f4"/><rect x="${x - 2.3}" y="14.7" width="4.6" height=".6" fill="#333"/><circle cx="${x}" cy="15" r=".7" fill="#fff" stroke="#333" stroke-width=".3"/></g>`; }).join("")}
+      <rect x="17" y=".3" width="18" height="10.6" rx="1.2" fill="#263238" stroke="#111" stroke-width=".5"/>
+      <rect x="18.4" y="1.6" width="15.2" height="8" rx=".6" fill="#0f1d14"/>
+      <path class="cf-heart" d="M26 8.6 C22.6 6.4 22.4 3.6 24.2 3.4 C25 3.3 25.7 3.9 26 4.6 C26.3 3.9 27 3.3 27.8 3.4 C29.6 3.6 29.4 6.4 26 8.6 Z" fill="#7ee081"/>
+      <path d="M18.4 6 H21 L21.8 4.4 L22.6 7.4 L23.2 6 H24" fill="none" stroke="#4caf50" stroke-width=".35" opacity=".8"/>`,
+    masterball: (p) => `<defs>${WOOD(p + "w", "#8d6e63", "#5d4037", "#3e2723")}
+      <radialGradient id="${p}u" cx="40%" cy="25%" r="80%"><stop offset="0" stop-color="#b47ad6"/><stop offset=".6" stop-color="#7b3fa0"/><stop offset="1" stop-color="#4a1f66"/></radialGradient>
+      <linearGradient id="${p}g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e1f5fe" stop-opacity=".35"/><stop offset=".5" stop-color="#b3e5fc" stop-opacity=".12"/><stop offset="1" stop-color="#e1f5fe" stop-opacity=".3"/></linearGradient></defs>
+      <ellipse cx="13" cy="47.6" rx="12" ry=".8" fill="#000" opacity=".25"/>
+      <rect x="3" y="32" width="20" height="16" rx=".8" fill="url(#${p}w)" stroke="#3e2723" stroke-width=".45"/>
+      <rect x="1" y="29.6" width="24" height="3.2" rx=".8" fill="#8d6e63" stroke="#4e342e" stroke-width=".4"/><rect x="1.4" y="29.8" width="23.2" height=".7" fill="#bca093"/>
+      <rect x="7.6" y="37.6" width="10.8" height="4.4" rx=".5" fill="#c49000"/><rect x="8.2" y="38.2" width="9.6" height="3.2" rx=".4" fill="#ffd54f"/><rect x="9.6" y="39.4" width="6.8" height=".7" fill="#a87400"/>
+      <circle cx="13" cy="20" r="6.8" fill="#000" opacity=".2"/>
+      <path d="M6.4 19 A6.6 6.6 0 0 1 19.6 19 Z" fill="url(#${p}u)"/>
+      <path d="M6.4 19 A6.6 6.6 0 0 0 19.6 19 Z" fill="#f4f4f4"/>
+      <circle cx="9.6" cy="15.4" r="1.4" fill="#ff5fa8"/><circle cx="16.4" cy="15.4" r="1.4" fill="#ff5fa8"/>
+      <path d="M11 17.4 V13.6 L13 15.8 L15 13.6 V17.4" fill="none" stroke="#fff" stroke-width=".7" stroke-linejoin="round"/>
+      <rect x="6.4" y="18.5" width="13.2" height="1" fill="#2a1a3a"/><circle cx="13" cy="19" r="6.6" fill="none" stroke="#2a1a3a" stroke-width=".6"/>
+      <circle cx="13" cy="19" r="2" fill="#2a1a3a"/><circle cx="13" cy="19" r="1.2" fill="#fafafa"/>
+      <rect x="3" y="3.6" width="20" height="26" fill="url(#${p}g)" stroke="#9fd3e6" stroke-width=".5"/>
+      <path d="M5 6 L9 6 L5 16 Z" fill="#fff" opacity=".35"/>
+      <rect x="2.4" y="1" width="21.2" height="3" rx=".6" fill="#7fb7c9" stroke="#4f8ea3" stroke-width=".4"/>
+      <path class="cf-spark" transform="translate(6 8)" d="M0 -2 L.5 -.5 L2 0 L.5 .5 L0 2 L-.5 .5 L-2 0 L-.5 -.5 Z" fill="#fff"/>`,
+    statue: (p) => `<defs>
+      <linearGradient id="${p}s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d6d6d6"/><stop offset=".5" stop-color="#9e9e9e"/><stop offset="1" stop-color="#6f6f6f"/></linearGradient></defs>
+      <ellipse cx="20" cy="59.6" rx="19" ry=".9" fill="#000" opacity=".25"/>
+      <rect x="2" y="44" width="36" height="16" rx=".8" fill="url(#${p}s)" stroke="#5f5f5f" stroke-width=".5"/>
+      <rect x="0" y="41.6" width="40" height="3.4" rx=".8" fill="#bdbdbd" stroke="#7d7d7d" stroke-width=".4"/><rect x=".4" y="41.8" width="39.2" height=".8" fill="#e6e6e6"/>
+      <rect x="4" y="56.4" width="32" height="1" fill="#000" opacity=".15"/>
+      <rect x="11" y="49.6" width="18" height="5.4" rx=".6" fill="#c49000"/><rect x="11.6" y="50.2" width="16.8" height="4.2" rx=".4" fill="#ffd54f"/><rect x="14" y="51.9" width="12" height=".8" fill="#a87400"/>
+      <g class="st-rock"><path d="M13 43 L12.4 24 Q12.4 18 16 17 L24 17 Q27.6 18 27.6 24 L27 43 Z" fill="#8a8a8a" stroke="#5f5f5f" stroke-width=".5"/><path d="M15 24 L19 23 L18 27 Z" fill="#767676"/></g>
+      <image class="st-img" x="0" y="0" width="0" height="0" style="image-rendering: pixelated"/>`,
+  };
+  /** 0.25초마다 — 시계 바늘은 지금 시각, 석상은 돌 그림이 오면 끼운다 */
+  const COIN_TICK = {
+    clock(k) {
+      const d = new Date(), h = ((d.getHours() % 12) + d.getMinutes() / 60) * 30, m = d.getMinutes() * 6 + d.getSeconds() * 0.1;
+      k.svg.querySelector(".cl-h").setAttribute("transform", `rotate(${h.toFixed(1)} 13 13)`);
+      k.svg.querySelector(".cl-m").setAttribute("transform", `rotate(${m.toFixed(1)} 13 13)`);
+    },
+    statue(k) {
+      const st = k.dexId ? stoneOf(k.dexId) : null;
+      const im = k.svg.querySelector(".st-img");
+      if (!st || im.dataset.dex === String(k.dexId)) return;
+      im.dataset.dex = String(k.dexId);
+      im.setAttribute("href", st.toDataURL());
+      im.setAttribute("x", 20 - st.width / 2); im.setAttribute("y", 43 - st.height);
+      im.setAttribute("width", st.width); im.setAttribute("height", st.height);
+      k.svg.querySelector(".st-rock").style.display = "none";
+    },
+  };
+
   /** 전설 석상 — 스프라이트를 돌 색 4단계로. 그림은 메인이 data: 주소로 준다(캔버스로 읽으려고) */
   const stones = new Map(); // dexId → 캔버스 | 불러오는 중(Promise) | null
   function stoneOf(dexId) {
@@ -941,10 +1443,10 @@
     const area = (a, b) => Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]));
     const wall = [[100, 24, 32, 26]]; // 도감 액자는 늘 있다
     if (on.has("window")) wall.push([20, 19, 76, 63]);
-    if (d.wins > 0) wall.push([138, 28, 46, 22]);
+    if (d.wins > 0) wall.push([DUB.x, DUB.y, DUB.w, DUB.h + 6]); // 아래 "N승" 글자까지
     if (on.has("poster")) wall.push([195, 17, 28, 38]);
     if (d.graduated > 0) wall.push([232, 34, 76, 32]);
-    if (d.weekTop > 0) wall.push([100, 56, 32, 40]); // 아래 "주간 1위" 글자까지
+    if (d.weekTop > 0) wall.push([100, 56, 32, 40]); // 아래 호봉 띠까지
     if (d.badges > 0) wall.push([GYB.x, GYB.y, GYB.w, GYB.h + 8]); // 아래 "배지" 글자까지
     const floor = [...on].filter((id) => FURN[id]).map((id) => [...posOf(id, FURN[id]), FURN[id].w, FURN[id].h]);
     const out = {};
@@ -1000,6 +1502,7 @@
   }
 
   function drawCoin(k, t) {
+    if (k.svg) return void (COIN_TICK[k.id] && COIN_TICK[k.id](k, t)); // 포켓몬 방의 SVG 코인 가구 — 움직임은 CSS
     k.g.clearRect(0, 0, k.f.w, k.f.h);
     k.f.draw(k.g, t, k);
   }
@@ -1563,14 +2066,12 @@
     trim(g, T);
     T.floor(g);
     dither(g, 0, FLOOR, AW, 3, "#0000002e"); // 벽 아래 그늘
-    if (on.has("window")) drawWindow(g, theme, per);
-    drawDexFrame(g, dg);
+    if (on.has("window")) (dg ? drawWindow(g, theme, per) : sky(g, 29, 27, 58, 44, theme, per)); // 포켓몬 방은 하늘만 — 창틀 · 커튼은 windowSvg
+    if (dg) drawDexFrame(g); // 🦖 디지바이스는 도트. 포켓몬 방의 액자 · 포스터 · 트로피 · 주간 메달은 SVG(dexFrameSvg …)로 얹는다
     if (d.wins > 0) drawBadges(g, d.wins);
-    if (on.has("poster")) (dg ? drawSign : drawPoster)(g);
-    if (d.graduated > 0) drawTrophies(g, d.graduated);
-    if (d.weekTop > 0) drawMedal(g);
+    if (on.has("poster") && dg) drawSign(g);
     if (d.badges > 0) drawGymBadges(g, d.champ || 0);
-    if (on.has("rug")) (dg ? drawFlowerBed : drawRug)(g);
+    if (on.has("rug") && dg) drawFlowerBed(g); // 포켓몬 방의 러그는 rugSvg
     // 밤이면 방이 어두워지고 램프 둘레만 밝다
     if (per === "night" || per === "evening") {
       g.fillStyle = per === "night" ? "rgba(10, 14, 40, .32)" : "rgba(60, 20, 40, .12)";
@@ -1588,24 +2089,38 @@
       if (!on.has(id)) continue;
       const f = FURN[id];
       const [x, y] = posOf(id, f);
-      html.push(`<canvas class="rm-f" data-f="${id}" data-move="floor" data-x="${x}" data-y="${y}" width="${f.w}" height="${f.h}" style="left:${X(x)}%; top:${Y(y)}%; width:${X(f.w)}%; height:${Y(f.h)}%; z-index:${(y + f.h) * 10};"></canvas>`);
+      const at = `data-f="${id}" data-move="floor" data-x="${x}" data-y="${y}" data-w="${f.w}" data-h="${f.h}" style="left:${X(x)}%; top:${Y(y)}%; width:${X(f.w)}%; height:${Y(f.h)}%; z-index:${(y + f.h) * 10};"`;
+      // 포켓몬 방은 입체 SVG(FURN_SVG), 🦖 디지털 월드는 도트 캔버스(FURN_DG · FURN.draw)
+      html.push(dg ? `<canvas class="rm-f" ${at} width="${f.w}" height="${f.h}"></canvas>` : `<div class="rm-f rm-fs" ${at}><svg viewBox="0 0 ${f.w} ${f.h}" aria-hidden="true">${FURN_SVG[id]("fs" + ++wallUid)}</svg></div>`);
     }
+    if (!dg && on.has("window")) html.push(windowSvg());
+    if (!dg && on.has("rug")) html.push(rugSvg());
     const pl = placeCoin(on, d, posOf);
     for (const [id, [x, y, w, h]] of Object.entries(pl)) {
       const z = COIN[id].wall ? 5 : COIN[id].flat ? 2 : (y + h) * 10;
       const move = COIN[id].wall ? "wall" : COIN[id].flat ? "flat" : "floor";
-      html.push(`<canvas class="rm-f" data-c="${id}" data-move="${move}" data-x="${x}" data-y="${y}" width="${w}" height="${h}" style="left:${X(x)}%; top:${Y(y)}%; width:${X(w)}%; height:${Y(h)}%; z-index:${z};"></canvas>`);
+      const at = `data-c="${id}" data-move="${move}" data-x="${x}" data-y="${y}" data-w="${w}" data-h="${h}" style="left:${X(x)}%; top:${Y(y)}%; width:${X(w)}%; height:${Y(h)}%; z-index:${z};"`;
+      html.push(dg ? `<canvas class="rm-f" ${at} width="${w}" height="${h}"></canvas>` : `<div class="rm-f rm-fs rm-coin" ${at}><svg viewBox="0 0 ${w} ${h}" aria-hidden="true">${COIN_SVG[id]("cs" + ++wallUid)}</svg></div>`);
     }
     if (on.has("aquarium") && !dg) {
       // 물고기는 움직여야 해서 따로 얹는다(디지털 월드의 같은 자리는 공중전화 부스라 없다)
       const [ax, ay] = posOf("aquarium", FURN.aquarium);
       html.push(`<i class="rm-fish" style="left:${X(ax + 4)}%; top:${Y(ay + 8)}%; --sw:${X(26)}cqw;"></i><i class="rm-fish b" style="left:${X(ax + 6)}%; top:${Y(ay + 15)}%; --sw:${X(22)}cqw;"></i>`);
     }
+    // 벽 장식 — 입체 SVG(디지털 월드의 디지바이스 · 간판만 도트)
+    if (!dg) html.push(dexFrameSvg());
+    if (on.has("poster") && !dg) html.push(posterSvg());
+    if (d.graduated > 0) html.push(trophySvg(d.graduated));
+    if (d.weekTop > 0) html.push(weekMedalSvg(d.weekTop));
     // 글자 — 캔버스에 쓰면 뭉개진다
     html.push(`<span class="rm-txt${dg ? " lcd" : ""}" style="left:${X(116)}%; top:${Y(dg ? 39 : 41)}%;">${dex.seen}/${dex.total}</span>`);
-    if (d.wins > 0) html.push(`<span class="rm-txt lt" style="left:${X(161)}%; top:${Y(52)}%;">${d.wins}승</span>`);
+    if (d.wins > 0) {
+      // 🏅 결투 메달 — 딴 것은 메달, 못 딴 칸은 점선 자리만
+      const cells = BADGE_AT.map((n, i) => `<i>${duelMedal(i, d.wins >= n)}</i>`).join("");
+      html.push(`<div class="rm-dub" style="left:${X(DUB.x + 2)}%; top:${Y(DUB.y + 2)}%; width:${X(DUB.w - 4)}%; height:${Y(DUB.h - 3)}%;">${cells}</div>`);
+      html.push(`<span class="rm-txt lt" style="left:${X(DUB.x + DUB.w / 2)}%; top:${Y(DUB.y + DUB.h + 3)}%;">결투 ${d.wins}승</span>`);
+    }
     if (d.graduated > 0) html.push(`<span class="rm-txt sm" style="left:${X(292)}%; top:${Y(44)}%;">졸업<br>${esc(d.lastGrad || "")}</span>`);
-    if (d.weekTop > 0) html.push(`<span class="rm-txt lt" style="left:${X(116)}%; top:${Y(90)}%;">주간 1위 ×${d.weekTop}</span>`);
     if (d.badges > 0) {
       // 배지 그림 — 체육관 탭의 배지 그대로. 못 딴 칸은 점선 자리만
       const art = window.ptbGymArt;
@@ -1623,6 +2138,11 @@
     layer.appendChild(base);
     layer.insertAdjacentHTML("beforeend", html.join(""));
     Rm.coin = [];
+    for (const c of layer.querySelectorAll(".rm-coin")) { // SVG 코인 가구 — 시계 · 석상만 타이머가 고친다
+      const k = { id: c.dataset.c, f: COIN[c.dataset.c], svg: c.querySelector("svg"), dexId: d.statue || null };
+      Rm.coin.push(k);
+      drawCoin(k, frame);
+    }
     for (const c of layer.querySelectorAll("canvas.rm-f")) {
       const g2 = c.getContext("2d");
       g2.imageSmoothingEnabled = false;
@@ -1945,9 +2465,9 @@
     const next = BADGE_NOTE.find((n) => R0.wins < n);
     $("rmRec").innerHTML = [
       `🖼️ <b>도감 액자</b> — 도감 ${dex.seen}/${dex.total}. 만날수록 숫자가 오른다`,
-      `🏅 <b>결투 배지 진열장</b> — ${R0.wins}승${next ? ` · ${next}승이면 배지가 하나 더 빛난다` : " · 배지를 다 모았다"}`,
+      `🎖️ <b>결투 메달 진열장</b> — ${R0.wins}승${next ? ` · ${next}승이면 ${["동", "은", "금", "루비"][BADGE_NOTE.indexOf(next)]} 메달이 걸린다` : " · 동 · 은 · 금 · 루비 메달을 다 모았다"}`,
       `🏆 <b>졸업 트로피</b> — ${R0.graduated ? `${R0.graduated}마리 졸업 (마지막: ${esc(R0.lastGrad)})` : "마스터까지 키우면 생긴다"}`,
-      `🏅 <b>주간 1위 메달</b> — ${R0.weekTop ? `${R0.weekTop}번` : "길드에서 한 주 동안 토큰을 가장 많이 쓰면 생긴다"}`,
+      `🏅 <b>주간 1위 메달</b> — ${R0.weekTop ? `${R0.weekTop}번 · 아래 띠에 한 번마다 금줄이 하나씩 쌓이고 다섯 줄이면 별이 된다` : "길드에서 한 주 동안 토큰을 가장 많이 쓰면 생긴다"}`,
       `🏟️ <b>체육관 배지 진열장</b> — ${R0.badges ? `배지 ${R0.badges}/8${R0.champ ? ` · 🏆 챔피언 ${R0.champ}번 (금테 진열장)` : R0.badges >= 8 ? " · 챔피언 로드에서 챔피언이 되면 진열장이 금테가 된다" : ""}` : "배틀 탭 › 체육관에서 첫 배지를 따면 생긴다"}`,
     ].join("<br>");
 
@@ -2055,11 +2575,11 @@
   }
   roomEl.addEventListener("pointerdown", (e) => {
     if (!roomEl.classList.contains("edit")) return;
-    const c = e.target.closest("canvas.rm-f[data-move]");
+    const c = e.target.closest(".rm-f[data-move]");
     if (!c) return;
     e.preventDefault();
     c.setPointerCapture(e.pointerId);
-    drag = { c, id: c.dataset.f || c.dataset.c, move: c.dataset.move, sx: e.clientX, sy: e.clientY, x0: Number(c.dataset.x), y0: Number(c.dataset.y), w: c.width, h: c.height, k: AW / roomEl.getBoundingClientRect().width, at: null };
+    drag = { c, id: c.dataset.f || c.dataset.c, move: c.dataset.move, sx: e.clientX, sy: e.clientY, x0: Number(c.dataset.x), y0: Number(c.dataset.y), w: Number(c.dataset.w) || c.width, h: Number(c.dataset.h) || c.height, k: AW / roomEl.getBoundingClientRect().width, at: null };
     c.classList.add("drag");
   });
   // 움직이기 · 놓기는 창 전체에서 듣는다 — 방 밖으로 끌고 나가서 놓아도 놓은 것이다

@@ -13,6 +13,46 @@
 .rm-room canvas { image-rendering: pixelated; position: absolute; display: block; }
 .rm-base { inset: 0; width: 100%; height: 100%; }
 .rm-f { pointer-events: none; }
+/* 포켓몬 방의 바닥 가구는 입체 SVG(room.js FURN_SVG) — 디지털 월드는 위 캔버스 그대로 */
+.rm-fs { position: absolute; line-height: 0; }
+.rm-fs svg { display: block; width: 100%; height: 100%; overflow: visible; }
+/* 코인 가구 SVG(room.js COIN_SVG)의 움직임 — 예전엔 0.25초마다 캔버스를 다시 칠했다 */
+.rm-coin .cf-fire, .rm-coin .cf-ripple, .rm-coin .cf-heart, .rm-coin .cf-zz { transform-box: fill-box; }
+.rm-coin .cf-neon { animation: cf-neon 4s infinite; }
+@keyframes cf-neon { 0%, 90%, 94%, 100% { opacity: 1; } 91%, 95% { opacity: .25; } }
+.rm-coin .cf-zz { animation: cf-zz 3s ease-in-out infinite; opacity: 0; }
+.rm-coin .cf-zz.b { animation-delay: 1.2s; }
+@keyframes cf-zz { 0% { opacity: 0; transform: translate(0, 2px); } 30% { opacity: .9; } 100% { opacity: 0; transform: translate(2px, -4px); } }
+.rm-coin .cf-note { animation: cf-note 2.4s ease-out infinite; opacity: 0; }
+.rm-coin .cf-note.b { animation-delay: 1.2s; }
+@keyframes cf-note { 0% { opacity: 0; transform: translate(0, 3px); } 20% { opacity: 1; } 60% { transform: translate(1.5px, -4px); } 100% { opacity: 0; transform: translate(-1px, -9px); } }
+.rm-coin .cf-arc { animation: cf-arc 1.5s ease-in-out infinite; }
+@keyframes cf-arc { 0%, 100% { opacity: .5; } 50% { opacity: 1; stroke: #fff; } }
+.rm-coin .cf-spin { animation: cf-spin 1s linear infinite; }
+@keyframes cf-spin { to { stroke-dashoffset: -4.4; } }
+.rm-coin .cf-blink { animation: cf-blink .6s steps(1) infinite; }
+.rm-coin .cf-blink.b { animation-delay: .3s; }
+@keyframes cf-blink { 50% { fill: #c49000; } }
+.rm-coin .cf-run { animation: cf-run 2.4s linear infinite; }
+@keyframes cf-run { from { transform: translateX(-3px); } to { transform: translateX(15px); } }
+.rm-coin .cf-ufo { animation: cf-ufo 3s ease-in-out infinite; }
+@keyframes cf-ufo { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-5px, 1px); } 50% { transform: translate(-10px, 0); } 75% { transform: translate(-5px, -1px); } }
+.rm-coin .cf-glow { animation: cf-glow 1.1s ease-in-out infinite alternate; }
+@keyframes cf-glow { from { opacity: .7; } to { opacity: 1; } }
+.rm-coin .cf-fire { transform-origin: 50% 100%; animation: cf-fire .5s ease-in-out infinite alternate; }
+.rm-coin .cf-fire.b { animation-duration: .37s; animation-delay: -.2s; }
+@keyframes cf-fire { from { transform: scale(1, 1); } to { transform: scale(1.05, .86) skewX(-3deg); } }
+.rm-coin .cf-ripple { transform-origin: 50% 50%; animation: cf-ripple 3.3s ease-out infinite; }
+@keyframes cf-ripple { from { transform: scale(.3); opacity: .9; } to { transform: scale(1.6); opacity: 0; } }
+.rm-coin .cf-karp { animation: cf-karp 6s ease-in-out infinite; }
+@keyframes cf-karp { 0%, 100% { transform: translate(0, 0); } 30% { transform: translate(3px, .6px); } 60% { transform: translate(6px, 0); } 70% { transform: translate(7px, -5px) rotate(-8deg); } 76% { transform: translate(8px, 0); } 88% { transform: translate(3px, .4px); } }
+.rm-coin .cf-ball { animation: cf-ball 1.5s steps(1) infinite; }
+@keyframes cf-ball { 0%, 16% { filter: brightness(1.6) drop-shadow(0 0 1px #fff); } 17% { filter: none; } }
+.rm-coin .cf-heart { transform-origin: 50% 50%; animation: cf-heart 1s ease-in-out infinite; }
+@keyframes cf-heart { 0%, 100% { transform: scale(1); fill: #4caf50; } 15% { transform: scale(1.18); fill: #9cf09c; } 30% { transform: scale(1); } }
+.rm-coin .cf-spark { animation: cf-spark 2s steps(1) infinite; }
+@keyframes cf-spark { 0% { transform: translate(6px, 8px); } 25% { transform: translate(20px, 12px) scale(.7); } 50% { transform: translate(18px, 26px); } 75% { transform: translate(7px, 24px) scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .rm-coin * { animation: none !important; } }
 /* 가구 옮기기 — 옮길 수 있는 가구에 점선, 끌면 노란 선. 포켓몬은 흐리게 비켜 둔다 */
 .rm-room.edit { touch-action: none; }
 .rm-room.edit .rm-f[data-move] { pointer-events: auto; cursor: grab; outline: 1px dashed rgba(255, 255, 255, .6); outline-offset: -1px; }
@@ -33,11 +73,22 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .rm-gyb svg { width: 100%; height: 100%; filter: drop-shadow(0 .15cqw .2cqw rgba(0, 0, 0, .45)); }
 .rm-room[data-per="evening"] .rm-gyb { filter: brightness(.9); }
 .rm-room[data-per="night"] .rm-gyb { filter: brightness(.75) saturate(.85); }
+/* 🖼️ 벽 장식 SVG(room.js dexFrameSvg · posterSvg · trophySvg · weekMedalSvg) — 글자(rm-txt)는 이 위에 */
+.rm-wl { position: absolute; z-index: 2; pointer-events: none; line-height: 0; }
+.rm-wl svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 .15cqw .2cqw rgba(0, 0, 0, .3)); }
+.rm-room[data-per="evening"] .rm-wl { filter: brightness(.9); }
+.rm-room[data-per="night"] .rm-wl { filter: brightness(.72) saturate(.85); }
+/* 🏅 결투 메달(room.js duelMedal) — 네 칸, 못에 매달린 메달 */
+.rm-dub { position: absolute; display: grid; grid-template-columns: repeat(4, 1fr); place-items: center; z-index: 3; pointer-events: none; }
+.rm-dub i { display: block; width: 100%; height: 100%; line-height: 0; }
+.rm-dub svg { width: 100%; height: 100%; filter: drop-shadow(0 .15cqw .2cqw rgba(0, 0, 0, .5)); }
+.rm-room[data-per="evening"] .rm-dub { filter: brightness(.9); }
+.rm-room[data-per="night"] .rm-dub { filter: brightness(.75) saturate(.85); }
 .rm-room .rm-f[data-f="lamp"], .rm-room .rm-f[data-c="neon"], .rm-room .rm-f[data-c="fireplace"] { filter: none; } /* 빛나는 것은 밤에도 밝다 */
 .rm-room[data-per="night"] .rm-mon .rm-body { filter: brightness(.86); }
 
 /* 캔버스 위에 얹는 글자 */
-.rm-txt { position: absolute; transform: translate(-50%, -50%); font: 800 1.9cqw/1 Consolas, "Malgun Gothic", monospace; color: #3b2a12; white-space: nowrap; text-align: center; pointer-events: none; }
+.rm-txt { position: absolute; z-index: 4; transform: translate(-50%, -50%); font: 800 1.9cqw/1 Consolas, "Malgun Gothic", monospace; color: #3b2a12; white-space: nowrap; text-align: center; pointer-events: none; }
 .rm-txt.lt { color: #ffffffcc; font-size: 1.5cqw; }
 .rm-txt.lcd { color: #1f3a1c; font-size: 1.4cqw; letter-spacing: 0; } /* 🦖 디지바이스 액정 */
 .rm-txt.board { line-height: 1.25; text-align: center; font-size: 1.35cqw; } /* 홀 전광판 */
