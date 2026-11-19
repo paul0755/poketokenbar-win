@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld("ptb", {
   // 미니룸
   roomBuy: (a) => ipcRenderer.invoke("room-buy", a),
   roomCoins: () => ipcRenderer.invoke("room-coins"),
+  roomGrads: () => ipcRenderer.invoke("room-grads"), // 🎓 졸업장 목록
+
   statueImage: (dexId) => ipcRenderer.invoke("statue-image", dexId),
   roomSet: (patch) => ipcRenderer.invoke("room-set", patch),
   // 길드

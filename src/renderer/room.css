@@ -16,43 +16,52 @@
 /* 포켓몬 방의 바닥 가구는 입체 SVG(room.js FURN_SVG) — 디지털 월드는 위 캔버스 그대로 */
 .rm-fs { position: absolute; line-height: 0; }
 .rm-fs svg { display: block; width: 100%; height: 100%; overflow: visible; }
-/* 코인 가구 SVG(room.js COIN_SVG)의 움직임 — 예전엔 0.25초마다 캔버스를 다시 칠했다 */
-.rm-coin .cf-fire, .rm-coin .cf-ripple, .rm-coin .cf-heart, .rm-coin .cf-zz { transform-box: fill-box; }
-.rm-coin .cf-neon { animation: cf-neon 4s infinite; }
+/* 움직이는 SVG(.rm-anim — 코인 가구 COIN_SVG · 길드 홀) — 예전엔 0.25초마다 캔버스를 다시 칠했다 */
+.rm-anim .cf-fire, .rm-anim .cf-ripple, .rm-anim .cf-heart, .rm-anim .cf-zz { transform-box: fill-box; }
+.rm-anim .cf-neon { animation: cf-neon 4s infinite; }
 @keyframes cf-neon { 0%, 90%, 94%, 100% { opacity: 1; } 91%, 95% { opacity: .25; } }
-.rm-coin .cf-zz { animation: cf-zz 3s ease-in-out infinite; opacity: 0; }
-.rm-coin .cf-zz.b { animation-delay: 1.2s; }
+.rm-anim .cf-zz { animation: cf-zz 3s ease-in-out infinite; opacity: 0; }
+.rm-anim .cf-zz.b { animation-delay: 1.2s; }
 @keyframes cf-zz { 0% { opacity: 0; transform: translate(0, 2px); } 30% { opacity: .9; } 100% { opacity: 0; transform: translate(2px, -4px); } }
-.rm-coin .cf-note { animation: cf-note 2.4s ease-out infinite; opacity: 0; }
-.rm-coin .cf-note.b { animation-delay: 1.2s; }
+.rm-anim .cf-note { animation: cf-note 2.4s ease-out infinite; opacity: 0; }
+.rm-anim .cf-note.b { animation-delay: 1.2s; }
 @keyframes cf-note { 0% { opacity: 0; transform: translate(0, 3px); } 20% { opacity: 1; } 60% { transform: translate(1.5px, -4px); } 100% { opacity: 0; transform: translate(-1px, -9px); } }
-.rm-coin .cf-arc { animation: cf-arc 1.5s ease-in-out infinite; }
+.rm-anim .cf-arc { animation: cf-arc 1.5s ease-in-out infinite; }
 @keyframes cf-arc { 0%, 100% { opacity: .5; } 50% { opacity: 1; stroke: #fff; } }
-.rm-coin .cf-spin { animation: cf-spin 1s linear infinite; }
+.rm-anim .cf-spin { animation: cf-spin 1s linear infinite; }
 @keyframes cf-spin { to { stroke-dashoffset: -4.4; } }
-.rm-coin .cf-blink { animation: cf-blink .6s steps(1) infinite; }
-.rm-coin .cf-blink.b { animation-delay: .3s; }
+.rm-anim .cf-blink { animation: cf-blink .6s steps(1) infinite; }
+.rm-anim .cf-blink.b { animation-delay: .3s; }
 @keyframes cf-blink { 50% { fill: #c49000; } }
-.rm-coin .cf-run { animation: cf-run 2.4s linear infinite; }
+.rm-anim .cf-run { animation: cf-run 2.4s linear infinite; }
 @keyframes cf-run { from { transform: translateX(-3px); } to { transform: translateX(15px); } }
-.rm-coin .cf-ufo { animation: cf-ufo 3s ease-in-out infinite; }
+.rm-anim .cf-ufo { animation: cf-ufo 3s ease-in-out infinite; }
 @keyframes cf-ufo { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-5px, 1px); } 50% { transform: translate(-10px, 0); } 75% { transform: translate(-5px, -1px); } }
-.rm-coin .cf-glow { animation: cf-glow 1.1s ease-in-out infinite alternate; }
+.rm-anim .cf-glow { animation: cf-glow 1.1s ease-in-out infinite alternate; }
 @keyframes cf-glow { from { opacity: .7; } to { opacity: 1; } }
-.rm-coin .cf-fire { transform-origin: 50% 100%; animation: cf-fire .5s ease-in-out infinite alternate; }
-.rm-coin .cf-fire.b { animation-duration: .37s; animation-delay: -.2s; }
+.rm-anim .cf-fire { transform-origin: 50% 100%; animation: cf-fire .5s ease-in-out infinite alternate; }
+.rm-anim .cf-fire.b { animation-duration: .37s; animation-delay: -.2s; }
 @keyframes cf-fire { from { transform: scale(1, 1); } to { transform: scale(1.05, .86) skewX(-3deg); } }
-.rm-coin .cf-ripple { transform-origin: 50% 50%; animation: cf-ripple 3.3s ease-out infinite; }
+.rm-anim .cf-ripple { transform-origin: 50% 50%; animation: cf-ripple 3.3s ease-out infinite; }
 @keyframes cf-ripple { from { transform: scale(.3); opacity: .9; } to { transform: scale(1.6); opacity: 0; } }
-.rm-coin .cf-karp { animation: cf-karp 6s ease-in-out infinite; }
+.rm-anim .cf-karp { animation: cf-karp 6s ease-in-out infinite; }
 @keyframes cf-karp { 0%, 100% { transform: translate(0, 0); } 30% { transform: translate(3px, .6px); } 60% { transform: translate(6px, 0); } 70% { transform: translate(7px, -5px) rotate(-8deg); } 76% { transform: translate(8px, 0); } 88% { transform: translate(3px, .4px); } }
-.rm-coin .cf-ball { animation: cf-ball 1.5s steps(1) infinite; }
+.rm-anim .cf-ball { animation: cf-ball 1.5s steps(1) infinite; }
 @keyframes cf-ball { 0%, 16% { filter: brightness(1.6) drop-shadow(0 0 1px #fff); } 17% { filter: none; } }
-.rm-coin .cf-heart { transform-origin: 50% 50%; animation: cf-heart 1s ease-in-out infinite; }
+.rm-anim .cf-heart { transform-origin: 50% 50%; animation: cf-heart 1s ease-in-out infinite; }
 @keyframes cf-heart { 0%, 100% { transform: scale(1); fill: #4caf50; } 15% { transform: scale(1.18); fill: #9cf09c; } 30% { transform: scale(1); } }
-.rm-coin .cf-spark { animation: cf-spark 2s steps(1) infinite; }
+.rm-anim .cf-spark { animation: cf-spark 2s steps(1) infinite; }
 @keyframes cf-spark { 0% { transform: translate(6px, 8px); } 25% { transform: translate(20px, 12px) scale(.7); } 50% { transform: translate(18px, 26px); } 75% { transform: translate(7px, 24px) scale(.8); } }
-@media (prefers-reduced-motion: reduce) { .rm-coin * { animation: none !important; } }
+/* 길드 홀(room.js hallDecorSvg · HALL_SVG) — 등불이 흔들리고, 수족관 물고기가 오가고, 분수 물줄기가 흐른다 */
+.rm-anim .cf-swing { transform-box: fill-box; transform-origin: 50% 0; animation: cf-swing 2.6s ease-in-out infinite alternate; }
+@keyframes cf-swing { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+.rm-anim .cf-swim { animation: cf-swim 7s ease-in-out infinite; }
+.rm-anim .cf-swim.r { animation-name: cf-swim-r; animation-duration: 8.5s; }
+@keyframes cf-swim { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(6px, 1px); } }
+@keyframes cf-swim-r { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-6px, -1px); } }
+.rm-anim .cf-flow { animation: cf-flow .6s linear infinite; }
+@keyframes cf-flow { to { stroke-dashoffset: -3.2; } }
+@media (prefers-reduced-motion: reduce) { .rm-anim * { animation: none !important; } }
 /* 가구 옮기기 — 옮길 수 있는 가구에 점선, 끌면 노란 선. 포켓몬은 흐리게 비켜 둔다 */
 .rm-room.edit { touch-action: none; }
 .rm-room.edit .rm-f[data-move] { pointer-events: auto; cursor: grab; outline: 1px dashed rgba(255, 255, 255, .6); outline-offset: -1px; }
@@ -73,6 +82,9 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .rm-gyb svg { width: 100%; height: 100%; filter: drop-shadow(0 .15cqw .2cqw rgba(0, 0, 0, .45)); }
 .rm-room[data-per="evening"] .rm-gyb { filter: brightness(.9); }
 .rm-room[data-per="night"] .rm-gyb { filter: brightness(.75) saturate(.85); }
+/* 🌤️ 방 조명(room.js roomLightSvg) — 도트 벽지 · 바닥 · 창문 · 러그 위(같은 z 에서 뒤에 얹힌다), 벽 장식 · 가구 아래 */
+.rm-light { position: absolute; inset: 0; z-index: 2; pointer-events: none; line-height: 0; }
+.rm-light svg { display: block; width: 100%; height: 100%; }
 /* 🖼️ 벽 장식 SVG(room.js dexFrameSvg · posterSvg · trophySvg · weekMedalSvg) — 글자(rm-txt)는 이 위에 */
 .rm-wl { position: absolute; z-index: 2; pointer-events: none; line-height: 0; }
 .rm-wl svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 .15cqw .2cqw rgba(0, 0, 0, .3)); }
@@ -336,3 +348,28 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .rm-mon.dance .rm-body { animation: rm-dance .5s ease-in-out infinite; }
 @keyframes rm-dance { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-8%) rotate(6deg); } }
 .rm-mon.heal img { filter: drop-shadow(0 0 2px #ff8ab0) drop-shadow(0 0 4px #ffc1d6); }
+
+/* 🎓 졸업장 더미 — 내 방에서만 누를 수 있다(길드원의 방 · 가구 옮기기 중엔 그냥 그림) */
+.rm-hot { position: absolute; z-index: 6; padding: 0; border: 0; background: none; border-radius: 6px; pointer-events: none; }
+#rmRoom:not(.edit) .rm-hot { pointer-events: auto; cursor: pointer; }
+#rmRoom:not(.edit) .rm-hot:hover { background: rgba(255, 245, 200, .16); box-shadow: 0 0 0 1px rgba(255, 224, 130, .55); }
+
+/* 🎓 졸업장 앨범(room.js openGrads) — 방 아래에 펼친다. 한 장에 한 마리 */
+.rm-grads { margin: 8px 0 4px; padding: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.rg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+.rg-head span { color: var(--dim); font-size: 10.5px; flex: 1; }
+.rg-x { font: inherit; font-size: 11px; padding: 2px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--card2); color: var(--text); cursor: pointer; }
+.rg-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; max-height: 340px; overflow-y: auto; padding: 2px; }
+.rg-card { position: relative; padding: 9px 6px 8px; text-align: center; color: #3b2a12; background: linear-gradient(160deg, #fffdf6, #f3e8cc); border-radius: 3px;
+  box-shadow: inset 0 0 0 2px #fffaf0, inset 0 0 0 3px #c9a227, inset 0 0 0 5px #fffaf0, inset 0 0 0 5.6px #c9a22788, 0 2px 4px rgba(0, 0, 0, .25); }
+.rg-no { font-size: 9px; color: #8a6a12; letter-spacing: .05em; }
+.rg-pic { height: 56px; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+.rg-pic img { max-width: 64px; max-height: 56px; image-rendering: pixelated; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .2)); }
+.rg-name { font-weight: 800; font-size: 12px; margin-top: 2px; }
+.rg-meta { font-size: 10px; color: #b8860b; margin-top: 1px; min-height: 13px; }
+.rg-at { font-size: 9.5px; color: #7a6a52; margin-top: 3px; }
+.rg-seal { position: absolute; right: 8px; top: 8px; width: 13px; height: 13px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ff8a80, #e53935 55%, #8e0000); box-shadow: 0 0 0 1.5px #ffcdd2 inset; }
+.rg-seal::before, .rg-seal::after { content: ""; position: absolute; top: 10px; width: 4px; height: 6px; background: #c62828; }
+.rg-seal::before { left: 2px; transform: rotate(18deg); } .rg-seal::after { right: 2px; transform: rotate(-18deg); }
+.rg-empty { grid-column: 1 / -1; color: var(--dim); font-size: 11px; padding: 10px; text-align: center; }
+.rm-txt.sm.cup { color: #8a5a00; font-size: 1.5cqw; text-shadow: 0 1px 0 #fff6c2; } /* 🏆×N — 트로피가 셋을 넘으면 */

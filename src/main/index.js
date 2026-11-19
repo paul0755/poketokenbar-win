@@ -2025,7 +2025,7 @@ function roomState() {
     tags: r.tags, // 이름표 늘 보이기
     mons: room.monsIn(save, isEggMon),
     max: room.MAX_MONS,
-    // 기록 장식 — 졸업 트로피(마지막 졸업생 이름), 결투 배지(친선 + 박스 결투 승수)
+    // 기록 장식 — 졸업장(마지막 졸업생 이름 · 목록은 roomGrads), 결투 메달(친선 + 박스 결투 승수), 챔피언 트로피(champ)
     graduated: (save.graduated || []).length,
     lastGrad: ((save.graduated || []).slice(-1)[0] || {}).name || null,
     wins: ((save.friendRecord || {}).w || 0) + (save.box || []).reduce((a, m) => a + ((m.record || {}).w || 0), 0),
@@ -2033,6 +2033,18 @@ function roomState() {
     badges: (save.badges || []).length, // 🏟️ 체육관 배지 진열장 — 배지는 차례로 따니 개수만 알면 어느 배지인지 안다
     champ: (save.champion || {}).clears || 0, // 🏆 챔피언이 된 횟수 — 진열장 위 트로피
   };
+}
+
+/**
+ * 🎓 졸업장 목록 — 방의 졸업장 더미를 누르면 연다. 최근 졸업이 먼저.
+ * 졸업 기록(save.graduated)에 남은 이름 · 도감 번호 · 희귀도 · 성격 · 날짜에 그림만 붙인다
+ */
+async function roomGrads() {
+  const list = (save.graduated || []).map((g, i) => ({ ...g, no: i + 1 })).reverse();
+  return Promise.all(list.map(async (g) => ({
+    no: g.no, name: g.name, dexId: g.dexId || null, stars: g.stars || 0, nature: g.nature || "", at: g.at || "",
+    url: g.dexId ? await spriteUrl({ dexId: g.dexId, isShiny: false }, "anim").catch(() => null) : null,
+  })));
 }
 
 /** 배경·가구를 산다. 사탕은 상점과 같은 지갑에서 나간다. 코인 꾸미기는 코인 지갑으로(coinBuy) */
@@ -5300,6 +5312,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("raid-swap", (_e, a) => raidSwap(a || {}));
   ipcMain.handle("room-buy", (_e, { kind, id } = {}) => roomBuy(kind, id));
   ipcMain.handle("room-coins", () => roomCoins());
+  ipcMain.handle("room-grads", () => roomGrads());
   ipcMain.handle("statue-image", (_e, dexId) => statueImage(dexId));
   ipcMain.handle("room-set", (_e, patch) => roomSet(patch || {}));
   ipcMain.handle("set-moves", (_e, id, ids) => setMoves(id, ids));
