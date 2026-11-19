@@ -86,7 +86,7 @@
 코드 서명이 없어 **"Windows에서 PC를 보호했습니다"** 창이 뜨면 **추가 정보 → 실행**을 누르세요.
 
 ```
-SHA-256  0215a8a4ddc503a31e72ba327b8b16d393f619113e48e142efb32d212eacf8ee
+SHA-256  84713e4c38e0d2b2062a7d1a4bffb5b0afebf5a7965a1f93910e5ac723ac0a58
 ```
 
 ---
