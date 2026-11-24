@@ -1071,8 +1071,9 @@ function guildTeamCode() {
 }
 
 /**
- * 레이드 후보 — 남의 도전에서 대표 포켓몬이 쓰러지면 차례로 나갈 아이들(대표 빼고 RAID_LINEUP - 1 마리).
- * 많이 자란 순서. 대표 코드처럼 아이 · 레벨이 그대로면 전에 만든 코드를 다시 쓴다.
+ * 레이드 후보 — 남의 도전에서 함께 나갈 아이들(대표 빼고 RAID_LINEUP - 1 마리).
+ * 레벨 높은 순(같으면 많이 자란 순). 받는 쪽이 대표와 합쳐 다시 레벨 순으로 세운다(raidAttack) — 방 배치와 상관없이.
+ * 대표 코드처럼 아이 · 레벨이 그대로면 전에 만든 코드를 다시 쓴다.
  */
 let guildBench = { key: "", codes: [] };
 function guildBenchCodes() {
@@ -1080,11 +1081,10 @@ function guildBenchCodes() {
   const sp = growthSpeed();
   const pick = save.box
     .filter((m) => m && m !== rep && raidFighter(m.id))
-    .map((m) => ({ m, grown: box.effOf(m, sp) }))
-    .sort((a, b) => b.grown - a.grown)
+    .map((m) => { const grown = box.effOf(m, sp), p = profile.build(box.withLv(m, sp), grown); return { m, grown, p, lv: p ? p.level : 0 }; })
+    .sort((a, b) => b.lv - a.lv || b.grown - a.grown)
     .slice(0, RAID_LINEUP - 1);
-  const rows = pick.map(({ m, grown }) => {
-    const p = profile.build(box.withLv(m, sp), grown);
+  const rows = pick.map(({ m, grown, p }) => {
     return { m, grown, key: [m.id, poke.stageFor(grown, m.line), p ? p.level : 0, (m.tmMoves || []).length, (m.moveSet || []).join("."), (m.moveForgot || []).join("."), m.nature, m.hold || ""].join("|") };
   });
   const key = rows.map((x) => x.key).join(",") + "|" + save.trainerName + "|" + megaOn();
@@ -1601,8 +1601,29 @@ async function raidPack(L, seg) {
 }
 
 /**
- * 보스에게 도전한다 — 내 아이 한 마리와 다른 길드원 모두의 대표 포켓몬이 한꺼번에 싸운다(raidbattle.js).
- * 길드원의 대표가 쓰러지면 그 사람이 올려 둔 후보가 저절로 이어 나온다.
+ * 길드원 한 사람이 레이드에 내보낼 아이들 — 대표 코드와 후보 코드를 합쳐 레벨 높은 순(같으면 많이 자란 순, 그래도
+ * 같으면 올린 순)으로 RAID_LINEUP 마리. 길드 방 배치(대표)와 상관없이 센 아이부터 나간다. 옛 버전 길드원의 후보(많이
+ * 자란 순)도 여기서 다시 세운다. 같은 코드는 한 번만.
+ * 💎 돌을 지녔으면 메가진화한다 — 에너지는 쓰지 않는다(그 사람이 메가진화를 꺼 두었으면 코드에 돌이 없다)
+ */
+function raidLineup(x) {
+  const codes = [...new Set([x.team, ...(Array.isArray(x.bench) ? x.bench.slice(0, RAID_LINEUP - 1) : [])])];
+  return codes
+    .map((c, k) => {
+      const t = raidbattle.parseTeam(c); // 말이 안 되는 코드(고친 세이브 등)는 그 아이만 빠진다
+      if (!t) return null;
+      const p = profile.build(t.mon, t.grown);
+      return { mon: { id: k ? `raid-${x.id}-${k}` : "raid-" + x.id, ...t.mon }, grown: t.grown, mega: mega.stoneForm(t.mon.hold), lv: p ? p.level : 0, k };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.lv - a.lv || b.grown - a.grown || a.k - b.k)
+    .slice(0, RAID_LINEUP)
+    .map(({ mon, grown, mega: form }) => ({ mon, grown, mega: form }));
+}
+
+/**
+ * 보스에게 도전한다 — 내 아이 한 마리와 다른 길드원 모두의 가장 레벨 높은 아이가 한꺼번에 싸운다(raidbattle.js).
+ * 길드원의 아이가 쓰러지면 그 사람의 다음 아이(레벨 순)가 저절로 이어 나온다.
  * 내 아이가 쓰러지면 멈추고(need) 화면이 다음 아이를 고른다(raidNext). 깎은 칸은 포켓몬 주인마다 따로
  * 알린다. 화면은 보스 탭이 재생한다(boss.js).
  */
@@ -1617,14 +1638,10 @@ async function raidAttack(monId) {
   const allies = [raidAlly(m)];
   // 길드원의 코드가 말이 안 되면(고친 세이브 등) 그 아이만 빠진다
   for (const x of s.party || []) {
-    const t = raidbattle.parseTeam(x.team);
-    if (!t) continue;
-    // 후보 — 대표가 쓰러지면 차례로 나온다(옛 버전 길드원은 없다)
-    const bench = (Array.isArray(x.bench) ? x.bench : []).slice(0, RAID_LINEUP - 1)
-      .map((c, k) => { const b = raidbattle.parseTeam(c); return b && { mon: { id: `raid-${x.id}-${k + 1}`, ...b.mon }, grown: b.grown, mega: mega.stoneForm(b.mon.hold) }; })
-      .filter(Boolean);
-    // 💎 길드원의 아이도 돌을 지녔으면 메가진화한다 — 에너지는 쓰지 않는다(그 사람이 메가진화를 꺼 두었으면 코드에 돌이 없다)
-    allies.push({ mon: { id: "raid-" + x.id, ...t.mon }, grown: t.grown, owner: x.trainer || "", member: x.id, bench, mega: mega.stoneForm(t.mon.hold) });
+    const lineup = raidLineup(x);
+    if (!lineup.length) continue;
+    const [lead, ...bench] = lineup; // 가장 높은 아이가 먼저, 쓰러지면 다음 레벨 순으로 그 자리에
+    allies.push({ ...lead, owner: x.trainer || "", member: x.id, bench });
   }
   const b = raidbattle.start(allies, { mon: raidBoss(s.line), grown: RAID_BOSS_GROWN }, friend.rng(s.seed), { level: 50, bars: s.start / 1000, megaBudget: megaEnergy() });
   if (!b) return { ok: false, reason: "결투를 시작하지 못했습니다" };
@@ -1655,7 +1672,8 @@ async function raidView() {
   const v = await guildView();
   if (!v.ok) return v;
   const others = v.members.filter((m) => !m.me && m.canBattle).map((m) => {
-    const x = m.room.mons[0];
+    // 레이드는 레벨 높은 아이부터 나간다 — 미리 보기도 방에 보이는 아이 중 가장 높은 아이로(후보 코드는 길드 보기에 없다)
+    const x = [...m.room.mons].sort((a, b) => ((b.profile && b.profile.level) || 0) - ((a.profile && a.profile.level) || 0))[0];
     return { id: m.id, trainer: m.trainer, name: x ? x.name : "", url: x ? x.animUrl || x.url : null };
   });
   return { ok: true, raid: v.raid, members: others, walletOk: v.walletOk, lineup: RAID_LINEUP, name: v.name };
