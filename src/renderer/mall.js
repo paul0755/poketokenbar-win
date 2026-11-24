@@ -176,7 +176,7 @@
         const left = Math.max(0, Math.ceil((l.expires - Date.now()) / 86_400_000));
         return `<div class="ml-card${l.mine ? " mine" : ""}${l.legendary ? " legend" : ""}">
           <div class="pic">${l.animUrl || l.url ? `<img src="${esc(l.animUrl || l.url)}" alt="">` : ""}</div>
-          <div class="nm">${esc(l.name)}${l.shiny ? " ★" : ""} <span class="lv">Lv.${l.level ?? "?"}</span></div>
+          <div class="nm">${esc(l.name)}${l.shiny ? " ★" : ""}${l.plus ? ` <span class="pl" title="✨ 강화 +${l.plus}">+${l.plus}</span>` : ""} <span class="lv">Lv.${l.level ?? "?"}</span></div>
           <div class="ty">${(l.typeKeys || []).map((k, i) => `<span class="t t-${k}">${esc(l.types[i])}</span>`).join("")}<span class="st">${"★".repeat(l.stars)} ${esc(l.stage)}</span></div>
           <div class="meta">개체값 ${l.ivTotal}/186 · ${esc(l.nature)} · ${esc(l.ability || "")}</div>
           ${l.passives.length ? `<div class="meta">패시브 ${l.passives.map(esc).join(", ")}</div>` : ""}

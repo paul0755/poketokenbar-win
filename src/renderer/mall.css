@@ -36,6 +36,7 @@
 .ml-card .pic img { max-height: 64px; max-width: 100%; object-fit: contain; image-rendering: pixelated; }
 .ml-card .nm { font-size: 12.5px; font-weight: 800; }
 .ml-card .nm .lv { font-size: 10.5px; color: var(--accent); }
+.ml-card .nm .pl { padding: 0 5px; border-radius: 99px; font: 800 9.5px/1.5 Consolas, monospace; color: #3a2a00; background: #ffd54a; vertical-align: 1px; } /* ✨ 강화 +N */
 .ml-card .ty { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
 .ml-card .ty .t { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 99px; background: #33363f; }
 .ml-card .ty .st { margin-left: auto; font-size: 9.5px; color: var(--muted); }

@@ -1847,7 +1847,7 @@ async function shopSell(id) {
   return { ok: true, message: `${battle.josa(name, "을를")} 상점에 팔았습니다 +🪙${r.got}${r.got < r.price ? " (오늘 한도까지)" : ""}` };
 }
 
-/** 몰에 올릴 내용 — 교환 코드와 같다. 변하지않는돌을 지녔으면 레벨용 성장량도 */
+/** 몰에 올릴 내용 — 교환 코드와 같다. 변하지않는돌을 지녔으면 레벨용 성장량도. ✨ 강화 +N 도 실린다(0.19.1 서버부터 지킨다) */
 function monPayload(m) {
   const grown = box.effOf(m, growthSpeed());
   const lv = box.withLv(m, growthSpeed()).lvGrown;
@@ -1855,6 +1855,7 @@ function monPayload(m) {
     line: m.line, nature: m.nature ?? 0, shiny: Boolean(m.shiny), ivs: m.ivs, gender: m.gender, ability: m.ability ?? 0,
     eggMoves: m.eggMoves || [], tmMoves: m.tmMoves || [], grown: Math.round(grown), lvGrown: lv > grown ? Math.round(lv) : null,
     hold: m.hold === "everstone", ot: m.ot || save.trainerName || "", caughtAt: m.caughtAt || null,
+    plus: m.plus || 0,
   };
 }
 
@@ -1876,6 +1877,7 @@ function addMon(p, { evolve = false } = {}) {
     caughtAt: p.caughtAt || new Date().toISOString().slice(0, 10), graduatedAt: null,
     ot: p.ot || "", traded: evolve ? new Date().toISOString().slice(0, 10) : undefined,
   };
+  if (Number.isInteger(p.plus) && p.plus >= 1 && p.plus <= 5) m.plus = p.plus; // ✨ 강화 +N — 옛 서버 · 옛 앱이 올린 매물엔 없다(+0)
   if (p.hold) {
     const cap = poke.stoneCap(m.line, grown);
     if (cap != null) Object.assign(m, { hold: "everstone", holdCap: cap, fed: Math.max(grown, p.lvGrown || 0) });
@@ -1929,6 +1931,7 @@ async function marketView() {
       name: d.name, stage: d.stage.label, stageKey: d.stage.key, shiny: d.isShiny, stars: rr.stars, rarity: rr.label, legendary: Boolean((poke.LINES[mon.line] || {}).legendary),
       level: p ? p.level : null, ivTotal: p ? p.ivTotal : null, types: p ? p.types : [], typeKeys: p ? p.typeKeys : [],
       nature: (poke.NATURES[mon.nature] || {}).name || "", ability: p ? p.ability : "", passives: p ? p.eggMoves.map((x) => x.name) : [],
+      plus: Number.isInteger(mon.plus) && mon.plus >= 1 && mon.plus <= 5 ? mon.plus : 0,
       hold: mon.hold, ot: mon.ot, evolvesTo: !mon.hold && tradeEvolves(mon.line, mon.grown) >= 0 ? poke.LINES[mon.line].names[tradeEvolves(mon.line, mon.grown) + 1] : null,
       valid: !bad, invalidWhy: bad || null,
       url: await url(d, "still"), animUrl: await url(d, "anim"),

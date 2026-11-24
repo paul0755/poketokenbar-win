@@ -38,7 +38,7 @@ const str = (v, n) => String(v ?? "").replace(/[\u0000-\u001f]/g, "").trim().sli
 const isInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 const GENDERS = ["무성", "수컷", "암컷"];
 
-/** 판매할 아이 — 교환 코드와 같은 내용. 꼴만 본다 */
+/** 판매할 아이 — 교환 코드와 같은 내용. 꼴만 본다. ✨ 강화 +N(plus)은 옛 앱이 안 보내니 없으면 0 */
 function cleanMon(m) {
   if (!m || typeof m !== "object") return null;
   const ok =
@@ -54,6 +54,7 @@ function cleanMon(m) {
     eggMoves: m.eggMoves, tmMoves: m.tmMoves, grown: Math.round(m.grown),
     lvGrown: Number.isFinite(m.lvGrown) && m.lvGrown > m.grown && m.lvGrown <= 5e9 ? Math.round(m.lvGrown) : null,
     hold: m.hold === true, ot: str(m.ot, 16), caughtAt: /^\d{4}-\d{2}-\d{2}$/.test(m.caughtAt) ? m.caughtAt : null,
+    plus: isInt(m.plus, 0, 5) ? m.plus : 0,
   };
 }
 
