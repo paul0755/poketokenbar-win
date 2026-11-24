@@ -1847,7 +1847,7 @@ async function shopSell(id) {
   return { ok: true, message: `${battle.josa(name, "을를")} 상점에 팔았습니다 +🪙${r.got}${r.got < r.price ? " (오늘 한도까지)" : ""}` };
 }
 
-/** 몰에 올릴 내용 — 교환 코드와 같다. 변하지않는돌을 지녔으면 레벨용 성장량도. ✨ 강화 +N 도 실린다(0.19.1 서버부터 지킨다) */
+/** 몰에 올릴 내용 — 교환 코드와 같다. 변하지않는돌을 지녔으면 레벨용 성장량도. ✨ 강화 +N 도 실린다(몰 서버가 지킨다 — 0.20.0 부터) */
 function monPayload(m) {
   const grown = box.effOf(m, growthSpeed());
   const lv = box.withLv(m, growthSpeed()).lvGrown;
@@ -3204,6 +3204,7 @@ async function buildStats() {
         skills: d.skills || null, // 🦖 필살기 — 펫이 디지털 연출로 쓴다(digifx.js)
         attr: d.attr || null, // 🦖 속성 — 연출 색
         fav: Boolean(m.fav),
+        legend: d.stage.key !== "egg" && Boolean((poke.LINES[m.line] || {}).legendary), // ⭐ 전설만 보기. 알은 깨기 전까지 모른다
         dex: d.dexId || 0, // 박스 정렬(도감 번호 순). 알은 0
         ratio: d.progress.ratio,
         next: d.progress.next,

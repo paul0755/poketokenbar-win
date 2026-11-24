@@ -45,12 +45,12 @@
   {"key":"lopunny","id":10088,"dex":428,"name":"메가이어롭","stone":"lopunny","stoneName":"이어롭나이트","types":[1,2],"base":[65,136,94,54,96,135],"ability":113},
   {"key":"salamence","id":10089,"dex":373,"name":"메가보만다","stone":"salamence","stoneName":"보만다나이트","types":[16,3],"base":[95,145,130,120,90,120],"ability":184},
   {"key":"beedrill","id":10090,"dex":15,"name":"메가독침붕","stone":"beedrill","stoneName":"독침붕나이트","types":[7,4],"base":[65,150,40,15,80,145],"ability":91},
-  {"key":"clefable","id":10278,"dex":36,"name":"메가픽시","stone":"clefable","stoneName":"픽시나이트","types":[18,3],"base":[95,80,93,135,110,70]},
-  {"key":"victreebel","id":10279,"dex":71,"name":"메가우츠보트","stone":"victreebel","stoneName":"우츠보트나이트","types":[12,4],"base":[80,125,85,135,95,70]},
-  {"key":"starmie","id":10280,"dex":121,"name":"메가아쿠스타","stone":"starmie","stoneName":"아쿠스타나이트","types":[11,14],"base":[60,100,105,130,105,120]},
-  {"key":"dragonite","id":10281,"dex":149,"name":"메가망나뇽","stone":"dragonite","stoneName":"망나뇽나이트","types":[16,3],"base":[91,124,115,145,125,100]},
-  {"key":"meganium","id":10282,"dex":154,"name":"메가메가니움","stone":"meganium","stoneName":"메가니움나이트","types":[12,18],"base":[80,92,115,143,115,80]},
-  {"key":"feraligatr","id":10283,"dex":160,"name":"메가장크로다일","stone":"feraligatr","stoneName":"장크로다일나이트","types":[11,16],"base":[85,160,125,89,93,78]},
-  {"key":"skarmory","id":10284,"dex":227,"name":"메가무장조","stone":"skarmory","stoneName":"무장조나이트","types":[9,3],"base":[65,140,110,40,100,110]},
-  {"key":"emboar","id":10286,"dex":500,"name":"메가염무왕","stone":"emboar","stoneName":"염무왕나이트","types":[10,2],"base":[110,148,75,110,110,75]}
+  {"key":"clefable","id":10278,"dex":36,"name":"메가픽시","stone":"clefable","stoneName":"픽시나이트","types":[18,3],"base":[95,80,93,135,110,70],"ability":156},
+  {"key":"victreebel","id":10279,"dex":71,"name":"메가우츠보트","stone":"victreebel","stoneName":"우츠보트나이트","types":[12,4],"base":[80,125,85,135,95,70],"ability":215},
+  {"key":"starmie","id":10280,"dex":121,"name":"메가아쿠스타","stone":"starmie","stoneName":"아쿠스타나이트","types":[11,14],"base":[60,100,105,130,105,120],"ability":37},
+  {"key":"dragonite","id":10281,"dex":149,"name":"메가망나뇽","stone":"dragonite","stoneName":"망나뇽나이트","types":[16,3],"base":[91,124,115,145,125,100],"ability":136},
+  {"key":"meganium","id":10282,"dex":154,"name":"메가메가니움","stone":"meganium","stoneName":"메가니움나이트","types":[12,18],"base":[80,92,115,143,115,80],"ability":310},
+  {"key":"feraligatr","id":10283,"dex":160,"name":"메가장크로다일","stone":"feraligatr","stoneName":"장크로다일나이트","types":[11,16],"base":[85,160,125,89,93,78],"ability":309},
+  {"key":"skarmory","id":10284,"dex":227,"name":"메가무장조","stone":"skarmory","stoneName":"무장조나이트","types":[9,3],"base":[65,140,110,40,100,110],"ability":242},
+  {"key":"emboar","id":10286,"dex":500,"name":"메가염무왕","stone":"emboar","stoneName":"염무왕나이트","types":[10,2],"base":[110,148,75,110,110,75],"ability":104}
 ]

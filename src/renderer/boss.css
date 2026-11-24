@@ -84,6 +84,7 @@
 .bs-log .bad { color: var(--dim); }
 .bs-log .ft { color: var(--red); font-weight: 700; }
 .bs-log .sys { color: var(--accent); }
+.bs-log .ab { color: #c9a4ff; } /* ✨ 특성이 움직였다 */
 .bs-log .rw { color: var(--green); font-weight: 700; }
 .bs-log .turn { color: var(--dim); font-size: 10px; margin-top: 3px; }
 

@@ -116,7 +116,7 @@ function fighter(mon, grown, level = null) {
 
 /* ---------------- 특성 · 날씨 도우미 ---------------- */
 
-/** 이 아이가 지금 이 특성인가. noAb — 화학변화가스 · 레이드 */
+/** 이 아이가 지금 이 특성인가. noAb — 화학변화가스(레이드도 0.20.0 부터 특성이 있다) */
 const has = (f, k) => Boolean(f && !f.noAb && f.ab === k);
 const breaks = (f) => Boolean(f && !f.noAb && AB.BREAKER.has(f.ab));
 /** 상대(by)의 기술을 막거나 줄이는 특성 — by 가 틀깨기면 없는 셈 */
@@ -131,6 +131,9 @@ function weather(f) {
   if (fd.F.some((x) => x.hp > 0 && (has(x, K.날씨부정) || has(x, K.에어록)))) return null;
   return fd.w;
 }
+
+/** 내가 쓰는 기술이 받는 날씨 — 💎 메가솔라는 날씨와 상관없이 햇살(Z-A 메가메가니움) */
+const moveWeather = (f) => (has(f, K.메가솔라) ? "sun" : weather(f));
 
 /** 위급할 때 1.5배가 되는 타입 */
 const PINCH = { [K.심록]: "grass", [K.맹화]: "fire", [K.급류]: "water", [K.벌레의알림]: "bug" };
@@ -147,12 +150,13 @@ function sheerable(mv) {
 function moveAs(me, mv) {
   if (!mv || mv.t === -1) return mv;
   if (mv.id === AB.WEATHER_BALL) {
-    const t = { sun: 10, rain: 11, sand: 6, hail: 15 }[weather(me)];
+    const t = { sun: 10, rain: 11, sand: 6, hail: 15 }[moveWeather(me)];
     if (t) return { ...mv, t, p: 100 };
   }
   if (has(me, K.노말스킨)) return mv.t === 1 ? mv : { ...mv, t: 1 };
-  const skin = has(me, K.스카이스킨) ? 3 : has(me, K.페어리스킨) ? 18 : has(me, K.프리즈스킨) ? 15 : 0;
-  if (skin && mv.t === 1 && mv.c !== "status") return { ...mv, t: skin, skin: true };
+  // 6세대 스킨은 1.3배, Z-A 의 드래곤스킨은 1.2배(7세대부터의 스킨 배율)
+  const skin = has(me, K.스카이스킨) ? 3 : has(me, K.페어리스킨) ? 18 : has(me, K.프리즈스킨) ? 15 : has(me, K.드래곤스킨) ? 16 : 0;
+  if (skin && mv.t === 1 && mv.c !== "status") return { ...mv, t: skin, skin: skin === 16 ? 1.2 : 1.3 };
   return mv;
 }
 
@@ -274,7 +278,7 @@ function bpMul(att, def, mv) {
   if (has(att, K.단단한발톱) && AB.contact(mv)) m *= 1.3;
   if (has(att, K.메가런처) && AB.PULSE.has(mv.id)) m *= 1.5;
   if (has(att, K.옹골찬턱) && AB.BITE.has(mv.id)) m *= 1.5;
-  if (mv.skin) m *= 1.3;
+  if (mv.skin) m *= mv.skin;
   if (!att.noAb && PINCH[att.ab] === tk && att.hp * 3 <= att.maxHp) m *= 1.5;
   if (has(att, K.투쟁심) && att.gender !== "무성" && def.gender !== "무성") m *= att.gender === def.gender ? 1.25 : 0.75;
   if (has(att, K.애널라이즈) && mv.last) m *= 1.3;
@@ -296,7 +300,7 @@ function aMul(att, def, mv) {
   if (phys && has(att, K.의욕)) m *= 1.5;
   if (phys && att.slow > 0 && has(att, K.슬로스타트)) m *= 0.5;
   if (att.hp * 2 <= att.maxHp && has(att, K.무기력)) m *= 0.5;
-  const w = weather(att);
+  const w = moveWeather(att);
   if (!phys && w === "sun" && has(att, K.선파워)) m *= 1.5;
   if (phys && w === "sun" && has(att, K.플라워기프트)) m *= 1.5;
   const tk = typeK(mv.t);
@@ -321,7 +325,7 @@ function finalMul(att, def, mv, e) {
   if (e > 0 && e < 1 && has(att, K.색안경)) m *= 2;
   if (e > 1 && (guard(def, K.하드록, att) || guard(def, K.필터, att))) m *= 0.75;
   if (def.hp === def.maxHp && guard(def, K.멀티스케일, att)) m *= 0.5;
-  const w = weather(att);
+  const w = moveWeather(att);
   const tk = typeK(mv.t);
   if (w === "rain") m *= tk === "water" ? 1.5 : tk === "fire" ? 0.5 : 1;
   if (w === "sun") m *= tk === "fire" ? 1.5 : tk === "water" ? 0.5 : 1;
@@ -817,7 +821,7 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
 
     // 명중. 명중률이 없는 기술(칼춤 등)과 나에게 거는 기술은 반드시 맞는다. 노가드면 서로 반드시 맞는다
     if (mv.a != null && !self && !has(me, K.노가드) && !has(foe, K.노가드)) {
-      const w = weather(me);
+      const w = moveWeather(me);
       let a = mv.a;
       let sure = false;
       if (AB.RAIN_SURE.has(mv.id)) { if (w === "rain") sure = true; else if (w === "sun") a = 50; }
@@ -853,7 +857,7 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
       let did = false;
       if (mv.hl) {
         let pct = mv.hl;
-        const w = weather(me);
+        const w = moveWeather(me);
         if (AB.MOON_HEAL.has(mv.id) && w && w !== "wind") pct = w === "sun" ? 200 / 3 : 25;
         setHp(i, me.hp + (me.maxHp * pct) / 100, `${nm(i)}의 체력이 회복되었다!`);
         did = true;
@@ -885,11 +889,17 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
       let sturdy = false;
       if (amount >= foe.hp && foe.hp === foe.maxHp && foe.maxHp > 1 && guard(foe, K.옹골참, me)) { amount = foe.hp - 1; sturdy = true; }
       // 흡수 · 반동은 실제로 깎은 만큼만 — Lv.100 이 Lv.6 을 이판사판태클로 치고 반동으로 같이 쓰러지던 것
-      dealt += Math.min(amount, foe.hp);
+      const lost = Math.min(amount, foe.hp);
+      dealt += lost;
       hitCount++;
       setHp(j, foe.hp - amount, crit ? "급소에 맞았다!" : "");
       if (sturdy) pop(j, `${nm(j)}의 옹골참! 공격을 버텼다!`);
       afterHit(i, j, hm, crit, touch);
+      // 💎 내용물분출 — 쓰러지면 그 공격으로 잃은 체력만큼 되돌려준다(Z-A 메가우츠보트). 틀깨기로도 못 막는다
+      if (foe.hp <= 0 && has(foe, K.내용물분출) && me.hp > 0 && !has(me, K.매직가드)) {
+        pop(j);
+        setHp(i, me.hp - lost, `${josa(nm(i), "은는")} 데미지를 입었다!`);
+      }
     }
     if (lastE === 0) return void say({ t: "info", side: j, text: `${nm(j)}에게는 효과가 없는 것 같다...` });
     if (lastE > 1) say({ t: "info", side: j, eff: lastE, text: "효과가 굉장했다!" });
@@ -1086,4 +1096,7 @@ function run(monA, grownA, monB, grownB, rng = Math.random, opts = {}) {
   };
 }
 
-module.exports = { run, fighter, effectiveness, damage, josa, MAX_TURNS };
+/** ⚔️ 레이드(raidbattle.js)가 빌리는 특성 · 날씨 도우미 — 여럿 대 하나도 같은 규칙으로 */
+const abil = { has, guard, moveAs, absorbOf, critChance, eff, effOf, ailGuardOf, dropGuardOf, weather, moveWeather, isType, WEATHER_KO, WEATHER_TURNS };
+
+module.exports = { run, fighter, effectiveness, damage, josa, MAX_TURNS, abil };

@@ -7,7 +7,7 @@
  *
  * ── 무엇이 바뀌나 ──
  * 타입과 종족값(HP 빼고 — 원작도 메가진화로 HP 종족값은 그대로다). 개체값 · 성격 · 레벨 · 기술은 그대로.
- * 특성은 결투 규칙에 없어서(battle.js 머리말) 바뀌는 특성은 화면에만 적는다.
+ * ✨ 특성도 메가의 특성으로 바뀐다(form.ability — 원작 46종 · Z-A 8종 모두).
  * 그림은 Showdown 의 3D 모델(pokemon.js 의 kind "3d" · "3dback")로 바뀐다 — 흑백 도트에는 메가가 없다.
  *
  * ── 규칙 ──
@@ -55,7 +55,7 @@ const lineFits = (ids, item) => {
 /**
  * 싸우는 아이(battle.fighter 의 꼴)를 메가진화시킨다 — 타입 · 능력치(HP 빼고) · 이름 · 특성.
  * 랭크 · 상태이상 · 체력은 그대로. megaId 는 그림(Showdown 폼 번호)
- * ✨ form.ability 가 있으면 메가의 특성(원작 6세대)으로 바뀐다. 레전즈 Z-A 의 새 메가는 아직 원래 특성 그대로
+ * ✨ form.ability 가 있으면 메가의 특성으로 바뀐다(원작 6세대 · 레전즈 Z-A)
  */
 function evolve(f, form) {
   const st = profile.statsOf(f.dexId, f.level, f.ivs, f.nature, form.base);

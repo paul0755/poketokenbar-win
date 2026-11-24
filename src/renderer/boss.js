@@ -649,7 +649,7 @@
           a.el.classList.add("megafx");
           await wait(500);
         }
-        if (!(a && ev.mega)) logLine(ev.text, ev.who == null ? "sys" : ev.eff > 1 ? "good" : ev.eff < 1 ? "bad" : "");
+        if (!(a && ev.mega)) logLine(ev.text, ev.ability ? "ab" : ev.who == null ? "sys" : ev.eff > 1 ? "good" : ev.eff < 1 ? "bad" : ""); // ✨ 특성은 보라색
         await wait(ev.who == null ? 300 : 160);
       }
     }
