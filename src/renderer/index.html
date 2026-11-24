@@ -496,7 +496,8 @@
   }
   .boxchip:hover { color: var(--text); }
   .boxchip.on { color: #fff; background: #c43a6a; border-color: #c43a6a; }
-  .boxchip.leg.on { color: #3a2a00; background: #ffd54a; border-color: #ffd54a; } /* ⭐ 전설만 — 금색 */
+  /* ⭐ 전설만 — 별이 노란색이라 노란 바탕에 묻힌다. 진한 호박색 바탕 · 금테 · 금색 글자로 */
+  .boxchip.leg.on { color: #ffe08a; background: #5c4300; border-color: #ffd54a; box-shadow: 0 0 0 1px rgba(255, 213, 74, .25); }
   .boxfavn { margin-left: auto; font-size: 10px; color: var(--dim); }
   .bx .pic img { width: 50px; height: 50px; object-fit: contain; image-rendering: pixelated; }
   .bx .pic img.mega { image-rendering: auto; filter: drop-shadow(0 0 2px rgba(255,190,255,.8)); } /* 💎 마스터 메가 — Showdown 3D 그림 */
