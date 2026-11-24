@@ -40,6 +40,18 @@ const CANDY_TIME = {
   ],
 };
 
+/**
+ * 🔥 길드 순위의 버닝 몫 — 모두에게 같은 고정 시간(기본 버닝타임: 10~16시 · 18시~자정, 매일).
+ * 순위 막대의 주황 몫 · 🔥 버닝 MVP · 칭호를 내 버닝타임 설정으로 세면, 하루 종일 버닝으로 잡은 사람이
+ * 다 가져간다(설정은 성장 배수일 뿐인데 순위까지 사게 된다). 그래서 견주는 숫자는 이 시간으로만 센다
+ */
+const GUILD_TIME = {
+  enabled: true,
+  mult: DEFAULT.mult,
+  weekdays: false,
+  spans: DEFAULT.spans.map((s) => ({ ...s })),
+};
+
 const isHour = (h) => Number.isInteger(h) && h >= 0 && h <= 23;
 
 /** 세이브·설정 창에서 온 값을 바로잡는다. 모르는 값은 기본으로 */
@@ -109,4 +121,4 @@ function status(now, b) {
   return { enabled: true, on, mult: b.mult, until: on ? edge : null, next: on ? null : edge };
 }
 
-module.exports = { DEFAULT, MULTS, CANDY_TIME, normalize, multAt, share, status };
+module.exports = { DEFAULT, MULTS, CANDY_TIME, GUILD_TIME, normalize, multAt, share, status };

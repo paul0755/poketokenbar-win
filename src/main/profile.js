@@ -20,6 +20,7 @@ const poke = require("./world").pack; // 🌏 지금 세계의 종 데이터(포
 const SPECIES = require("./species.json");
 const MOVES = require("./moves.json");
 const ABILITIES = require("./abilities.json");
+const BATTLE_AB = require("./ability").BATTLE;
 const TYPES = require("./types.json");
 
 /**
@@ -54,6 +55,29 @@ function rollGender(dexId) {
   const r = s ? s.genderRate : -1;
   if (r < 0) return "무성";
   return Math.random() < r / 8 ? "암컷" : "수컷";
+}
+
+/**
+ * 지금 모습의 특성 칸 — 칸 번호(mon.ability)는 알에서 나올 때 첫 모습 기준으로 정해지고 진화해도 그대로다.
+ * 그런데 모습마다 칸 구성이 다른 라인이 있다: 이브이 [도주 · 적응력 · 위험예지(숨김)] → 샤미드 [저수 · 촉촉바디(숨김)].
+ * 번호만 따라가면 적응력(일반)이 촉촉바디(숨김)가 되고, 위험예지(숨김)가 칸이 없어 저수가 된다.
+ * 그래서 첫 모습과 칸 종류가 어긋나는 모습은 첫 모습 칸에 맞춰 다시 늘어놓는다 — 일반은 일반으로(모자라면 첫 일반),
+ * 숨김은 숨김으로(없으면 첫 일반). 원작에서도 샤미드의 두 번째 일반 칸은 저수다.
+ * 칸 종류가 맞고 칸만 더 있는 모습(철시드 [철가시] → 너트령 [철가시 · 위험예지(숨김)])은 그대로 쓴다.
+ */
+function abilitySlots(lineNo, dexId) {
+  const s = SPECIES[dexId];
+  const form = (s && s.abilities) || [];
+  const L = poke.LINES[lineNo];
+  const b = L && L.ids ? SPECIES[L.ids[1]] : null;
+  const base = (b && b.abilities) || [];
+  if (!base.length || base === form) return form;
+  if (form.length >= base.length && base.every((a, i) => Boolean(a.hidden) === Boolean(form[i].hidden))) return form;
+  const nor = form.filter((a) => !a.hidden);
+  const hid = form.filter((a) => a.hidden);
+  if (!nor.length && !hid.length) return form;
+  let k = 0;
+  return base.map((a) => (a.hidden ? hid[0] || nor[0] : nor[k++] || nor[0] || hid[0]));
 }
 
 /**
@@ -357,7 +381,8 @@ function build(mon, grown) {
 
   const stats = statsOf(dexId, level, mon.ivs, mon.nature);
   const ivs = mon.ivs || [0, 0, 0, 0, 0, 0];
-  const ab = s.abilities[mon.ability ?? 0] || s.abilities[0];
+  const slots = abilitySlots(mon.line, dexId);
+  const ab = slots[mon.ability ?? 0] || slots[0];
   const abInfo = ab ? ABILITIES[ab.id] : null;
 
   return {
@@ -369,6 +394,7 @@ function build(mon, grown) {
     ability: abInfo ? abInfo.n : null,
     abilityDesc: abInfo ? abInfo.d : null,
     abilityHidden: Boolean(ab && ab.hidden),
+    abilityBattle: ab ? BATTLE_AB[ab.id] || null : null, // ✨ 결투에서 하는 일(없으면 효과 없음)
     stats: STAT_KEYS.map((k, i) => ({
       key: k,
       name: STAT_NAME[k],
@@ -405,4 +431,4 @@ function build(mon, grown) {
   };
 }
 
-module.exports = { levelOf, rollIVs, rollGender, rollAbility, rollEggMoves, statsOf, movesOf, tmCandidates, build, PER_LEVEL, MOVE_SET_MAX, movePool, levelPool, cleanForgot, newMoves, cleanMoveSet, activeMoveIds, tmPick };
+module.exports = { levelOf, rollIVs, rollGender, rollAbility, abilitySlots, rollEggMoves, statsOf, movesOf, tmCandidates, build, PER_LEVEL, MOVE_SET_MAX, movePool, levelPool, cleanForgot, newMoves, cleanMoveSet, activeMoveIds, tmPick };

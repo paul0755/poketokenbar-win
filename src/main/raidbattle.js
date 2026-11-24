@@ -16,7 +16,10 @@
  * battle.js 를 고치지 않고 여기 따로 둔다 — battle.js 는 친선 배틀 데이터 버전(friend.dataVersion)에
  * 들어가서, 고치면 옛 버전 앱과 친선 배틀이 안 된다. 그래서 내보내지 않은 작은 도우미 몇 개를 옮겨 왔다.
  */
-const { fighter, effectiveness, damage, josa } = require("./battle");
+const battle = require("./battle");
+const { effectiveness, damage, josa } = battle;
+/** ✨ 레이드에는 아직 특성이 없다 — 1:1 의 특성 · 날씨 규칙은 battle.js 의 run 안에만 있다(데미지 보정이 끼지 않게 끈다) */
+const fighter = (...a) => { const f = battle.fighter(...a); if (f) f.noAb = true; return f; };
 const friend = require("./friend");
 const mega = require("./mega");
 const poke = require("./pokemon");

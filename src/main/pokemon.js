@@ -136,12 +136,18 @@ function rollWild() {
 }
 
 /**
- * 전설의 알(상점) — 전설 중 하나를 고르게 뽑는다. 환상의 포켓몬은 뺀다(야생에서만 만나는 특별함으로 둔다).
- * 키우는 아이와 같은 종은 피한다(roll 과 같은 이유)
+ * 전설의 알(상점 · 체육관 배지 8개) — 전설 중 하나를 고르게 뽑는다. 환상의 포켓몬은 뺀다(야생에서만 만나는 특별함으로 둔다).
+ * 키우는 아이와 같은 종은 피한다(roll 과 같은 이유).
+ *
+ * owned — 이미 가진 횟수(라인 → 몇 마리, 박스 + 졸업). 60🍬 를 들여 깼는데 있는 전설이 또 나오면 서운하다 —
+ * 아직 없는 전설에서만 뽑는다. 다 모았으면 가장 적게 가진 전설들 중에서(그때부터는 겹칠 수밖에 없다)
  */
-function rollLegend(exclude = null) {
+function rollLegend(exclude = null, owned = null) {
   const pool = LINES.map((_, i) => i).filter((i) => i !== exclude && LINES[i].single && LINES[i].legendary && !LINES[i].mythical);
-  return pool[Math.floor(Math.random() * pool.length)];
+  const has = (i) => (owned && (owned.get(String(i)) || 0)) || 0;
+  const least = Math.min(...pool.map(has));
+  const pick = pool.filter((i) => has(i) === least);
+  return pick[Math.floor(Math.random() * pick.length)];
 }
 
 /**

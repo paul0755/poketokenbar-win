@@ -435,6 +435,7 @@
     const box = $("side" + k);
     box.querySelector(".nm").textContent = f.label || f.name;
     box.querySelector(".lv").textContent = "Lv." + f.level;
+    box.title = f.ability ? `특성 ${f.ability}` : ""; // ✨ 나올 때 특성
     // 체육관에서 이어 나온 아이는 깎인 체력 · 상태이상을 들고 온다
     box.querySelector(".st").textContent = AIL_SHORT[f.status] || "";
     // 상대 아이는 내 박스에 없다 — 메인이 그림 주소를 같이 준다
@@ -491,6 +492,41 @@
     $("btlLog").scrollTop = $("btlLog").scrollHeight;
   }
 
+  /**
+   * ✨ 특성 띠 — 원작처럼 그쪽 이름 상자 옆에 특성 이름이 잠깐 미끄러져 나온다.
+   * 같은 쪽에 연달아 나오면 앞의 것을 바꿔 쓴다(쌓이면 가린다)
+   */
+  function abilityPop(i, name) {
+    const scene = $("arena");
+    let el = scene.querySelector(".abpop." + (i === 0 ? "me" : "foe"));
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "abpop " + (i === 0 ? "me" : "foe");
+      scene.appendChild(el);
+    }
+    el.textContent = name;
+    el.classList.remove("on");
+    void el.offsetWidth;
+    el.classList.add("on");
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove("on"), fast ? 400 : 1500);
+  }
+
+  /** 🌦️ 날씨 — 장면 위에 비 · 햇살 · 모래 · 싸라기눈 · 난기류 막을 씌운다. null 이면 걷는다 */
+  const WX_ICON = { rain: "🌧️ 비", sun: "☀️ 쾌청", sand: "🌪️ 모래바람", hail: "🌨️ 싸라기눈", wind: "🌀 난기류" };
+  function setWx(w) {
+    const scene = $("arena");
+    let el = scene.querySelector(".wx");
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "wx";
+      el.innerHTML = '<i class="fx"></i><b class="tag"></b>';
+      scene.prepend(el);
+    }
+    el.dataset.w = w || "";
+    el.querySelector(".tag").textContent = w ? WX_ICON[w] || "" : "";
+  }
+
   /** 맞은 쪽이 깜빡인다. 데미지가 났다는 게 숫자보다 먼저 보여야 한다 */
   function hit(i) {
     const b = $("body" + SIDE[i]);
@@ -534,6 +570,8 @@
     scene.classList.remove("enter");
     void scene.offsetWidth;
     scene.classList.add("enter");
+    setWx(null); // 🌦️ 날씨는 판마다 새로
+    scene.querySelectorAll(".abpop").forEach((el) => el.classList.remove("on"));
     const opening = intro || [`${josa(r.fighters[1].label || r.fighters[1].name, "이", "가")} 승부를 걸어왔다!`, `가랏, ${r.fighters[0].name}!`];
     for (const [n, t] of opening.entries()) {
       say(t);
@@ -582,7 +620,9 @@
             $("side" + SIDE[ev.side]).querySelector(".st").textContent =
               ev.status && ev.status !== "unconfused" ? AIL_SHORT[ev.status] || "" : "";
           }
-          if (!ev.mega) line(ev.text, ev.side < 0 ? "sys" : ev.eff > 1 ? "good" : ev.eff < 1 ? "bad" : ""); // 메가는 컷인 앞에서 적었다
+          if (ev.ability && ev.side >= 0) abilityPop(ev.side, ev.ability); // ✨
+          if (ev.weather !== undefined) setWx(ev.weather); // 🌦️
+          if (!ev.mega) line(ev.text, ev.ability ? "ab" : ev.side < 0 ? "sys" : ev.eff > 1 ? "good" : ev.eff < 1 ? "bad" : ""); // 메가는 컷인 앞에서 적었다
           await sleep(ev.side < 0 ? 300 : ev.mega ? 700 : 500);
         }
       }

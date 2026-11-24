@@ -39,8 +39,8 @@ let dv = null;
 function dataVersion() {
   if (dv) return dv;
   const h = crypto.createHash("sha1");
-  // profile·friend 도 넣는다 — 레벨·기술을 정하는 방식이 바뀌면 같은 코드로 다른 결투가 나온다
-  for (const f of ["species.json", "moves.json", "types.json", "battle.js", "profile.js", "friend.js", "mega.js", "mega.json"]) h.update(fs.readFileSync(path.join(__dirname, f)));
+  // profile·friend 도 넣는다 — 레벨·기술을 정하는 방식이 바뀌면 같은 코드로 다른 결투가 나온다. ✨ ability.js 는 특성 규칙
+  for (const f of ["species.json", "moves.json", "types.json", "battle.js", "ability.js", "profile.js", "friend.js", "mega.js", "mega.json"]) h.update(fs.readFileSync(path.join(__dirname, f)));
   return (dv = h.digest("hex").slice(0, 8));
 }
 
@@ -113,6 +113,7 @@ function encodeTrade(mon, grown, trainer) {
         // 지닌 도구 — 1 변하지않는돌, 2 빛가림돌, 💎 메가스톤은 이름 그대로. 옛 앱은 1 만 알고 나머지는 넘어간다
         mega.isStone(mon.hold) ? mon.hold : HOLDS.indexOf(mon.hold) + 1,
         lvOf(mon, grown),
+        mon.plus || 0, // ✨ 강화 +N — 옛 앱은 모르고 넘어간다(받으면 +0)
       ],
     ]),
   ).toString("base64url");
@@ -133,9 +134,12 @@ function decodeTrade(code) {
   }
   const [ver, , trainer, nonce, d] = arr || [];
   if (ver !== 1 || !Array.isArray(d) || typeof nonce !== "string") return { error: "이 앱이 모르는 형식의 코드입니다." };
-  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, ot, caughtAt, hold, lv] = d;
+  const [line, nature, shiny, ivs, g, ability, eggMoves, tmMoves, grown, ot, caughtAt, hold, lv, plus] = d;
   const mon = { line, nature, shiny: Boolean(shiny), ivs, gender: GENDERS[g], ability, eggMoves, tmMoves };
   if (lv) mon.lvGrown = lv;
+  // ✨ 강화 +N — 옛 앱이 만든 코드엔 없다
+  if (plus != null && !isInt(plus, 0, 5)) return { error: "말이 안 되는 값이 들어 있습니다 — 강화" };
+  if (plus) mon.plus = plus;
   const why = validate(mon, grown);
   if (why) return { error: "말이 안 되는 값이 들어 있습니다 — " + why };
   const item = mega.isStone(hold) && mega.lineFits(poke.LINES[line].ids, hold) ? hold : HOLDS[hold - 1] || null;
@@ -206,7 +210,9 @@ function validate(mon, grown) {
   if (!Array.isArray(mon.ivs) || mon.ivs.length !== 6 || !mon.ivs.every((v) => isInt(v, 0, 31))) return "개체값";
   if (!mon.gender) return "성별";
   const base = SPECIES[L.ids[1]];
-  if (!base || !isInt(mon.ability, 0, base.abilities.length - 1)) return "특성";
+  // 특성 칸은 지금 모습에서 찾는다 — 진화하면 칸이 늘어나는 라인이 있어(철시드 1칸 → 너트령 2칸) 라인에서 가장 많은 칸까지 된다
+  const slots = Math.max(...L.ids.filter(Boolean).map((id) => profile.abilitySlots(mon.line, id).length));
+  if (!base || !isInt(mon.ability, 0, slots - 1)) return "특성";
   const egg = new Set(base.egg || []);
   if (!Array.isArray(mon.eggMoves) || mon.eggMoves.length > 2 || !mon.eggMoves.every((id) => egg.has(id))) return "패시브스킬";
   // 기술머신은 라인의 어느 모습에서 배웠든 된다 — 진화 전에 배운 기술을 들고 간다

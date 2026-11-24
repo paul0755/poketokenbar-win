@@ -53,8 +53,9 @@ const lineFits = (ids, item) => {
 };
 
 /**
- * 싸우는 아이(battle.fighter 의 꼴)를 메가진화시킨다 — 타입 · 능력치(HP 빼고) · 이름.
+ * 싸우는 아이(battle.fighter 의 꼴)를 메가진화시킨다 — 타입 · 능력치(HP 빼고) · 이름 · 특성.
  * 랭크 · 상태이상 · 체력은 그대로. megaId 는 그림(Showdown 폼 번호)
+ * ✨ form.ability 가 있으면 메가의 특성(원작 6세대)으로 바뀐다. 레전즈 Z-A 의 새 메가는 아직 원래 특성 그대로
  */
 function evolve(f, form) {
   const st = profile.statsOf(f.dexId, f.level, f.ivs, f.nature, form.base);
@@ -65,6 +66,7 @@ function evolve(f, form) {
   f.name = form.name;
   f.mega = form.key;
   f.megaId = form.id;
+  if (form.ability) f.ab = form.ability;
   return true;
 }
 

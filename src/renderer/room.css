@@ -310,6 +310,11 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .gd-rank .hd { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; font-size: 12px; }
 .gd-rank .hd span { margin-left: auto; font-size: 10.5px; color: var(--muted); }
 .gd-rank .hd span b { color: var(--accent); }
+/* 막대 색 범례 — 주황 = 🔥 버닝타임(모두 같은 고정 시간), 파랑 = 그 밖 */
+.gd-rank .lg { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: -2px 0 6px; padding: 0 6px; font-size: 10px; color: var(--muted); }
+.gd-rank .lg i { display: inline-block; width: 14px; height: 6px; margin-right: 4px; vertical-align: 1px; border-radius: 99px; background: var(--blue); }
+.gd-rank .lg i.b { background: linear-gradient(90deg, #ff7a18, #ffb347); }
+.gd-rank .lg .w { margin-left: auto; }
 .gd-rank .row { display: grid; grid-template-columns: 18px minmax(60px, 1fr) 2fr auto; grid-template-rows: auto auto; column-gap: 7px; align-items: center; padding: 4px 6px; border-radius: 8px; font-size: 11.5px; }
 .gd-rank .row.me { background: #26220f; }
 .gd-rank .row .no { font-weight: 800; color: var(--muted); text-align: center; }
@@ -373,3 +378,5 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .rg-seal::before { left: 2px; transform: rotate(18deg); } .rg-seal::after { right: 2px; transform: rotate(-18deg); }
 .rg-empty { grid-column: 1 / -1; color: var(--dim); font-size: 11px; padding: 10px; text-align: center; }
 .rm-txt.sm.cup { color: #8a5a00; font-size: 1.5cqw; text-shadow: 0 1px 0 #fff6c2; } /* 🏆×N — 트로피가 셋을 넘으면 */
+/* 🎵 주크박스가 벽 장식 바로 아래에 서면 음표를 끈다(room.js hushJukebox) */
+.rm-coin.hush .cf-note { display: none; }

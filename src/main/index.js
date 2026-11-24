@@ -20,6 +20,9 @@ const update = require("./update");
 const backup = require("./backup");
 const battle = require("./battle");
 const mega = require("./mega"); // 💎 메가진화
+const enhance = require("./enhance"); // ✨ 강화 · 💊 특성캡슐
+const AB = require("./ability");
+const SPECIES = require("./species.json");
 const wild = require("./wild");
 const friend = require("./friend");
 const raidbattle = require("./raidbattle");
@@ -830,7 +833,7 @@ async function gymChallenge(gymId, ids) {
       reward = { badge: g.badge, candy: GYM_CANDY, count: save.badges.length };
       // 배지 8개 — 전설의 알 하나. 키우던 아이는 그대로 둔다(상점 알과 달리 바로 바꾸지 않는다)
       if (save.badges.length >= gym.GYMS.length && !save.gymLegend) {
-        const line = poke.rollLegend();
+        const line = poke.rollLegend(null, ownedCount());
         const egg = box.make(line, poke.rollNature(), poke.rollShiny(Boolean(save.charm)));
         save.box.push(egg);
         if (!save.seen.includes(line)) save.seen.push(line);
@@ -1139,14 +1142,15 @@ function guildSnap() {
 
 /**
  * 길드 순위에 올릴 내 사용량 — 합계뿐이다(이번 주 · 오늘 · 이번 주 중 버닝타임에 쓴 몫 ·
- * 칭호용 시간대별 몫: 아침 6~10 · 코어 10~16 · 야근 18~24 · 새벽 0~6시. 시간대는 버닝타임
- * 설정과 상관없이 고정이다 — 사람마다 다르면 칭호를 견줄 수 없다).
+ * 칭호용 시간대별 몫: 아침 6~10 · 코어 10~16 · 야근 18~24 · 새벽 0~6시). 버닝 몫도 시간대도
+ * 내 버닝타임 설정과 상관없이 고정이다(burning.GUILD_TIME — 10~16시 · 18시~자정) — 사람마다 다르면
+ * 견줄 수 없고, 하루 종일 버닝으로 잡은 사람이 🔥 몫 · 버닝 MVP 를 다 가져간다(0.19.0 전에는 내 설정으로 셌다).
  * 주는 홈의 "이번 주"와 같은 월요일 0시 시작. 언제 기준인지(weekKey·dayKey)를 같이 보내서
  * 지난주에 마지막으로 올린 사람의 숫자가 이번 주 순위에 섞이지 않게 한다.
  */
 let guildUsage = null;
 const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-function weekUsage(u, burn) {
+function weekUsage(u) {
   const now = new Date();
   const monday = new Date(now);
   monday.setHours(0, 0, 0, 0);
@@ -1159,7 +1163,7 @@ function weekUsage(u, burn) {
     for (const e of u.events || []) {
       if (e.t < from || e.t >= to) continue;
       s.week += e.n;
-      if (burning.multAt(e.t, burn) > 1) s.burn += e.n;
+      if (burning.multAt(e.t, burning.GUILD_TIME) > 1) s.burn += e.n; // 모두 같은 시간 — 내 설정(burn)이 아니다
       const h = new Date(e.t).getHours();
       if (h < 6) s.dawn += e.n;
       else if (h < 10) s.morning += e.n;
@@ -2188,6 +2192,91 @@ function holdBack(m) {
   save.items = { ...(save.items || {}), [m.hold]: ((save.items || {})[m.hold] || 0) + 1 };
 }
 
+/* ---------------- ✨ 강화 · 💊 특성캡슐 (enhance.js) ---------------- */
+
+const capCount = () => (save.items && save.items.abcap) || 0;
+
+/** 지금 모습의 특성 칸 — 결투(battle.fighter)와 같은 종에서. 알이면 첫 모습 */
+function slotsOf(m) {
+  const L = poke.LINES[m.line];
+  if (!L || !L.ids) return [];
+  const dex = L.ids[poke.stageFor(box.effOf(m, growthSpeed()))] || L.ids[1];
+  return profile.abilitySlots(m.line, dex); // 진화해도 같은 종류의 칸 — 결투 · 상세와 같은 칸
+}
+
+/** 강화 재료가 될 수 있나 — 같은 라인의 다른 아이. ♥ · 키우는 중은 안 된다 */
+const inDuel = (id) => Boolean(duel && (duel.ids || []).includes(id));
+const matOk = (t, x) => x.id !== t.id && x.line === t.line && !x.fav && x.id !== save.activeId && !inDuel(x.id);
+
+/** ✨ 강화 — target 에 같은 라인의 mat 을 넣는다. mat 은 박스에서 떠나고, 지닌 도구는 가방으로 */
+function enhanceMon(targetId, matId) {
+  if (world.isDigimon) return { ok: false, reason: "강화는 포켓몬 세계에만 있습니다" };
+  const t = box.find(save.box, targetId);
+  const x = box.find(save.box, matId);
+  if (!t || !x) return { ok: false, reason: "없는 아이입니다" };
+  if (x.id === t.id || x.line !== t.line) return { ok: false, reason: "같은 라인의 다른 아이만 넣을 수 있습니다" };
+  if (x.fav) return { ok: false, reason: "즐겨찾기한 아이는 재료로 쓸 수 없습니다. ♥ 를 먼저 풀어 주세요" };
+  if (x.id === save.activeId) return { ok: false, reason: "키우는 중인 아이는 재료로 쓸 수 없습니다" };
+  if (inDuel(x.id)) return { ok: false, reason: "결투 중인 아이는 재료로 쓸 수 없습니다" };
+  if ((t.plus || 0) >= enhance.PLUS_MAX) return { ok: false, reason: `이미 +${enhance.PLUS_MAX} 입니다` };
+  const r = enhance.step(t, slotsOf(t));
+  if (!r) return { ok: false, reason: "강화하지 못했습니다" };
+  const tName = poke.describe(box.effOf(t, growthSpeed()), t.line, poke.look(t)).name;
+  const xName = poke.describe(box.effOf(x, growthSpeed()), x.line, poke.look(x)).name;
+  holdBack(x);
+  save.box = save.box.filter((m) => m.id !== x.id);
+  save.petIds = save.petIds.filter((id) => id !== x.id);
+  destroyPet(x.id);
+  writeSave();
+  syncPets();
+  refresh(true);
+  pushDex();
+  return { ok: true, plus: r.plus, notes: r.notes, message: `✨ ${tName} 강화 +${r.plus} — ${r.notes.join(" · ")} (${xName}은(는) 떠났습니다)` };
+}
+
+/** 💊 특성캡슐 — 좋은 특성 중 하나로 랜덤. 바꿀 게 없으면 캡슐을 쓰지 않는다 */
+function useCapsule(id) {
+  if (world.isDigimon) return { ok: false, reason: "특성캡슐은 포켓몬 세계에만 있습니다" };
+  const m = box.find(save.box, id);
+  if (!m) return { ok: false, reason: "없는 아이입니다" };
+  if (capCount() < 1) return { ok: false, reason: "특성캡슐이 없습니다 — 상점에서 삽니다" };
+  const r = enhance.capsule(m, slotsOf(m));
+  if (!r) return { ok: false, reason: (m.plus || 0) >= 3 ? "바꿀 좋은 특성이 없습니다" : "바꿀 좋은 특성이 없습니다 — 강화 +3 이면 숨겨진 특성도 후보가 됩니다" };
+  save.items.abcap = capCount() - 1;
+  writeSave();
+  refresh(true);
+  pushShop();
+  const name = poke.describe(box.effOf(m, growthSpeed()), m.line, poke.look(m)).name;
+  return { ok: true, message: `💊 ${name}의 특성이 ${r.from} → ${r.to}${r.hidden ? "(숨겨진 특성)" : ""}(으)로 바뀌었습니다` };
+}
+
+/** 박스 상세에 실을 강화 · 캡슐 정보 */
+function enhanceView(m) {
+  if (world.isDigimon) return null;
+  const plus = m.plus || 0;
+  const mats = save.box.filter((x) => matOk(m, x)).length;
+  const slots = slotsOf(m);
+  const pool = enhance.capsulePool(m, slots);
+  // 캡슐 후보 이름 — "무엇 중에서 바뀌나"가 보여야 누를 마음이 든다
+  const capPool = pool.map((i) => ({ name: AB.name(slots[i].id), hidden: Boolean(slots[i].hidden) }));
+  // +3 전이라 후보에서 빠진 좋은 숨겨진 특성 — "+3 이면 이것도"라고 알려 준다
+  const lockedHidden = plus < 3 ? slots.filter((a, i) => a.hidden && i !== (m.ability ?? 0) && AB.good(a.id)).map((a) => AB.name(a.id)) : [];
+  const capItem = SHOP_ALL.find((x) => x.id === "ab-capsule");
+  return { plus, max: enhance.PLUS_MAX, next: plus < enhance.PLUS_MAX ? enhance.NEXT[plus + 1] : null, mats, caps: capCount(), capPrice: capItem ? priceOf(capItem.cost) : null, capOk: pool.length > 0, capPool, lockedHidden };
+}
+
+/** ✨ 재료로 넣을 수 있는 아이들(상세에서 고르는 목록) */
+function enhanceMats(id) {
+  const t = box.find(save.box, id);
+  if (!t) return [];
+  return save.box.filter((x) => matOk(t, x)).map((x) => {
+    const e = box.effOf(x, growthSpeed());
+    const d = poke.describe(e, x.line, poke.look(x));
+    const p = profile.build(box.withLv(x, growthSpeed()), e);
+    return { id: x.id, name: d.name, stage: d.stage.label, level: p ? p.level : null, ability: p ? p.ability : null, hidden: Boolean(p && p.abilityHidden), ivTotal: p ? p.ivTotal : null, shiny: Boolean(x.shiny), graduated: Boolean(x.graduatedAt), plus: x.plus || 0, hold: holdName(x.hold) || null };
+  });
+}
+
 /**
  * 도구를 지니게 하거나 뺀다. 한 마리에 하나.
  *
@@ -2339,11 +2428,12 @@ const SHOP_ALL = [
    * 무작위 전설 하나(환상 제외). 레이드 조각은 "고른" 전설이라 쓸모가 겹치지 않는다.
    * 값은 마스터볼(🍬40)보다 비싸게, 한 주에 하나 — 사탕이 쌓인 사람이 전설을 한 번에 다 모으지 않게
    */
-  { id: "egg-mythic", name: "전설의 알", cost: 60, desc: "전설의 포켓몬 하나가 깨어난다(환상의 포켓몬은 야생에서만). 한 주에 1개만 살 수 있다", icon: "🥚", egg: "mythic", weekly: "mythicWeek" },
+  { id: "egg-mythic", name: "전설의 알", cost: 60, desc: "전설의 포켓몬 하나가 깨어난다 — 아직 없는 전설부터(환상의 포켓몬은 야생에서만). 한 주에 1개만 살 수 있다", icon: "🥚", egg: "mythic", weekly: "mythicWeek" },
   { id: "rare-candy", name: "이상한사탕", cost: 1, desc: "키우는 아이를 1000만 만큼 자라게 한다", icon: "🍬" },
   { id: "mint", name: "민트", cost: 2, desc: "성격만 다시 뽑는다. 키우던 건 그대로", icon: "🌿" },
   { id: "everstone", name: "변하지않는돌", cost: 3, desc: "지닌 아이는 진화하지 않는다. 박스 › 상세에서 지니게 하거나 뺀다. 빼면 돌아온다", icon: "🪨" },
   { id: "shade", name: "빛가림돌", cost: 3, desc: "지닌 아이는 졸업(마스터)해도 이로치로 바뀌지 않는다. 태어난 이로치는 그대로. 박스 › 상세에서 지니게 하거나 뺀다", icon: "🌑" },
+  { id: "ab-capsule", name: "특성캡슐", cost: 20, desc: "쓰면 그 아이의 특성이 그 종의 좋은 특성(결투에서 효과가 있는 것) 중 하나로 랜덤으로 바뀐다. 숨겨진 특성은 강화 +3 이상만. 박스 › 상세의 ✨ 강화 카드에서 쓴다", icon: "💊" },
   { id: "tm", name: "기술머신", cost: 3, desc: "키우는 아이에게 어울리는 기술머신 기술 하나를 가르친다 — 자기 타입 · 강한 쪽 공격 · 아직 없는 타입부터. 쓸 기술은 박스 › 상세 › 기술 관리에서 고른다", icon: "💿" },
   { id: "great-ball", name: "슈퍼볼 3개", cost: 1, desc: "야생 포켓몬이 1.5배 잘 잡힌다", icon: "🔵", ball: "great" },
   { id: "ultra-ball", name: "하이퍼볼 3개", cost: 2, desc: "야생 포켓몬이 2배 잘 잡힌다", icon: "🟡", ball: "ultra" },
@@ -2821,10 +2911,29 @@ function candy() {
  * 0.1.x에서는 여기서 키우던 아이를 덮어썼다. 이제는 박스에 더하고
  * 새 아이를 "키우는 중"으로 옮긴다 — 이전 아이는 그 자리에 남는다.
  */
+/**
+ * 가진 종 — 라인 → 몇 마리. 전설의 알이 이미 있는 전설을 피하는 데 쓴다.
+ * 박스를 센다. 졸업한 아이는 박스에도 남아 있으니(graduatedAt) 졸업 기록은 박스에서 놓아준 몫만 더한다 —
+ * 졸업시키고 놓아준 전설도 "키워 본" 전설이다
+ */
+function ownedCount() {
+  const n = new Map();
+  const add = (line, k = 1) => { if (line != null && k > 0) n.set(String(line), (n.get(String(line)) || 0) + k); };
+  const boxGrads = new Map();
+  for (const m of save.box || []) {
+    add(m.line);
+    if (m.graduatedAt) boxGrads.set(String(m.line), (boxGrads.get(String(m.line)) || 0) + 1);
+  }
+  const grads = new Map();
+  for (const g of save.graduated || []) if (g.line != null) grads.set(String(g.line), (grads.get(String(g.line)) || 0) + 1);
+  for (const [line, k] of grads) add(line, k - (boxGrads.get(line) || 0));
+  return n;
+}
+
 function hatch(minStars = 0, legend = false) {
   const cur = box.active(save);
   const exclude = cur ? cur.line : null;
-  const line = legend ? poke.rollLegend(exclude) : minStars > 0 ? poke.rollAtLeast(minStars, exclude) : poke.roll(exclude);
+  const line = legend ? poke.rollLegend(exclude, ownedCount()) : minStars > 0 ? poke.rollAtLeast(minStars, exclude) : poke.roll(exclude);
   const m = box.make(line, poke.rollNature(), poke.rollShiny(Boolean(save.charm)));
   save.box.push(m);
   save.activeId = m.id;
@@ -2901,6 +3010,10 @@ function buy(itemId) {
     save.items = save.items || {};
     save.items.shade = (save.items.shade || 0) + 1;
     msg = "빛가림돌을 샀습니다 (가진 수 " + save.items.shade + ") — 박스 › 상세에서 지니게 하세요";
+  } else if (itemId === "ab-capsule") {
+    save.items = save.items || {};
+    save.items.abcap = (save.items.abcap || 0) + 1;
+    msg = "특성캡슐을 샀습니다 (가진 수 " + save.items.abcap + ") — 박스 › 상세의 ✨ 강화 카드나 박스 위 ✨ 강화에서 쓰세요";
   } else if (itemId === "charm") { save.charm = true; msg = "이로치 확률이 2배가 됩니다"; }
   if (item.weekly) save[item.weekly] = localMonday(); // 한 주에 1개 — 이번 주 월요일을 적어 둔다
 
@@ -3051,7 +3164,7 @@ async function buildStats() {
     for (const m of save.box) if (poke.branch(m, box.effOf(m, growthSpeed()), u.events)) moved = true;
     if (moved) writeSave();
   }
-  guildUsage = weekUsage(u, burn);
+  guildUsage = weekUsage(u);
   weekTick(u);
 
   const act = box.active(save);
@@ -3102,6 +3215,9 @@ async function buildStats() {
         likes: tasteOf(m).likes,
         dislikes: tasteOf(m).dislikes,
         boost: m.boost || 0,
+        enh: enhanceView(m), // ✨ 강화 +N · 💊 특성캡슐
+        line: m.line, // ✨ 강화 화면이 같은 라인끼리 묶는다
+        inDuel: inDuel(m.id), // ✨ 결투 중이면 재료가 되지 않는다
         sellPrice: poke.shopPrice(m.line, e, m.shiny), // 상점에 팔면 받을 코인(서버가 다시 센다)
         // 변하지않는돌. evolveTo — 지금 빼면 무엇으로 진화하나(쌓인 토큰이 문턱을 넘었을 때만)
         stone: m.hold === "everstone",
@@ -3645,6 +3761,19 @@ async function pushDex() {
   }
 }
 
+/**
+ * 🏆 전설 모음 — 전설의 알에서 나올 수 있는 전설(환상 빼고) 중 가진 것(박스 + 졸업, ownedCount).
+ * 전설의 알은 아직 없는 전설부터 나온다(poke.rollLegend) — 그게 보이게 상점에 몇 마리 모았나를 적는다.
+ * 디지털 월드는 전설 구분이 없어 내지 않는다
+ */
+function legendDex() {
+  if (world.isDigimon) return null;
+  const pool = poke.LINES.map((_, i) => i).filter((i) => poke.LINES[i].single && poke.LINES[i].legendary && !poke.LINES[i].mythical);
+  if (!pool.length) return null;
+  const owned = ownedCount();
+  return { have: pool.filter((i) => owned.get(String(i)) > 0).length, total: pool.length };
+}
+
 function pushShop() {
   if (!win || win.isDestroyed()) return;
   const c = candy();
@@ -3655,8 +3784,9 @@ function pushShop() {
       ...x,
       cost: priceOf(x.cost),
       owned: x.once ? Boolean(save.charm) : x.weekly ? save[x.weekly] === localMonday() : false,
-      have: x.id === "everstone" ? stoneCount() : x.id === "shade" ? shadeCount() : x.ball ? ((save.balls || {})[x.ball] || 0) : undefined,
+      have: x.id === "everstone" ? stoneCount() : x.id === "shade" ? shadeCount() : x.id === "ab-capsule" ? capCount() : x.ball ? ((save.balls || {})[x.ball] || 0) : undefined,
       afford: c.left >= priceOf(x.cost),
+      legend: x.egg === "mythic" ? legendDex() : undefined, // 🏆 모은 전설
     })),
     stones: stoneShop(), // 💎 메가스톤
     mega: megaView(),
@@ -4366,6 +4496,7 @@ const AIL_SHORT = { paralysis: "마비!", burn: "화상!", poison: "독!", sleep
  */
 function duelSay(ev) {
   const t = ev.text || "";
+  if (ev.ability) return { side: ev.side, text: "✨" + ev.ability, kind: "good" }; // 특성 — 이름만
   if (ev.eff > 1) return { side: ev.side, text: "효과가 굉장했다!", kind: "good" };
   if (ev.eff < 1) return { side: ev.side, text: "효과가 별로…", kind: "bad" };
   if (ev.stat) return { side: ev.side, text: STAT_SHORT[ev.stat] + " " + (ev.change > 0 ? "↑" : "↓").repeat(Math.min(3, Math.abs(ev.change))), kind: ev.change > 0 ? "up" : "down" };
@@ -5318,6 +5449,9 @@ app.whenReady().then(async () => {
   ipcMain.handle("set-moves", (_e, id, ids) => setMoves(id, ids));
   ipcMain.handle("forget-move", (_e, id, moveId) => forgetMove(id, moveId));
   ipcMain.handle("restore-moves", (_e, id) => restoreMoves(id));
+  ipcMain.handle("enhance", (_e, id, mat) => enhanceMon(id, mat)); // ✨ 강화
+  ipcMain.handle("enhance-mats", (_e, id) => enhanceMats(id));
+  ipcMain.handle("ab-capsule", (_e, id) => useCapsule(id)); // 💊 특성캡슐
   ipcMain.handle("toggle-stone", (_e, id, item) => toggleStone(id, item === "shade" || mega.isStone(item) ? item : "everstone"));
   ipcMain.handle("mega-toggle", (_e, on) => megaToggle(on));
   ipcMain.handle("feed-berry", (_e, { id, key } = {}) => feedBerry(id, key));

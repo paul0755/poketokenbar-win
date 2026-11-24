@@ -604,6 +604,26 @@
   }
 
   /**
+   * 🎖️ · 🏟️ 진열장 틀(SVG) — 결투 메달(DUB, 남색 벨벳 · 메달 거는 못 넷) · 체육관 배지(GYB, 자주 벨벳 · 가운데 선반 · 배지 자리 여덟).
+   * gold 면 금테(100승 · 챔피언). 메달 · 배지 그림은 이 위에 따로(rm-dub · rm-gyb). 🦖 디지털 월드는 캔버스(drawBadges · drawGymBadges)
+   */
+  function caseSvg(B, gold, kind) {
+    const p = "cs" + ++wallUid, { x, y, w, h } = B;
+    const vel = kind === "duel" ? ["#25366e", "#16204a"] : ["#5a2034", "#3a1420"];
+    const inner = kind === "duel"
+      ? [0, 1, 2, 3].map((i) => { const cx = 8 + i * 13; return `<rect x="${cx - 1.5}" y="2.6" width="3" height="2" rx=".5" fill="url(#${p}g)" stroke="#8a5a00" stroke-width=".2"/>`; }).join("")
+      : `<rect x="3" y="${h / 2 - .4}" width="${w - 6}" height="1.2" fill="#2a0e18"/><rect x="3" y="${h / 2 + .8}" width="${w - 6}" height=".5" fill="#fff" opacity=".06"/>`
+        + Array.from({ length: 8 }, (_, i) => `<ellipse cx="${8 + (i % 4) * 13}" cy="${9 + Math.floor(i / 4) * 14}" rx="4.2" ry="4.2" fill="#000" opacity=".22"/>`).join("");
+    return wallSvg(x, y, w, h, `<defs>${gold ? GOLD(p + "f") : WOOD(p + "f", "#8d6e63", "#5d4037", "#2b1d19")}${GOLD(p + "g")}
+      <radialGradient id="${p}v" cx="50%" cy="35%" r="75%"><stop offset="0" stop-color="${vel[0]}"/><stop offset="1" stop-color="${vel[1]}"/></radialGradient></defs>
+      <rect x=".8" y="1" width="${w}" height="${h}" rx="1.2" fill="#000" opacity=".18"/>
+      <rect x=".3" y=".3" width="${w - .6}" height="${h - .6}" rx="1.2" fill="url(#${p}f)" stroke="${gold ? "#7a5608" : "#1a110e"}" stroke-width=".6"/>
+      <rect x="1.4" y="1.4" width="${w - 2.8}" height="${h - 2.8}" rx=".6" fill="none" stroke="#fff" stroke-opacity="${gold ? .45 : .15}" stroke-width=".4"/>
+      <rect x="2.2" y="2.2" width="${w - 4.4}" height="${h - 4.4}" fill="url(#${p}v)"/>
+      <rect x="2.2" y="2.2" width="${w - 4.4}" height="1.2" fill="#000" opacity=".3"/>${inner}`);
+  }
+
+  /**
    * 🏅 길드 주간 1위 메달 액자(100, 56, 32 × 30) — 호두나무 테 · 남색 벨벳 · 월계관 두른 금메달.
    * 아래 남색 띠(87 ~ 95)에 1위 한 번마다 금빛 사선 줄(호봉 줄)이 하나씩 쌓이고, 다섯 줄이 모이면 별 하나가 된다.
    * 12번이면 ★★ + 줄 둘. 별은 다섯(25번)까지, 그 위는 별 옆에 작은 + 가 붙는다
@@ -749,6 +769,57 @@
       <circle cx="2" cy="2.3" r="2" fill="#c49000"/><circle cx="78" cy="2.3" r="2" fill="#c49000"/><circle cx="1.4" cy="1.7" r=".6" fill="#fff3b0"/><circle cx="77.4" cy="1.7" r=".6" fill="#fff3b0"/>
       <rect x="4" y="56" width="72" height="4" rx=".6" fill="url(#${p}w)" stroke="#3e2410" stroke-width=".4"/><rect x="4.4" y="56.3" width="71.2" height=".8" fill="#c99566"/>
       <rect x="6" y="60" width="68" height="1.2" fill="#000" opacity=".15"/>`);
+  }
+
+  /**
+   * 🌳 바깥 들판의 나무 게시판 — 하늘에 떠 있던 벽 장식(액자 · 진열장 · 선반 · 포스터 · 시계)을 받쳐 준다.
+   * 장식이 차지한 자리(rects)를 x 로 이어 붙여 무리마다 판 하나: 지붕 처마 · 가로 널빤지 · 땅에 박힌 기둥
+   */
+  /** 게시판 무리 — 장식 자리(rects)를 x 로 이어 붙여(14px 안쪽 틈은 한 판) 판 · 지붕 · 기둥 자리를 낸다 */
+  function boardGroups(rects) {
+    const rs = rects.map(([x, y, w, h]) => [x, y, x + w, y + h]).sort((a, b) => a[0] - b[0]);
+    const groups = [];
+    for (const r of rs) {
+      const g = groups[groups.length - 1];
+      if (g && r[0] <= g[2] + 14) { g[1] = Math.min(g[1], r[1]); g[2] = Math.max(g[2], r[2]); g[3] = Math.max(g[3], r[3]); }
+      else groups.push([...r]);
+    }
+    return groups.map(([x0, y0, x1, y1]) => {
+      const L = Math.max(1, x0 - 5), Rt = Math.min(AW - 1, x1 + 5), T0 = Math.max(9, y0 - 4), B = Math.min(FLOOR - 10, y1 + 4), w = Rt - L;
+      return { L, Rt, T0, B, w, posts: w > 100 ? [L + 7, (L + Rt) / 2, Rt - 7] : [L + 7, Rt - 7] };
+    });
+  }
+
+  /** 🦖 디지털 월드의 같은 게시판 — 도트로, 바탕 캔버스에(디지바이스 · 간판 · 진열장보다 먼저) */
+  function fieldBoardPixel(g, rects) {
+    for (const { L, Rt, T0, B, w, posts } of boardGroups(rects)) {
+      const G = FLOOR + 4;
+      for (const px of posts) { oval(g, Math.round(px), G, 5, 1, "#00000038"); box(g, Math.round(px) - 2, B - 2, 5, G - B + 2, "#8a5a32", "#3e2410", "#a8743f", "#5e3a1d"); }
+      box(g, Math.round(L), T0, Math.round(w), B - T0, "#a87848", "#4e3018", "#c99566", "#7a4e2a");
+      for (let y = T0 + 7; y < B - 2; y += 7) R(g, Math.round(L) + 1, y, Math.round(w) - 2, 1, "#7d5230");
+      for (let y = T0 + 3; y < B - 2; y += 7) { R(g, Math.round(L) + 2, y, 1, 1, "#3e2410"); R(g, Math.round(Rt) - 3, y, 1, 1, "#3e2410"); }
+      for (let i = 0; i < 7; i++) { const ins = 6 - i; R(g, Math.round(L) - 4 + ins, T0 - 7 + i, Math.round(w) + 8 - ins * 2, 1, i === 0 ? "#9a5530" : i % 2 ? "#7a3f22" : "#6e3820"); }
+      for (let x = Math.round(L) + 2; x < Rt; x += 6) R(g, x, T0 - 6, 1, 6, "#4e2412");
+      R(g, Math.round(L) - 4, T0 - 1, Math.round(w) + 8, 1, "#3e2410");
+    }
+  }
+
+  function fieldBoardSvg(rects) {
+    if (!rects.length) return "";
+    const p = "fb" + ++wallUid;
+    const out = boardGroups(rects).map(({ L, Rt, T0, B, w, posts }) => {
+      return `${posts.map((px) => `<ellipse cx="${px}" cy="${FLOOR + 4}" rx="5" ry="1.4" fill="#000" opacity=".22"/><rect x="${px - 2.2}" y="${B - 2}" width="4.4" height="${FLOOR + 4 - B + 2}" fill="url(#${p}p)" stroke="#3e2410" stroke-width=".4"/>`).join("")}
+        <rect x="${L}" y="${T0}" width="${w}" height="${B - T0}" rx="1" fill="url(#${p}w)" stroke="#4e3018" stroke-width=".6"/>
+        ${Array.from({ length: Math.floor((B - T0) / 7) }, (_, i) => `<path d="M${L + 1} ${T0 + 7 + i * 7} H${Rt - 1}" stroke="#6e4524" stroke-opacity=".55" stroke-width=".5"/>`).join("")}
+        ${[L + 2.5, Rt - 2.5].map((nx) => Array.from({ length: Math.floor((B - T0) / 7) + 1 }, (_, i) => `<circle cx="${nx}" cy="${T0 + 3.5 + i * 7}" r=".45" fill="#3e2410"/>`).join("")).join("")}
+        <path d="M${L - 4} ${T0} L${L + 3} ${T0 - 7} H${Rt - 3} L${Rt + 4} ${T0} Z" fill="url(#${p}r)" stroke="#3e2410" stroke-width=".5"/>
+        ${Array.from({ length: Math.floor((w + 2) / 6) }, (_, i) => `<path d="M${L + 2 + i * 6} ${T0 - 6.6} V${T0 - .4}" stroke="#3e2410" stroke-opacity=".35" stroke-width=".4"/>`).join("")}
+        <rect x="${L - 4}" y="${T0 - .6}" width="${w + 8}" height="1.4" fill="#3e2410" opacity=".55"/>`;
+    }).join("");
+    return `<div class="rm-wl" style="left:0; top:0; width:100%; height:100%;"><svg viewBox="0 0 ${AW} ${AH}" aria-hidden="true"><defs>
+      <linearGradient id="${p}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b98a57"/><stop offset="1" stop-color="#8d5f34"/></linearGradient>
+      <linearGradient id="${p}p" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5e3a1d"/><stop offset=".4" stop-color="#8a5a32"/><stop offset="1" stop-color="#4e3018"/></linearGradient>
+      <linearGradient id="${p}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8d4a2a"/><stop offset="1" stop-color="#5d2e18"/></linearGradient></defs>${out}</svg></div>`;
   }
 
   /** 러그(92, 152, 136 × 32) — 바닥에 깔린 타원 무늬 양탄자, 양 끝에 술 */
@@ -1257,7 +1328,7 @@
       box(g, 2, 44, 36, 16, "#9e9e9e", "#5f5f5f", "#c4c4c4", "#7d7d7d"); R(g, 0, 42, 40, 3, "#b5b5b5"); R(g, 0, 42, 40, 1, "#d6d6d6");
       R(g, 11, 50, 18, 5, "#c49000"); R(g, 11, 50, 18, 1, "#ffd54f");
       const st = k && k.dexId ? stoneOf(k.dexId) : null;
-      if (st) g.drawImage(st, 20 - Math.floor(st.width / 2), 43 - st.height);
+      if (st) g.drawImage(st, 20 - Math.floor(st.fitW / 2), 43 - st.fitH, st.fitW, st.fitH);
       else { box(g, 12, 18, 16, 25, "#8a8a8a", "#5f5f5f", "#a0a0a0", "#767676"); R(g, 15, 24, 4, 3, "#767676"); }
     } },
   };
@@ -1420,7 +1491,7 @@
       <rect x="4" y="56.4" width="32" height="1" fill="#000" opacity=".15"/>
       <rect x="11" y="49.6" width="18" height="5.4" rx=".6" fill="#c49000"/><rect x="11.6" y="50.2" width="16.8" height="4.2" rx=".4" fill="#ffd54f"/><rect x="14" y="51.9" width="12" height=".8" fill="#a87400"/>
       <g class="st-rock"><path d="M13 43 L12.4 24 Q12.4 18 16 17 L24 17 Q27.6 18 27.6 24 L27 43 Z" fill="#8a8a8a" stroke="#5f5f5f" stroke-width=".5"/><path d="M15 24 L19 23 L18 27 Z" fill="#767676"/></g>
-      <image class="st-img" x="0" y="0" width="0" height="0" style="image-rendering: pixelated"/>`,
+      <image class="st-img" x="0" y="0" width="0" height="0"/>`,
   };
   /** 0.25초마다 — 시계 바늘은 지금 시각, 석상은 돌 그림이 오면 끼운다 */
   const COIN_TICK = {
@@ -1435,8 +1506,8 @@
       if (!st || im.dataset.dex === String(k.dexId)) return;
       im.dataset.dex = String(k.dexId);
       im.setAttribute("href", st.toDataURL());
-      im.setAttribute("x", 20 - st.width / 2); im.setAttribute("y", (Number(im.dataset.base) || 43) - st.height); // 방 석상은 받침 위 43, 홀 마스코트는 53
-      im.setAttribute("width", st.width); im.setAttribute("height", st.height);
+      im.setAttribute("x", 20 - st.fitW / 2); im.setAttribute("y", (Number(im.dataset.base) || 43) - st.fitH); // 방 석상은 받침 위 43, 홀 마스코트는 53
+      im.setAttribute("width", st.fitW); im.setAttribute("height", st.fitH); // 원본 크기 돌 그림을 매끄럽게 줄여 그린다
       k.svg.querySelector(".st-rock").style.display = "none";
     },
   };
@@ -1456,6 +1527,11 @@
     }
     return null;
   }
+  /**
+   * 스프라이트 → 깎은 돌. 원본 크기 그대로(줄이지 않는다) 돌빛으로 칠하고, 왼쪽 위에서 빛이 드는 것처럼
+   * 가장자리 · 굴곡을 밝게/어둡게 새긴 뒤 아주 옅은 돌결을 얹는다. 그리는 쪽이 fitW × fitH 로 매끄럽게 줄인다.
+   * 예전엔 42px 로 줄여 4단계 회색 도트로 찍어서, 매끈한 받침 위에 거친 덩어리처럼 보였다
+   */
   function toStone(img, maxH) {
     const W0 = img.naturalWidth, H0 = img.naturalHeight;
     const [, g] = canvas(W0, H0);
@@ -1465,20 +1541,34 @@
     for (let y = 0; y < H0; y++) for (let x = 0; x < W0; x++) if (d[(y * W0 + x) * 4 + 3] > 40) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
     if (x1 < x0) return null;
     const bw = x1 - x0 + 1, bh = y1 - y0 + 1, s = Math.min(1, maxH / bh, 38 / bw);
-    const [o, og] = canvas(Math.max(1, Math.round(bw * s)), Math.max(1, Math.round(bh * s)));
-    const P = ["#585858", "#767676", "#999999", "#c2c2c2"];
-    for (let y = 0; y < o.height; y++) for (let x = 0; x < o.width; x++) {
-      const i = ((y0 + Math.floor(y / s)) * W0 + x0 + Math.floor(x / s)) * 4;
-      if (d[i + 3] <= 40) continue;
-      const lum = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) / 255;
-      R(og, x, y, 1, 1, P[Math.min(3, Math.floor(lum * 4.2))]);
+    const at = (x, y) => (x < x0 || y < y0 || x > x1 || y > y1 ? -1 : (y * W0 + x) * 4);
+    const solid = (x, y) => { const i = at(x, y); return i >= 0 && d[i + 3] > 40; };
+    const lumOf = (x, y) => { const i = at(x, y); return i < 0 || d[i + 3] <= 40 ? 0 : (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) / 255; };
+    const [o, og] = canvas(bw, bh);
+    const px = og.createImageData(bw, bh);
+    const DARK = [72, 72, 80], LIGHT = [232, 229, 220]; // 서늘한 짙은 돌 → 따뜻한 밝은 돌
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      if (!solid(x, y)) continue;
+      const l = lumOf(x, y);
+      let t = 0.38 + l * 0.42; // 원래 색의 밝기는 줄여서 — 돌은 한 빛깔이다
+      t += (l - lumOf(x - 1, y - 1)) * 0.3; // 굴곡: 왼쪽 위보다 밝으면 볼록
+      if (!solid(x - 1, y) || !solid(x, y - 1)) t += 0.16; // 빛 받는 가장자리
+      if (!solid(x + 1, y) || !solid(x, y + 1)) t -= 0.2; // 그늘진 가장자리
+      t += (((x * 73856093) ^ (y * 19349663)) % 7) / 7 * 0.05 - 0.025; // 돌결
+      t = Math.max(0, Math.min(1, t));
+      const j = ((y - y0) * bw + (x - x0)) * 4;
+      for (let c = 0; c < 3; c++) px.data[j + c] = Math.round(DARK[c] + (LIGHT[c] - DARK[c]) * t);
+      px.data[j + 3] = 255;
     }
+    og.putImageData(px, 0, 0);
+    o.fitW = Math.max(1, Math.round(bw * s)); o.fitH = Math.max(1, Math.round(bh * s)); // 받침 위에 설 크기
     return o;
   }
 
   /** 코인 가구를 놓을 자리 — 이미 놓인 사탕 가구 · 벽 장식과 겹치지 않는 후보부터. → { id: [x, y, w, h] } */
-  function placeCoin(on, d, posOf) {
-    const area = (a, b) => Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]));
+  const rectArea = (a, b) => Math.max(0, Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]));
+  /** 벽 장식이 차지한 자리 — [x, y, w, h]. 코인 가구 자리 고르기와 주크박스 음표(hushJukebox)가 같이 본다 */
+  function wallDeco(on, d) {
     const wall = [[100, 24, 32, 26]]; // 도감 액자는 늘 있다
     if (on.has("window")) wall.push([20, 19, 76, 63]);
     if (d.wins > 0) wall.push([DUB.x, DUB.y, DUB.w, DUB.h + 6]); // 아래 "N승" 글자까지
@@ -1486,6 +1576,22 @@
     if (d.graduated > 0 || d.champ > 0) wall.push([232, 22, 84, 44]); // 기록 선반 — 쌓인 졸업장(오른쪽 위로 비켜 쌓인다) · 트로피 위 "×N" 까지
     if (d.weekTop > 0) wall.push([100, 56, 32, 40]); // 아래 호봉 띠까지
     if (d.badges > 0) wall.push([GYB.x, GYB.y, GYB.w, GYB.h + 8]); // 아래 "배지" 글자까지
+    return wall;
+  }
+  /**
+   * 🎵 주크박스 위로 떠오르는 음표가 벽 장식(체육관 배지 진열장 · 기록 선반 …) 위를 지나가면 끈다.
+   * 자리가 모자라면 주크박스가 진열장 바로 아래에 서는데, 그때 음표가 배지 위에서 피어올라 지저분했다
+   */
+  function hushJukebox(pl, on, d) {
+    if (!pl.jukebox) return false;
+    const [x, y] = pl.jukebox;
+    const notes = [x + 2, y, 28, 18]; // 위 16px 가 음표 자리(COIN.jukebox) — 조금 넉넉히
+    return wallDeco(on, d).some((w) => rectArea(notes, w) > 0);
+  }
+
+  function placeCoin(on, d, posOf) {
+    const area = rectArea;
+    const wall = wallDeco(on, d);
     const floor = [...on].filter((id) => FURN[id]).map((id) => [...posOf(id, FURN[id]), FURN[id].w, FURN[id].h]);
     const out = {};
     for (const id of COIN_ORDER) {
@@ -1678,10 +1784,27 @@
      화단 · 서재 · 피아노 · 소파 · 마스코트)은 하나씩 따로(HALL_SVG) — 포켓몬과 앞뒤를 가려야 해서.
      배경(성 · 벚꽃 · 서울대 · 신전의 벽 · 바닥)은 도트 그대로, 그 위에 roomLightSvg 조명 */
   function hallDecorSvg(o) {
-    const { col, mark, has, night, board, goal } = o;
+    const { col, mark, has, night, board, goal, outdoor } = o;
     const [c, hi, dk] = col;
     const p = "hd" + ++wallUid;
     const out = [];
+    /*
+     * 🌸 바깥 배경(벚꽃 · 서울대)은 벽 · 천장이 없어 깃발 · 간판 · 등불 · 샹들리에가 하늘에 떠 있었다.
+     * 양 끝 기둥에 지붕 얹은 들보를 건너질러 거기에 매달고, 횃불 · 게시판 · 수족관은 땅에 박은 다리로 세운다
+     */
+    if (outdoor) {
+      const G = FLOOR + 3, post = (x) => `<ellipse cx="${x + 3}" cy="${G + 1}" rx="6" ry="1.5" fill="#000" opacity=".22"/><rect x="${x}" y="8" width="6" height="${G - 8}" fill="url(#${p}pw)" stroke="#3e2410" stroke-width=".5"/><rect x="${x - 1}" y="${G - 4}" width="8" height="4" rx=".6" fill="#4e3018"/>`;
+      const leg = (x, y0) => `<ellipse cx="${x + 1.2}" cy="${G + .6}" rx="3" ry="1" fill="#000" opacity=".2"/><rect x="${x}" y="${y0}" width="2.4" height="${G - y0}" fill="url(#${p}pw)" stroke="#3e2410" stroke-width=".3"/>`;
+      out.push(post(1), post(AW - 7));
+      out.push(`<rect x="0" y="7" width="${AW}" height="5.4" fill="url(#${p}wd)" stroke="#3e2410" stroke-width=".5"/>
+        <rect x="0" y="7.4" width="${AW}" height=".8" fill="#c99566" opacity=".7"/>
+        <path d="M-4 7.4 L4 1 H${AW - 4} L${AW + 4} 7.4 Z" fill="url(#${p}rf)" stroke="#3e2410" stroke-width=".5"/>
+        ${Array.from({ length: 54 }, (_, i) => `<path d="M${2 + i * 6} 1.6 V7" stroke="#3e2410" stroke-opacity=".35" stroke-width=".4"/>`).join("")}
+        ${[[7, 1], [AW - 7, -1]].map(([x, s]) => `<path d="M${x} 12.4 L${x + s * 8} 12.4 L${x} 20 Z" fill="url(#${p}wd)" stroke="#3e2410" stroke-width=".4"/>`).join("")}`);
+      for (const x of [84, 232]) out.push(leg(x + 1.3, 55)); // 횃불 기둥
+      if (board) out.push(leg(235.6, 100), leg(252.6, 100)); else out.push(leg(229, 93), leg(261, 93)); // 게시판 · 전광판 다리
+      if (has("aquarium")) out.push(leg(140, 94), leg(179.6, 94)); // 수족관 받침대 다리
+    }
     const mk = (x0, y0) => (MARKS[mark] || MARKS.star).map((row, j) => [...row].map((ch, i) => (ch === "#" ? `<rect x="${x0 + i}" y="${y0 + j}" width="1.02" height="1.02"/>` : "")).join("")).join("");
     // 융단 — 입구에서 분수까지(바닥). 금테면 굵은 금실 · 마름모
     const gold = has("goldCarpet");
@@ -1794,6 +1917,8 @@
       <radialGradient id="${p}tg"><stop offset="0" stop-color="#ffaa3c" stop-opacity=".4"/><stop offset="1" stop-color="#ffaa3c" stop-opacity="0"/></radialGradient>
       <radialGradient id="${p}cg"><stop offset="0" stop-color="#ffdc8c" stop-opacity=".35"/><stop offset="1" stop-color="#ffdc8c" stop-opacity="0"/></radialGradient>
       <radialGradient id="${p}lg"><stop offset="0" stop-color="#ff7850" stop-opacity=".35"/><stop offset="1" stop-color="#ff7850" stop-opacity="0"/></radialGradient>
+      <linearGradient id="${p}pw" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5e3a1d"/><stop offset=".4" stop-color="#8a5a32"/><stop offset="1" stop-color="#4e3018"/></linearGradient>
+      <linearGradient id="${p}rf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8d4a2a"/><stop offset="1" stop-color="#5d2e18"/></linearGradient>
     </defs>${out.join("")}</svg></div>`;
   }
 
@@ -1891,7 +2016,7 @@
       <rect x="0" y="51.6" width="40" height="3.4" rx=".8" fill="#bdbdbd" stroke="#7d7d7d" stroke-width=".4"/><rect x=".4" y="51.8" width="39.2" height=".8" fill="#e6e6e6"/>
       <rect x="11" y="58.6" width="18" height="5.4" rx=".6" fill="#c49000"/><rect x="11.6" y="59.2" width="16.8" height="4.2" rx=".4" fill="#ffd54f"/><path d="M${20 - 3} 61.4 l3 -1.2 l3 1.2 l-3 1.2 Z" fill="#a87400"/>
       <g class="st-rock"><path d="M13 53 L12.4 34 Q12.4 28 16 27 L24 27 Q27.6 28 27.6 34 L27 53 Z" fill="#8a8a8a" stroke="#5f5f5f" stroke-width=".5"/><path d="M15 34 L19 33 L18 37 Z" fill="#767676"/></g>
-      <image class="st-img" data-base="53" x="0" y="0" width="0" height="0" style="image-rendering: pixelated"/>`,
+      <image class="st-img" data-base="53" x="0" y="0" width="0" height="0"/>`,
   };
 
   /**
@@ -2063,7 +2188,7 @@
     const html = [];
     // 🌤️ 길드 홀에도 방과 같은 조명 · 걸레받이(바깥 배경은 걸레받이 없이). 창이 없어 창빛은 없다
     html.push(roomLightSvg(T && T.outdoor ? "digital" : "hall", { trim: ["#5f574e", "#4a433b", "#7a7268"] }, per, false));
-    html.push(hallDecorSvg({ col, mark, has, night, board, goal, golds: hall.golds || 0 }));
+    html.push(hallDecorSvg({ col, mark, has, night, board, goal, golds: hall.golds || 0, outdoor: !!(T && T.outdoor) }));
     // 바닥에 서는 것 — 하나씩 입체 SVG(HALL_SVG), 포켓몬과 앞뒤를 가린다
     const item = (id, x, y, w, h, svg) => html.push(`<div class="rm-f rm-fs rm-anim" data-h="${id}" style="left:${X(x)}%; top:${Y(y)}%; width:${X(w)}%; height:${Y(h)}%; z-index:${(y + h) * 10};"><svg viewBox="0 0 ${w} ${h}" aria-hidden="true">${svg("hs" + ++wallUid)}</svg></div>`);
     item("fountain", HALL.fountain.x, HALL.fountain.y, HALL.fountain.w, HALL.fountain.h, (q) => HALL_SVG.fountain(q, has("goldFountain")));
@@ -2105,6 +2230,8 @@
     const dg = document.body.classList.contains("world-digimon"); // 🦖 디지털 월드 — 가구 그림이 다르다(FURN_DG)
     const on = new Set((d.furni || []).filter((id) => FURN[id] || COIN[id] || ["window", "rug", "poster"].includes(id)));
     const theme = THEMES[d.theme] ? d.theme : "cabin";
+    // 🌳 바깥 들판(digital)은 벽이 아니라 하늘이다 — 창문을 걸면 하늘에 창틀이 떠 있었다. 산 창문은 그대로 두고 여기서만 안 그린다
+    if (theme === "digital") on.delete("window");
     const per = period(theme);
     const T = THEMES[theme];
     const dex = d.dex || { seen: 0, total: 0 };
@@ -2115,11 +2242,13 @@
     trim(g, T);
     T.floor(g);
     dither(g, 0, FLOOR, AW, 3, "#0000002e"); // 벽 아래 그늘
+    // 🦖 디지털 월드의 바깥 들판 — 벽 장식 뒤에 도트 게시판(포켓몬 방은 fieldBoardSvg)
+    if (theme === "digital" && dg) fieldBoardPixel(g, [...wallDeco(on, d), ...Object.entries(placeCoin(on, d, posOf)).filter(([id]) => COIN[id].wall).map(([, r]) => r)]);
     if (on.has("window")) (dg ? drawWindow(g, theme, per) : sky(g, 29, 27, 58, 44, theme, per)); // 포켓몬 방은 하늘만 — 창틀 · 커튼은 windowSvg
     if (dg) drawDexFrame(g); // 🦖 디지바이스는 도트. 포켓몬 방의 액자 · 포스터 · 트로피 · 주간 메달은 SVG(dexFrameSvg …)로 얹는다
-    if (d.wins > 0) drawBadges(g, d.wins);
+    if (d.wins > 0 && dg) drawBadges(g, d.wins); // 포켓몬 방은 caseSvg(입체 진열장 틀)
     if (on.has("poster") && dg) drawSign(g);
-    if (d.badges > 0) drawGymBadges(g, d.champ || 0);
+    if (d.badges > 0 && dg) drawGymBadges(g, d.champ || 0);
     if (on.has("rug") && dg) drawFlowerBed(g); // 포켓몬 방의 러그는 rugSvg
     // 밤이면 방이 어두워지고 램프 둘레만 밝다
     if (per === "night" || per === "evening") {
@@ -2149,7 +2278,8 @@
       const z = COIN[id].wall ? 5 : COIN[id].flat ? 2 : (y + h) * 10;
       const move = COIN[id].wall ? "wall" : COIN[id].flat ? "flat" : "floor";
       const at = `data-c="${id}" data-move="${move}" data-x="${x}" data-y="${y}" data-w="${w}" data-h="${h}" style="left:${X(x)}%; top:${Y(y)}%; width:${X(w)}%; height:${Y(h)}%; z-index:${z};"`;
-      html.push(dg ? `<canvas class="rm-f" ${at} width="${w}" height="${h}"></canvas>` : `<div class="rm-f rm-fs rm-coin rm-anim" ${at}><svg viewBox="0 0 ${w} ${h}" aria-hidden="true">${COIN_SVG[id]("cs" + ++wallUid)}</svg></div>`);
+      const hush = id === "jukebox" && hushJukebox(pl, on, d) ? " hush" : ""; // 음표가 벽 장식 위로 가면 끈다
+      html.push(dg ? `<canvas class="rm-f" ${at} width="${w}" height="${h}"></canvas>` : `<div class="rm-f rm-fs rm-coin rm-anim${hush}" ${at}><svg viewBox="0 0 ${w} ${h}" aria-hidden="true">${COIN_SVG[id]("cs" + ++wallUid)}</svg></div>`);
     }
     if (on.has("aquarium") && !dg) {
       // 물고기는 움직여야 해서 따로 얹는다(디지털 월드의 같은 자리는 공중전화 부스라 없다)
@@ -2157,6 +2287,11 @@
       html.push(`<i class="rm-fish" style="left:${X(ax + 4)}%; top:${Y(ay + 8)}%; --sw:${X(26)}cqw;"></i><i class="rm-fish b" style="left:${X(ax + 6)}%; top:${Y(ay + 15)}%; --sw:${X(22)}cqw;"></i>`);
     }
     html.push(roomLightSvg(theme, T, per, on.has("window")));
+    // 🌳 바깥 들판 — 벽이 없으니 벽 장식 · 벽에 거는 코인 가구 뒤에 나무 게시판을 세운다(도트인 디지털 월드는 그대로)
+    if (theme === "digital" && !dg) html.push(fieldBoardSvg([...wallDeco(on, d), ...Object.entries(pl).filter(([id]) => COIN[id].wall).map(([, r]) => r)]));
+    // 결투 메달 · 체육관 배지 진열장의 틀 — 입체(들판 게시판 앞에 서야 해서 캔버스가 아니라 여기)
+    if (!dg && d.wins > 0) html.push(caseSvg(DUB, d.wins >= 100, "duel"));
+    if (!dg && d.badges > 0) html.push(caseSvg(GYB, (d.champ || 0) > 0, "gym"));
     // 벽 장식 — 입체 SVG(디지털 월드의 디지바이스 · 간판만 도트)
     if (!dg) html.push(dexFrameSvg());
     if (on.has("poster") && !dg) html.push(posterSvg());

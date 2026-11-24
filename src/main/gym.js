@@ -67,16 +67,18 @@ function challenge(mine, g, rng = Math.random, opts = {}) {
   let i = 0, j = 0;
   let stA = null, stB = null; // 다음 판으로 들고 가는 체력 · 상태이상
   let mA = false, mB = false; // 지금 서 있는 아이가 메가진화해 있나
+  let wx = null; // 🌦️ 이어지는 날씨 { w, wt } — 원작처럼 교체해도 남는다
   let used = 0;
   const budget = opts.budget || 0;
-  const carry = (e) => ({ hp: e.hp / e.max, status: e.status });
+  const carry = (e) => ({ hp: e.hp / e.max, status: e.status, stay: true }); // stay — 이어 서 있으니 나올 때 특성(위협 · 날씨)이 다시 움직이지 않는다
   while (i < mine.length && j < foe.length) {
     const spA = mine[i].mega ? (mA || mine[i].perm ? { form: mine[i].mega, pre: true } : used < budget ? { form: mine[i].mega } : null) : null;
     const spB = foe[j].mega && (mB || spA) ? { form: foe[j].mega, pre: mB } : null;
-    const r = battle.run(mine[i].mon, mine[i].grown, foe[j].mon, foe[j].grown, rng, { init: [stA, stB], mega: [spA, spB] });
+    const r = battle.run(mine[i].mon, mine[i].grown, foe[j].mon, foe[j].grown, rng, { init: [stA, stB], mega: [spA, spB], field: wx });
     if (!r) return null;
     if (spA && !spA.pre && r.fighters[0].mega) used++;
     rounds.push({ a: i, b: j, r });
+    wx = r.winner != null ? r.field : null; // 둘 다 쓰러지면 새로 시작한다
     if (r.winner === 0) { stA = carry(r.end[0]); stB = null; mA = Boolean(r.fighters[0].mega); mB = false; j++; }
     else if (r.winner === 1) { stB = carry(r.end[1]); stA = null; mB = Boolean(r.fighters[1].mega); mA = false; i++; }
     else { stA = stB = null; mA = mB = false; i++; j++; }

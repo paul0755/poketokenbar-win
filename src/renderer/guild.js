@@ -70,9 +70,10 @@
     ].filter(Boolean).join(" · ");
     $("gdRank").innerHTML = `
       <div class="hd"><b>📊 이번 주 토큰 순위</b><span>길드 합계 <b>${fmt(rk.total)}</b></span></div>
+      <div class="lg" title="버닝 몫은 각자의 버닝타임 설정과 상관없이 모두 같은 시간으로 셉니다(0.19.0 이상인 길드원부터)"><span><i class="b"></i>🔥 버닝타임 10~16시 · 18시~자정</span><span><i></i>그 밖의 시간</span><span class="w">막대 길이 = 이번 주 합계</span></div>
       ${rows || '<div class="sub">아직 공개한 길드원이 없습니다</div>'}
       ${extra ? `<div class="ft">${extra}</div>` : ""}
-      <div class="ft dim">월요일 0시부터. 길드원의 앱이 켜져 있을 때 몇 분마다 올라갑니다. 막대의 주황 몫은 버닝타임에 쓴 토큰</div>`;
+      <div class="ft dim">월요일 0시부터. 길드원의 앱이 켜져 있을 때 몇 분마다 올라갑니다. 🔥 몫은 각자의 버닝타임 설정과 상관없이 모두 같은 시간(10~16시 · 18시~자정)으로 셉니다 — 0.19.0 이상인 길드원부터</div>`;
   }
 
   /* ---------------- 칭호 · 명예의 전당 ----------------

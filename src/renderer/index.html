@@ -414,6 +414,13 @@
   .item .nm { font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 5px; }
   .item .de { font-size: 10.5px; color: var(--dim); margin-top: 1px; }
   .item .pr { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+  /* 🏆 전설의 알 — 모은 전설 */
+  .item .lgd { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 7px; margin-top: 4px; font-size: 10.5px; color: var(--muted); }
+  .item .lgd b { color: #ffd54a; }
+  .item .lgd i { height: 5px; border-radius: 99px; background: #2b2e37; overflow: hidden; }
+  .item .lgd em { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #c8c8d8, #ffd54a); }
+  .item .lgd small { grid-column: 1 / -1; font-size: 10px; color: var(--dim); }
+  .item .lgd.done em { background: linear-gradient(90deg, #ffd54a, #ff9b5e); }
   .item button {
     flex-shrink: 0; min-width: 52px; padding: 6px 10px; font: inherit; font-size: 11px; font-weight: 700;
     color: #14151a; background: var(--accent); border: 0; border-radius: 8px; cursor: pointer;
@@ -441,6 +448,24 @@
   }
   .boxall button:hover:not(:disabled) { color: var(--accent); border-color: #4a3a16; }
   .boxall button:disabled { opacity: .45; cursor: default; }
+  /* ✨ 강화 화면 — 박스 위 버튼. 켜져 있으면 금색 */
+  .boxall button.enhmode { color: #ffd54a; border-color: #5a4a1c; }
+  .boxall button.enhmode.on { color: #3a2a00; background: #ffd54a; border-color: #ffd54a; }
+  .boxall button.enhmode b { margin-left: 3px; padding: 0 5px; border-radius: 99px; font-size: 9.5px; color: #3a2a00; background: #ffd54a; }
+  .boxall button.enhmode.on b { color: #ffd54a; background: #3a2a00; }
+  #tab-box.enhon .boxbar, #tab-box.enhon #boxNote { display: none; }
+  .enhlist { display: grid; gap: 10px; }
+  .enhlist .enhtop { font-size: 10.5px; color: var(--muted); line-height: 1.55; padding: 7px 10px; border-radius: 9px; background: rgba(255, 213, 74, .06); border: 1px solid #4a3e1c; }
+  .enhgrp { padding: 9px 10px 4px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); }
+  .enhgrp .gh { display: flex; align-items: baseline; gap: 6px; font-size: 12px; }
+  .enhgrp .gh span { font-size: 10px; color: var(--dim); }
+  .enhgrp .who { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+  .enhgrp .who button { display: flex; align-items: center; gap: 4px; padding: 3px 8px 3px 3px; border-radius: 99px; font: inherit; font-size: 10px; color: var(--muted); background: #2b2e37; border: 1px solid var(--line); cursor: pointer; }
+  .enhgrp .who button img { width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; }
+  .enhgrp .who button.on { color: var(--text); border-color: #ffd54a; box-shadow: 0 0 0 1px #ffd54a; }
+  .enhgrp .who button em { font-style: normal; font-weight: 800; color: #ffd54a; }
+  .enhgrp .who .lab { align-self: center; font-size: 10px; color: var(--dim); margin-right: 2px; }
+  .enhgrp .enhcard { margin-top: 7px; }
   #boxNote { margin: 0 0 10px; font-size: 10px; color: var(--dim); line-height: 1.5; }
   .bx {
     display: flex; align-items: center; gap: 10px; margin-bottom: 7px; padding: 9px 11px;
@@ -577,6 +602,58 @@
   .mvgone button:hover { border-color: var(--accent); }
   .prof .abil { font-size: 10px; color: var(--muted); line-height: 1.5; }
   .prof .abil b { color: var(--text); }
+  .prof .abil .abb { color: #c9a4ff; font-weight: 700; } /* ✨ 결투에서 하는 일 */
+  .prof .abil .abb.none { color: var(--dim); font-weight: 400; }
+  /* ✨ 강화 · 💊 특성캡슐 — 상세 안의 카드 하나 */
+  .enhcard { margin: 8px 0 4px; padding: 9px 10px; border-radius: 10px; background: #23252d; border: 1px solid var(--line); }
+  .enhcard .eh { display: flex; align-items: baseline; justify-content: space-between; }
+  .enhcard .eh b { font-size: 12px; }
+  .enhcard .lvl { font: 900 15px/1 Consolas, monospace; color: #ffd54a; }
+  .enhcard .lvl small { font-size: 10px; color: var(--dim); }
+  .enhcard .steps { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); margin: 8px 0 6px; padding: 0; position: relative; }
+  .enhcard .steps::before { content: ""; position: absolute; left: 10%; right: 10%; top: 10px; height: 2px; background: #3a3e49; }
+  .enhcard .steps li { position: relative; display: grid; justify-items: center; gap: 1px; text-align: center; }
+  .enhcard .steps i { width: 21px; height: 21px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 10.5px; background: #2b2e37; box-shadow: inset 0 0 0 1px #444955; filter: grayscale(1); opacity: .65; }
+  .enhcard .steps b { font: 800 9.5px/1.2 Consolas, monospace; color: var(--dim); margin-top: 2px; }
+  .enhcard .steps span { font-size: 9px; color: var(--dim); line-height: 1.2; }
+  .enhcard .steps li.on i { filter: none; opacity: 1; color: #3a2a00; font-weight: 900; background: radial-gradient(circle at 35% 35%, #fff4b8, #ffd54a 55%, #e0a400); box-shadow: none; }
+  .enhcard .steps li.on b, .enhcard .steps li.on span { color: var(--muted); }
+  .enhcard .steps li.nx i { filter: none; opacity: 1; box-shadow: inset 0 0 0 2px #ffd54a, 0 0 8px rgba(255, 213, 74, .45); }
+  .enhcard .steps li.nx b { color: #ffd54a; }
+  .enhcard .steps li.nx span { color: var(--text); font-weight: 700; }
+  .enhcard .enhnext { font-size: 10.5px; color: var(--muted); padding: 5px 8px; border-radius: 7px; background: rgba(255, 213, 74, .07); border-left: 2px solid #ffd54a; }
+  .enhcard .enhnext b { color: #ffd54a; }
+  .enhcard .enhnext.done { border-left-color: var(--orange); }
+  .enhcard .enhbtn { display: block; width: 100%; margin-top: 7px; padding: 7px; border-radius: 8px; font: inherit; font-size: 11px; font-weight: 800; color: #3a2a00; background: linear-gradient(180deg, #ffe27a, #ffcd38); border: 0; cursor: pointer; }
+  .enhcard .enhbtn small { font-weight: 600; opacity: .75; margin-left: 4px; }
+  .enhcard .enhbtn.on { color: var(--text); background: #2b2e37; box-shadow: inset 0 0 0 1px var(--line); }
+  .enhcard .enhhint { margin-top: 6px; font-size: 10px; color: var(--dim); line-height: 1.5; }
+  .enhcard .enhpick { display: grid; grid-template-columns: repeat(auto-fill, minmax(82px, 1fr)); gap: 5px; margin-top: 7px; }
+  .enhcard .mc { display: grid; justify-items: center; gap: 1px; padding: 5px 4px 6px; border-radius: 8px; font: inherit; color: var(--text); background: #2b2e37; border: 1px solid var(--line); cursor: pointer; }
+  .enhcard .mc:hover { border-color: var(--accent); }
+  .enhcard .mc.sel { border-color: #ffd54a; box-shadow: 0 0 0 1px #ffd54a, 0 0 8px rgba(255, 213, 74, .3); }
+  .enhcard .mc .im { width: 40px; height: 40px; display: grid; place-items: center; }
+  .enhcard .mc .im img { max-width: 40px; max-height: 40px; image-rendering: pixelated; }
+  .enhcard .mc b { font-size: 10.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .enhcard .mc small { font-size: 9.5px; color: var(--dim); }
+  .enhcard .mc small.ab { color: #c9a4ff; }
+  .enhcard .enhgo { display: flex; align-items: center; gap: 8px; margin-top: 7px; padding: 7px 9px; border-radius: 8px; font-size: 10.5px; line-height: 1.5; color: var(--muted); background: rgba(255, 162, 69, .08); border: 1px solid rgba(255, 162, 69, .45); }
+  .enhcard .enhgo b { color: var(--text); }
+  .enhcard .enhgo small { display: block; font-size: 9.5px; color: var(--orange); }
+  .enhcard .enhgo .bt { display: grid; gap: 4px; flex: none; }
+  .enhcard .enhgo button { padding: 4px 10px; border-radius: 7px; font: inherit; font-size: 10.5px; font-weight: 700; color: var(--text); background: #2b2e37; border: 1px solid var(--line); cursor: pointer; }
+  .enhcard .enhgo button.go { color: #14151a; background: #ffd54a; border-color: #ffd54a; }
+  .enhcard .capcard { margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--line); }
+  .enhcard .capcard .ct { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .enhcard .capcard .ct span { color: var(--dim); font-size: 10px; }
+  .enhcard .capcard .ct button { margin-left: auto; padding: 3px 12px; border-radius: 7px; font: inherit; font-size: 10.5px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #8a4fe0, #c25ad8); border: 0; cursor: pointer; }
+  .enhcard .capcard .ct button:disabled { opacity: .35; cursor: not-allowed; }
+  .enhcard .capcard .ct .none { margin-left: auto; color: var(--dim); }
+  .enhcard .capcard .cl { margin-top: 3px; font-size: 10.5px; color: var(--muted); }
+  .enhcard .capcard .cl b { color: #c9a4ff; }
+  .enhcard .capcard .cs { margin-top: 2px; font-size: 9.5px; color: var(--dim); }
+  .bx .nm .tag.pl { color: #3a2a00; background: #ffd54a; font-weight: 800; }
+  .bx .nm .tag.pl.mx { background: linear-gradient(90deg, #ffd54a, #ff9b5e); }
 
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
   .cell {
@@ -812,7 +889,7 @@
   <!-- ---------------- 박스 ---------------- -->
   <section id="tab-box" hidden>
     <div class="dexhead"><span class="t">박스</span><span class="c" id="boxCount"></span>
-      <span class="boxall"><button id="petAllOn">모두 띄우기</button><button id="petAllOff">모두 내리기</button></span>
+      <span class="boxall"><button id="boxEnh" class="enhmode" hidden title="같은 라인이 둘 이상인 아이만 모아 강화한다">✨ 강화</button><button id="petAllOn">모두 띄우기</button><button id="petAllOff">모두 내리기</button></span>
     </div>
     <div class="note" id="boxNote">
       키우는 아이만 자랍니다. 바탕화면에는 여러 마리를 동시에 세울 수 있습니다.

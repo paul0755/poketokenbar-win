@@ -301,6 +301,8 @@ function sortPool(pool, picked) {
     .sort((a, b) => (moveSort.first ? picked.has(b.x.id) - picked.has(a.x.id) : 0) || by(a.x, b.x) || a.i - b.i)
     .map((y) => y.x);
 }
+/** ✨ 강화 — 재료 고르기를 펼친 아이 { id, mats: [...], pick: 고른 재료 id(아래 확인 줄에서 넣는다) } */
+let enhOpen = null;
 let forgetAsk = null; // 🗑 한 번 누른 "잊기" — { id, move }. 한 번 더 눌러야 잊는다(놓아주기와 같은 두 번 누르기)
 
 /*
@@ -336,8 +338,78 @@ $("boxFavOnly").addEventListener("click", () => {
   if (lastStats) renderBox(lastStats);
 });
 
+/*
+ * ✨ 강화 화면 — 박스 위 "✨ 강화" 버튼. 상세를 하나하나 열어 강화를 찾지 않게, 같은 라인이 둘 이상인 아이만
+ * 라인별로 묶어 보여 준다. 묶음마다 중심(강화받을 아이)을 고르고, 나머지가 재료로 바로 펼쳐진다.
+ * 중심은 처음엔 강화가 가장 높은 아이 → 키우는 중 → ♥ → 레벨 높은 아이. 고른 것은 화면을 닫을 때까지 기억한다
+ */
+let enhMode = false;
+const enhWho = {}; // 라인 → 중심 아이 id
+$("boxEnh").addEventListener("click", () => {
+  enhMode = !enhMode;
+  enhOpen = null;
+  if (lastStats) renderBox(lastStats);
+});
+
+/** 재료 후보 — 메인의 enhanceMats 와 같은 규칙(같은 라인 · 나 아님 · ♥ 아님 · 키우는 중 아님 · 결투 중 아님). 넣을 때 메인이 다시 본다 */
+function localMats(t, rows) {
+  return rows.filter((x) => x.line === t.line && x.id !== t.id && !x.fav && !x.active && !x.inDuel).map((x) => ({
+    id: x.id, name: x.name, stage: x.stage, shiny: x.shiny, graduated: x.graduated,
+    level: x.profile ? x.profile.level : x.lv, ability: x.profile ? x.profile.ability : null, hidden: Boolean(x.profile && x.profile.abilityHidden),
+    plus: (x.enh && x.enh.plus) || 0,
+    hold: x.stone ? "변하지않는돌" : x.shade ? "빛가림돌" : x.mega && x.mega.id ? x.mega.stone : null,
+  }));
+}
+
+/** 강화할 수 있는 라인 묶음 — [{ line, mons, target }] */
+function enhGroups(rows) {
+  const by = new Map();
+  for (const m of rows) if (m.enh && m.line != null) by.set(m.line, [...(by.get(m.line) || []), m]);
+  const out = [];
+  for (const [line, mons] of by) {
+    if (mons.length < 2) continue;
+    const can = mons.filter((m) => m.enh.plus < m.enh.max && localMats(m, rows).length);
+    if (!can.length) continue;
+    const rank = (m) => [m.enh.plus, m.active ? 1 : 0, m.fav ? 1 : 0, m.profile ? m.profile.level : 0];
+    const best = [...can].sort((a, b) => { const x = rank(a), y = rank(b); for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return y[i] - x[i]; return 0; })[0];
+    const target = can.find((m) => m.id === enhWho[line]) || best;
+    out.push({ line, mons, target });
+  }
+  return out;
+}
+
+function renderEnhance(s) {
+  const rows = s.box || [];
+  const groups = enhGroups(rows);
+  if (!groups.length) {
+    $("boxList").innerHTML = `<div class="enhlist"><div class="enhtop">강화할 수 있는 아이가 없습니다. 같은 라인의 아이가 둘 이상 있어야 합니다 — 알 · 야생에서 같은 종을 또 데려오면 여기에 나옵니다.<br>♥ 즐겨찾기 · 키우는 중인 아이는 재료가 되지 않습니다.</div></div>`;
+    return;
+  }
+  $("boxList").innerHTML = `<div class="enhlist">
+      <div class="enhtop">✨ 같은 라인의 아이를 넣으면 중심 아이가 강화됩니다(+1 ~ +5). 넣은 아이는 박스에서 떠납니다.<br>위에서 <b>중심</b>을 고르고, 아래에서 <b>재료</b>를 고르세요.</div>
+      ${groups.map(({ line, mons, target }) => {
+        const who = mons.filter((m) => m.enh.plus < m.enh.max || m.id === target.id).map((m) => `<button class="${m.id === target.id ? "on" : ""}" data-enhwho="${m.id}" data-line="${line}">${m.url ? `<img src="${m.url}" alt="">` : ""}${m.profile ? "Lv." + m.profile.level : m.stage}${m.enh.plus ? ` <em>+${m.enh.plus}</em>` : ""}${m.active ? " · 키우는 중" : ""}${m.fav ? " ♥" : ""}</button>`).join("");
+        return `<div class="enhgrp">
+          <div class="gh"><b>${target.name}</b><span>같은 라인 ${mons.length}마리</span></div>
+          <div class="who"><span class="lab">중심</span>${who}</div>
+          ${enhanceHtml(target, target.profile, localMats(target, rows))}
+        </div>`;
+      }).join("")}
+    </div>`;
+}
+
 function renderBox(s) {
   const all = s.box || [];
+  // ✨ 강화 버튼 — 강화할 수 있는 라인 수. 디지털 월드(enh 없음)엔 없다
+  const eg = all.some((m) => m.enh) ? enhGroups(all).length : -1;
+  $("boxEnh").hidden = eg < 0;
+  $("boxEnh").classList.toggle("on", enhMode);
+  $("boxEnh").innerHTML = enhMode ? "← 박스로" : `✨ 강화${eg > 0 ? ` <b>${eg}</b>` : ""}`;
+  $("tab-box").classList.toggle("enhon", enhMode && eg >= 0); // 정렬 · 즐겨찾기 줄은 강화 화면에서 숨긴다
+  if (enhMode && eg >= 0) {
+    $("boxCount").textContent = all.length + "마리";
+    return renderEnhance(s);
+  }
   const favN = all.filter((m) => m.fav).length;
   $("boxCount").textContent = all.length + "마리";
   $("boxFavN").textContent = favN ? `♥ ${favN}마리` : "";
@@ -362,6 +434,7 @@ function renderBox(s) {
         (m.isPet ? '<span class="tag pet">바탕화면</span>' : "") +
         (m.graduated ? '<span class="tag gr">졸업</span>' : "") +
         (m.boost > 0 ? '<span class="tag bo">2배</span>' : "") +
+        (m.enh && m.enh.plus ? `<span class="tag pl${m.enh.plus >= m.enh.max ? " mx" : ""}" title="✨ 강화 +${m.enh.plus}">+${m.enh.plus}</span>` : "") +
         (m.stone ? '<span class="tag st" title="변하지않는돌을 지니고 있다">🪨</span>' : "") +
         (m.shade ? '<span class="tag st" title="빛가림돌을 지니고 있다 — 졸업해도 원래 색">🌑</span>' : "") +
         (m.profile && m.profile.moveNew ? `<span class="tag mvn" title="새로 배운 기술 ${m.profile.moveNew}개 — 상세 › 💿 기술 관리에서 넣는다">💿NEW</span>` : "") +
@@ -397,6 +470,84 @@ const eul = (w) => {
   const c = String(w).charCodeAt(String(w).length - 1);
   return w + (c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 ? "을" : "를");
 };
+
+/**
+ * ✨ 강화 · 💊 특성캡슐 — 상세의 특성 바로 아래 카드 하나.
+ *
+ * 문장만 늘어놓으면 "몇 단계에서 무엇이 되나"가 안 읽힌다 — 다섯 칸 단계표로 보여 주고, 다음 칸만 빛낸다.
+ * 재료는 그림 칸으로 고르고(같은 라인이라 이름만으론 구분이 안 된다 — Lv · 특성을 같이), 고르면 아래 확인 줄에서
+ * "누구를 넣으면 무엇이 되나"를 한 문장으로 보여 준 뒤 넣는다. 캡슐은 따로 — 바뀔 후보 이름을 늘 보여 준다.
+ */
+const ENH_STEPS = [
+  ["🎲", "특성 랜덤"],
+  ["💪", "개체값 31"],
+  ["🔓", "숨김 열림"],
+  ["💪", "개체값 31"],
+  ["⭐", "전부 31"],
+];
+function enhanceHtml(m, p, inline = null) {
+  const e = m.enh;
+  if (!e) return "";
+  const done = e.plus >= e.max;
+  const steps = ENH_STEPS.map(([ic, lab], i) => {
+    const st = i < e.plus ? "on" : i === e.plus ? "nx" : "";
+    return `<li class="${st}"><i>${i < e.plus ? "✓" : ic}</i><b>+${i + 1}</b><span>${lab}</span></li>`;
+  }).join("");
+
+  // 재료 고르기 — 박스 목록에서 그림을 찾아 붙인다
+  // inline — ✨ 강화 화면: 재료가 늘 펼쳐져 있다(목록은 화면이 만든다)
+  const open = Boolean(inline) || (enhOpen && enhOpen.id === m.id);
+  const pickId = enhOpen && enhOpen.id === m.id ? enhOpen.pick : null;
+  const matList = inline || (enhOpen && enhOpen.mats) || [];
+  let picker = "";
+  if (open) {
+    const rows = (lastStats && lastStats.box) || [];
+    const cards = matList.map((x) => {
+      const r = rows.find((b) => b.id === x.id) || {};
+      const img = r.url ? `<img src="${r.url}" alt="">` : window.eggSvg ? window.eggSvg(30, r.single, r.egg) : "🥚";
+      return `<button class="mc${pickId === x.id ? " sel" : ""}" data-enhpick="${x.id}" data-id="${m.id}">
+          <span class="im">${img}</span>
+          <b>${x.name}${x.shiny ? " ★" : ""}</b>
+          <small>${x.level ? "Lv." + x.level : x.stage}${x.plus ? " · +" + x.plus : ""}</small>
+          <small class="ab">${x.ability ? x.ability + (x.hidden ? " (숨김)" : "") : "—"}</small>
+        </button>`;
+    }).join("");
+    const sel = matList.find((x) => x.id === pickId);
+    const confirm = sel
+      ? `<div class="enhgo">
+          <div><b>${sel.name}</b>${sel.level ? ` (Lv.${sel.level})` : ""}을(를) 넣으면 <b>+${e.plus + 1}</b> — ${e.next}.
+            <small>넣은 아이는 박스에서 떠납니다${sel.graduated ? " · 졸업 기록은 남습니다" : ""}${sel.hold ? ` · ${sel.hold}은(는) 가방으로` : ""}</small></div>
+          <span class="bt"><button class="go" data-enhgo="${m.id}">넣고 강화</button><button data-enhcancel="1">취소</button></span>
+        </div>`
+      : '<div class="enhhint">재료로 넣을 아이를 고르세요.</div>';
+    picker = `<div class="enhpick">${cards}</div>${confirm}`;
+  }
+
+  // 💊 캡슐 — 후보를 늘 보여 준다
+  const curAb = p && p.ability ? `${p.ability}${p.abilityHidden ? " (숨김)" : ""}` : "—";
+  const cand = e.capPool.map((c) => `<b>${c.name}${c.hidden ? " (숨김)" : ""}</b>`).join(" · ");
+  const capLine = e.capPool.length
+    ? `${curAb} → ${cand}${e.capPool.length > 1 ? " 중 하나" : ""}`
+    : `바꿀 좋은 특성이 없습니다${e.lockedHidden.length ? ` — 강화 +3 이면 <b>${e.lockedHidden.join(" · ")}</b>(숨김)도 후보` : ""}`;
+  const capBtn = !e.caps ? `<span class="none">상점에서 ${e.capPrice != null ? cur().icon + e.capPrice : "살 수 있다"}</span>` : `<button data-cap="${m.id}"${e.capOk ? "" : " disabled"}>쓰기</button>`;
+
+  return `<div class="enhcard">
+      <div class="eh"><b>✨ 강화</b><span class="lvl">+${e.plus}<small> / ${e.max}</small></span></div>
+      <ol class="steps">${steps}</ol>
+      ${done
+        ? '<div class="enhnext done">최대 강화입니다.</div>'
+        : `<div class="enhnext">다음 <b>+${e.plus + 1}</b> — ${e.next}</div>
+           ${inline ? "" : e.mats
+             ? `<button class="enhbtn${open ? " on" : ""}" data-enh="${m.id}">${open ? "재료 고르기 닫기" : `✨ 재료 넣고 강화하기 <small>같은 라인 ${e.mats}마리</small>`}</button>`
+             : '<div class="enhhint">같은 라인의 아이를 더 데려오면(알 · 야생) 재료로 넣을 수 있습니다. ♥ 즐겨찾기 · 키우는 중인 아이는 재료가 되지 않습니다.</div>'}`}
+      ${picker}
+      <div class="capcard">
+        <div class="ct"><b>💊 특성캡슐</b><span>${e.caps}개</span>${capBtn}</div>
+        <div class="cl">${capLine}</div>
+        <div class="cs">결투에서 효과가 있는 좋은 특성 중 하나로 랜덤 · 숨겨진 특성은 강화 +3 부터</div>
+      </div>
+    </div>`;
+}
 
 /**
  * 개체 상세.
@@ -520,7 +671,9 @@ function profileHtml(p, m = {}, bag = [], stones = 0, shades = 0) {
       <div class="abil">
         특성 <b>${p.ability || "—"}</b>${p.abilityHidden ? " (숨겨진 특성)" : ""}
         ${p.abilityDesc ? `<br>${p.abilityDesc}` : ""}
+        ${p.ability ? `<br><span class="abb${p.abilityBattle ? "" : " none"}">⚔️ 결투: ${p.abilityBattle || "효과가 없다(교체 · 지닌 물건 · 동료에 쓰는 특성)"}</span>` : ""}
       </div>
+      ${enhanceHtml(m, p)}
       <h5>능력치 — 개체값 합계 ${p.ivTotal}/${p.ivMax}</h5>
       ${stats}
       ${moveHead}
@@ -631,6 +784,59 @@ $("boxList").addEventListener("click", async (e) => {
     const r = await window.ptb.setMoves(id, ms.dataset.mvsave ? [...(moveDraft ? moveDraft.ids : [])] : null);
     toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
     if (r.ok) { moveDraft = null; if (lastStats) renderBox(lastStats); }
+    return;
+  }
+
+  // ✨ 강화 — 재료 목록 펼치기 · 고르기 · 넣기
+  const en = e.target.closest("button[data-enh]");
+  if (en) {
+    const id = en.dataset.enh;
+    if (enhOpen && enhOpen.id === id) enhOpen = null;
+    else enhOpen = { id, mats: (await window.ptb.enhanceMats(id)) || [], pick: null };
+    if (lastStats) renderBox(lastStats);
+    return;
+  }
+  const wh = e.target.closest("button[data-enhwho]");
+  if (wh) {
+    enhWho[wh.dataset.line] = wh.dataset.enhwho;
+    enhOpen = null;
+    if (lastStats) renderBox(lastStats);
+    return;
+  }
+  const pk = e.target.closest("button[data-enhpick]");
+  if (pk) {
+    if (!enhOpen || enhOpen.id !== pk.dataset.id) enhOpen = { id: pk.dataset.id, mats: [], pick: null };
+    enhOpen.pick = enhOpen.pick === pk.dataset.enhpick ? null : pk.dataset.enhpick;
+    if (lastStats) renderBox(lastStats);
+    return;
+  }
+  if (e.target.closest("button[data-enhcancel]") && enhOpen) {
+    enhOpen.pick = null;
+    if (lastStats) renderBox(lastStats);
+    return;
+  }
+  const eg = e.target.closest("button[data-enhgo]");
+  if (eg && enhOpen && enhOpen.pick) {
+    eg.disabled = true;
+    const id = eg.dataset.enhgo;
+    const mat = enhOpen.pick;
+    const r = await window.ptb.enhance(id, mat);
+    toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
+    if (r.ok) {
+      // 넣은 아이는 떠났다 — 새 목록이 오기 전에 다시 그려도 그 카드를 다시 누를 수 없게
+      if (lastStats && lastStats.box) lastStats.box = lastStats.box.filter((b) => b.id !== mat);
+      const left = enhMode ? [] : (await window.ptb.enhanceMats(id)) || [];
+      enhOpen = enhMode || r.plus >= 5 || !left.length ? null : { id, mats: left, pick: null };
+    }
+    if (lastStats) renderBox(lastStats);
+    return;
+  }
+  // 💊 특성캡슐
+  const cp = e.target.closest("button[data-cap]");
+  if (cp) {
+    cp.disabled = true;
+    const r = await window.ptb.abCapsule(cp.dataset.cap);
+    toast(r.ok ? r.message : r.reason, r.ok ? "" : "bad");
     return;
   }
 
@@ -897,6 +1103,7 @@ window.ptb.onShop((s) => {
           <div class="body">
             <div class="nm">${it.name}</div>
             <div class="de">${it.desc}</div>
+            ${it.legend ? legendBar(it.legend) : ""}
             <div class="pr">가격 ${cur().icon}${it.cost}${it.have != null ? ` · 가진 수 ${it.have}` : ""}</div>
           </div>
           <button data-id="${it.id}"${dis}>${it.owned ? (it.weekly ? "이번 주 ✓" : "보유") : "구매"}</button>
@@ -904,6 +1111,16 @@ window.ptb.onShop((s) => {
     })
     .join("") + megaShop(s);
 });
+
+/** 🏆 전설의 알 — 모은 전설 수. 다 모으면 그때부터는 적게 가진 전설부터 나온다 */
+function legendBar(l) {
+  const done = l.have >= l.total;
+  return `<div class="lgd${done ? " done" : ""}">
+      <span>🏆 모은 전설 <b>${l.have}</b>/${l.total}</span>
+      <i><em style="width:${Math.round((l.have / l.total) * 100)}%"></em></i>
+      <small>${done ? "다 모았다 — 이제 적게 가진 전설부터" : `아직 없는 ${l.total - l.have}마리 중에서 나온다`}</small>
+    </div>`;
+}
 
 /** 💎 메가스톤 — 박스에 있는 라인의 것만 메인이 보낸다 */
 function megaShop(s) {
