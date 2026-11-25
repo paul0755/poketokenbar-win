@@ -3129,7 +3129,36 @@ function checkGraduation(m, grown) {
 const natureIndexByName = (name) =>
   Math.max(0, poke.NATURES.findIndex((n) => n.name === name));
 
+/*
+ * 💱 환율 — 토큰을 원화로 보여 줄 때(price.js 가 달러로 센다). Frankfurter(유럽중앙은행 고시 환율 · 열쇠 없음)에서
+ * 12시간에 한 번 받는다. 보내는 건 없다. 못 받으면 지난번 값, 그것도 없으면 FX_FALLBACK(화면에 "기본 환율"이라고 적는다)
+ */
+const FX_URL = "https://api.frankfurter.dev/v1/latest?base=USD&symbols=KRW";
+const FX_FALLBACK = 1350;
+const FX_EVERY = 12 * 3600_000;
+const FX_RETRY = 30 * 60_000;
+let fxTried = 0;
+async function fxRefresh() {
+  const f = save.fx;
+  if (f && f.at && Date.now() - f.at < FX_EVERY) return;
+  if (Date.now() - fxTried < FX_RETRY) return; // 실패했으면 30분 뒤에 다시
+  fxTried = Date.now();
+  try {
+    const r = await fetch(FX_URL, { signal: AbortSignal.timeout(10_000) });
+    const j = await r.json();
+    const rate = Number(j && j.rates && j.rates.KRW);
+    if (!(rate > 100 && rate < 10000)) return;
+    save.fx = { rate, date: String((j && j.date) || "").slice(0, 10), at: Date.now() };
+    writeSave();
+  } catch {
+    /* 인터넷이 없으면 지난 환율로 */
+  }
+}
+const fxView = () =>
+  save.fx && save.fx.rate > 0 ? { rate: save.fx.rate, date: save.fx.date || "", fallback: false } : { rate: FX_FALLBACK, date: "", fallback: true };
+
 async function buildStats() {
+  fxRefresh(); // 기다리지 않는다 — 받으면 다음 갱신부터
   const u = usage.collect(save.logRoots || {});
   // 📒 장부 누적 — 로그 합계(u.total)는 30일 지난 로그가 지워지면 준다. 성장 · 사탕 · 누적 표시는 장부로 센다
   const book = ledger.update(app.getPath("userData"), u);
@@ -3269,6 +3298,7 @@ async function buildStats() {
 
   return {
     usage: slim,
+    fx: fxView(), // 💱 원화로 보여 줄 환율
     world: worldView(),
     mon,
     stillPath: still,
@@ -5541,6 +5571,16 @@ app.whenReady().then(async () => {
   ipcMain.handle("update-check", () => checkUpdateNow());
   // 📊 주간 리포트 — key 가 없으면 이번 주
   ipcMain.handle("week-report", (_e, key) => weekReport(typeof key === "string" ? key : null));
+  // ⚔️ 상성표의 상성 바퀴 그림 — 타입마다 대표 포켓몬(도감 번호). 디지털 월드엔 상성표가 없다
+  ipcMain.handle("type-art", async (_e, ids) => {
+    if (world.isDigimon || !Array.isArray(ids)) return {};
+    const want = [...new Set(ids.map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 649))].slice(0, 30);
+    const out = {};
+    await Promise.all(want.map(async (id) => {
+      out[id] = await spriteUrl({ dexId: id, isShiny: false }, "anim").catch(() => null);
+    }));
+    return out;
+  });
   // 📢 새 소식을 열었다 — 이 버전은 읽은 것으로
   ipcMain.on("news-seen", () => {
     if (save.newsSeen === app.getVersion()) return;

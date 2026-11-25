@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld("ptb", {
   updateCheck: () => ipcRenderer.invoke("update-check"),
   newsSeen: () => ipcRenderer.send("news-seen"),
   weekReport: (key) => ipcRenderer.invoke("week-report", key),
+  typeArt: (ids) => ipcRenderer.invoke("type-art", ids), // ⚔️ 상성표 그림 — { 도감번호: 그림 주소 }
 
   // 도감
   openDex: () => ipcRenderer.send("open-dex"),

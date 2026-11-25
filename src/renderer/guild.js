@@ -52,6 +52,24 @@
     };
   }
 
+  /**
+   * 💸 길드 합계를 원화로 — 어림이다. 서버엔 길드원의 토큰 수만 있고 어떤 모델(Claude · Codex)을 썼는지는 없다.
+   * 그래서 내 이번 주 단가(Claude API 정가로 친 ₩ ÷ 토큰, app.js 의 window.ptbCost)를 길드 합계에 곱한다.
+   * 내 Claude 기록이 없으면(단가를 모르면) 보이지 않는다
+   */
+  function guildWon(total) {
+    const c = window.ptbCost;
+    if (!c || !c.fx || !(c.tokWeek > 0) || !(total > 0)) return "";
+    const w = Math.round((total * c.usdWeek * c.fx.rate) / c.tokWeek);
+    const txt = w >= 1e8 ? "₩" + (w / 1e8).toFixed(2).replace(/\.?0+$/, "") + "억" : "₩" + w.toLocaleString();
+    const per = (c.usdWeek * c.fx.rate * 1e6) / c.tokWeek; // 100만 토큰당 원
+    const tip =
+      `내 단가로 어림한 값 — 길드원이 어떤 모델을 썼는지는 서버에 오지 않아 정확히 셀 수 없습니다.\n` +
+      `이번 주 내 Claude 사용량을 API 정가로 치면 100만 토큰당 약 ₩${Math.round(per).toLocaleString()} — 이걸 길드 합계에 곱했습니다.\n` +
+      `캐시 읽기가 많은 사람 · Codex 를 쓰는 사람은 실제와 다릅니다. 환율 $1 = ₩${Math.round(c.fx.rate).toLocaleString()}`;
+    return ` <em class="gd-won" title="${esc(tip)}">≈ ${txt} <i>추정</i></em>`;
+  }
+
   function renderRank(g, rk) {
     const max = rk.ranked.length ? Math.max(1, rk.ranked[0].week) : 1;
     const rows = rk.ranked
@@ -69,7 +87,7 @@
       rk.hidden.length ? `비공개 ${rk.hidden.map((m) => esc(m.trainer)).join(", ")}` : "",
     ].filter(Boolean).join(" · ");
     $("gdRank").innerHTML = `
-      <div class="hd"><b>📊 이번 주 토큰 순위</b><span>길드 합계 <b>${fmt(rk.total)}</b></span></div>
+      <div class="hd"><b>📊 이번 주 토큰 순위</b><span>길드 합계 <b>${fmt(rk.total)}</b>${guildWon(rk.total)}</span></div>
       <div class="lg" title="버닝 몫은 각자의 버닝타임 설정과 상관없이 모두 같은 시간으로 셉니다(0.19.0 이상인 길드원부터)"><span><i class="b"></i>🔥 버닝타임 10~16시 · 18시~자정</span><span><i></i>그 밖의 시간</span><span class="w">막대 길이 = 이번 주 합계</span></div>
       ${rows || '<div class="sub">아직 공개한 길드원이 없습니다</div>'}
       ${extra ? `<div class="ft">${extra}</div>` : ""}

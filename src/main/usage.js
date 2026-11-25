@@ -15,6 +15,7 @@
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const price = require("./price");
 
 const HOME = os.homedir();
 
@@ -95,6 +96,7 @@ function readClaude(text, add, note) {
       out: u.output_tokens ?? 0,
       cacheW: u.cache_creation_input_tokens ?? 0,
       cacheR: u.cache_read_input_tokens ?? 0,
+      usd: price.claudeUsd(o.message.model, u), // 💸 API 정가로 치면(모르는 모델이면 null)
     };
     const n = parts.in + parts.out + parts.cacheW + parts.cacheR;
     if (n) add(o.timestamp, n, o.requestId || o.uuid, parts);
@@ -437,6 +439,10 @@ function collect(extraRoots = {}) {
   const bySource = new Map();
   // 도구별 토큰 종류 분해. 합계만 보면 캐시 때문에 커진 건지 알 수 없다.
   const detail = new Map();
+  // 💸 API 정가로 친 값(달러) — 일자별 · 도구별, 가격표가 없는 토큰 수(Codex 등)
+  const usdDay = new Map();
+  const usdSrc = new Map();
+  const unpriced = new Map();
   // 개별 사용 기록. 5시간 창·번레이트는 일자 합계로는 계산할 수 없다.
   const events = [];
   // 로그에 섞여 있는 공식 한도 (도구별로 가장 최근 것)
@@ -528,7 +534,12 @@ function collect(extraRoots = {}) {
       // 프록시 기록에서 이미 센 요청이면 여기서 끝낸다 (일자 합계도 건드리지 않는다)
       if (suppress && Number.isFinite(t) && suppress(t)) return;
       byDay.set(day, (byDay.get(day) ?? 0) + n);
-      if (Number.isFinite(t)) events.push({ t, n, src: src.id });
+      const usd = parts && typeof parts.usd === "number" ? parts.usd : null;
+      if (usd != null) {
+        usdDay.set(day, (usdDay.get(day) ?? 0) + usd);
+        usdSrc.set(src.id, (usdSrc.get(src.id) ?? 0) + usd);
+      } else unpriced.set(src.id, (unpriced.get(src.id) ?? 0) + n);
+      if (Number.isFinite(t)) events.push(usd != null ? { t, n, src: src.id, usd } : { t, n, src: src.id });
       if (parts) {
         const d = detail.get(src.id) ?? { in: 0, out: 0, cacheW: 0, cacheR: 0 };
         d.in += parts.in; d.out += parts.out; d.cacheW += parts.cacheW; d.cacheR += parts.cacheR;
@@ -609,9 +620,12 @@ function collect(extraRoots = {}) {
   const month1 = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   let week = 0;
   let month = 0;
+  let usdWeek = 0;
+  let usdMonth = 0;
+  let tokWeek = 0; // 이번 주에 가격을 셀 수 있었던 토큰 — 길드 합계를 내 단가로 어림할 때 쓴다
   for (const e of events) {
-    if (e.t >= monday.getTime()) week += e.n;
-    if (e.t >= month1) month += e.n;
+    if (e.t >= monday.getTime()) (week += e.n), (usdWeek += e.usd || 0), (tokWeek += e.usd != null ? e.n : 0);
+    if (e.t >= month1) (month += e.n), (usdMonth += e.usd || 0);
   }
 
   // 이번 달 일별 (그래프용). 빈 날도 0으로 채워 막대 간격이 일정하게.
@@ -619,7 +633,7 @@ function collect(extraRoots = {}) {
   const monthly = [];
   for (let d = 1; d <= daysInMonth; d++) {
     const key = localDay(new Date(now.getFullYear(), now.getMonth(), d));
-    monthly.push({ day: d, key, n: byDay.get(key) ?? 0 });
+    monthly.push({ day: d, key, n: byDay.get(key) ?? 0, usd: usdDay.get(key) ?? 0 });
   }
 
   return {
@@ -630,9 +644,11 @@ function collect(extraRoots = {}) {
     monthly,
     days: [...byDay.entries()].sort(),
     sources: [...bySource.values()]
-      .map((s) => ({ ...s, detail: detail.get(s.id) ?? null }))
+      .map((s) => ({ ...s, detail: detail.get(s.id) ?? null, usd: usdSrc.get(s.id) ?? 0, unpriced: unpriced.get(s.id) ?? 0 }))
       .sort((a, b) => b.total - a.total),
     events,
+    // 💸 API 정가로 친 값(달러). 가격표가 없는 도구(Codex 등)는 빠진다 — sources[].unpriced
+    cost: { today: usdDay.get(today) ?? 0, week: usdWeek, weekTokens: tokWeek, month: usdMonth, pricedAt: price.PRICED_AT },
     // 로그에서 주운 공식 한도. 없으면 빈 객체 — 지어내지 않는다.
     quota,
     fileCount: files,
@@ -684,7 +700,8 @@ if (require.main === module) {
       ` (${Date.now() - t0}ms)`,
   );
   console.log("\n도구별:");
-  for (const [k, v] of r.sources) console.log("  " + k.padEnd(14) + v.toLocaleString());
+  for (const s of r.sources) console.log("  " + s.label.padEnd(14) + s.total.toLocaleString() + "  $" + s.usd.toFixed(2) + (s.unpriced ? "  (가격표 없음 " + s.unpriced.toLocaleString() + ")" : ""));
+  console.log("\n💸 오늘 $" + r.cost.today.toFixed(2) + " · 이번 주 $" + r.cost.week.toFixed(2) + " · 이번 달 $" + r.cost.month.toFixed(2));
   console.log("\n날짜별 (최근 10일):");
   for (const [d, t] of r.days.slice(-10)) console.log("  " + d + "  " + t.toLocaleString());
 }

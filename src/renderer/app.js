@@ -229,6 +229,17 @@ function renderHome(s) {
   $("todayRaw").textContent = usage.today.toLocaleString();
   $("week").textContent = fmt(usage.week ?? 0);
   $("month").textContent = fmt(usage.month ?? 0);
+  // 💸 원화 — 가격을 셀 수 있는 도구(Claude)가 있을 때만
+  fxNow = s.fx || null;
+  const cost = usage.cost;
+  const priced = Boolean(fxNow && cost && (usage.sources || []).some((x) => x.usd > 0));
+  // 🏰 길드 합계를 원화로 어림할 때 쓰는 내 단가(이번 주) — guild.js
+  window.ptbCost = priced && cost.weekTokens > 0 ? { usdWeek: cost.week, tokWeek: cost.weekTokens, fx: fxNow } : null;
+  for (const [id, v, pre] of [["todayWon", cost && cost.today, "≈ "], ["weekWon", cost && cost.week, ""], ["monthWon", cost && cost.month, ""]]) {
+    $(id).hidden = !priced;
+    $(id).textContent = priced ? pre + won(v || 0) : "";
+    $(id).title = priced ? wonTip() : "";
+  }
 
   // 이번 달 일별
   const md = usage.monthly || [];
@@ -264,7 +275,14 @@ function renderHome(s) {
              <span>캐시 쓰기 <b>${fmt(d.cacheW)}</b></span>
              <span>캐시 읽기 <b>${fmt(d.cacheR)}</b></span>
            </div>`
-        : "");
+        : "") +
+      // 💸 누적을 API 정가로 — 장부 누적(로그가 지워져도 줄지 않는다)
+      (fxNow && cur.usd > 0
+        ? `<div class="won-row" title="${wonTip()}">💸 API 정가로 치면 누적 <b>≈ ${won(cur.usd)}</b> ($${cur.usd.toLocaleString(undefined, { maximumFractionDigits: 0 })})` +
+          (cur.unpriced > 0 ? ` · 가격표 없는 모델 ${fmt(cur.unpriced)} 빠짐` : "") + `</div>`
+        : cur.unpriced > 0
+          ? `<div class="won-row">💸 가격표가 없어 원화로 세지 않습니다(OpenAI · Gemini 모델)</div>`
+          : "");
   } else {
     $("srcbody").innerHTML = '<div class="note">읽을 로그가 없습니다.</div>';
   }
@@ -887,6 +905,24 @@ $("boxList").addEventListener("click", async (e) => {
 });
 
 /**
+ * 💸 원화 — 메인이 요청마다 Claude API 정가로 센 달러(usage.cost · sources[].usd) × 환율(s.fx).
+ * 구독으로 쓰면 실제로 내는 돈은 정액이다 — "API 로 썼다면"의 값이라고 툴팁에 적는다.
+ */
+let fxNow = null;
+function won(usd) {
+  if (!fxNow || !(usd >= 0)) return "";
+  const w = Math.round(usd * fxNow.rate);
+  if (w >= 1e8) return "₩" + (w / 1e8).toFixed(2).replace(/\.?0+$/, "") + "억";
+  return "₩" + w.toLocaleString();
+}
+const wonTip = () =>
+  fxNow
+    ? `Claude API 정가로 치면 — 구독은 정액이라 실제로 낸 돈과 다릅니다.\n` +
+      `요청마다 모델 · 입력 · 출력 · 캐시 쓰기 · 캐시 읽기를 따로 셉니다. Codex(OpenAI) · Gemini 는 가격표가 없어 빠집니다.\n` +
+      `환율 $1 = ₩${Math.round(fxNow.rate).toLocaleString()}${fxNow.fallback ? " (기본값 — 환율을 아직 받지 못했습니다)" : ` (${fxNow.date} 유럽중앙은행 고시)`}`
+    : "";
+
+/**
  * 고른 날의 사용량.
  *
  * 호버 툴팁만 있으면 마우스를 떼는 순간 사라져서 다른 날과 비교할 수가 없다.
@@ -904,7 +940,7 @@ function renderDayPick(md, todayDay) {
   const dow = ["일", "월", "화", "수", "목", "금", "토"][new Date(d.key + "T00:00:00").getDay()];
 
   el.innerHTML =
-    `<b>${d.day}일 (${dow})</b>  ${fmt(d.n)}` +
+    `<b>${d.day}일 (${dow})</b>  ${fmt(d.n)}` + (d.usd > 0 ? ` <span class="won" title="${wonTip()}">${won(d.usd)}</span>` : "") +
     (d.n ? `  ·  쓴 날 중 ${rank}위 / ${used}일` : "  ·  기록 없음") +
     (pickedDay == null
       ? '  <span class="hint">— 막대를 눌러 다른 날도 볼 수 있습니다</span>'

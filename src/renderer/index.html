@@ -338,6 +338,11 @@
   .big .raw { font-size: 11px; color: var(--dim); }
   .wm { display: flex; gap: 22px; margin-top: 7px; font-size: 11.5px; color: var(--muted); }
   .wm b { color: var(--text); font-weight: 700; }
+  /* 💸 API 정가로 친 원화 — 초록으로, 토큰 숫자보다 한 단계 작게 */
+  .big .won { margin-left: auto; font-size: 13.5px; font-weight: 800; color: #7ee0a0; cursor: help; }
+  .wm .won { font-style: normal; margin-left: 5px; font-size: 10.5px; font-weight: 700; color: #7ee0a0; cursor: help; }
+  .srcbody .won-row { margin-top: 6px; font-size: 10.5px; color: var(--dim); }
+  .srcbody .won-row b { color: #7ee0a0; font-size: 11.5px; }
 
   /* 월 그래프 */
   .chart { display: flex; align-items: flex-end; gap: 2px; height: 46px; margin-top: 4px; }
@@ -355,6 +360,7 @@
   }
   .daypick b { color: var(--text); font-weight: 700; }
   .daypick .hint { color: var(--dim); }
+  .daypick .won { color: #7ee0a0; font-weight: 700; cursor: help; }
 
   /* 도구 탭 */
   .srctabs { display: flex; gap: 4px; margin: 14px 0 10px; }
@@ -758,6 +764,7 @@
 <link rel="stylesheet" href="gym.css" />
 <link rel="stylesheet" href="boss.css" />
 <link rel="stylesheet" href="digibattle.css" />
+<link rel="stylesheet" href="typechart.css" />
 
 <nav>
   <button data-tab="home" class="on">홈</button>
@@ -812,10 +819,10 @@
 
     <div class="hcol">
     <h4>오늘 쓴 토큰<span class="peak" id="refreshedAt"></span></h4>
-    <div class="big"><span class="n" id="today">–</span><span class="raw" id="todayRaw"></span></div>
+    <div class="big"><span class="n" id="today">–</span><span class="raw" id="todayRaw"></span><span class="won" id="todayWon"></span></div>
     <div class="wm">
-      <span>이번 주 <b id="week">–</b></span>
-      <span>이번 달 <b id="month">–</b></span>
+      <span>이번 주 <b id="week">–</b><i class="won" id="weekWon"></i></span>
+      <span>이번 달 <b id="month">–</b><i class="won" id="monthWon"></i></span>
       <span class="wmb">
         <button class="mini ckbtn" id="homeCheckin" title="출석 — 하루 한 번 코인 🪙10" hidden>🗓 출석</button>
         <button class="mini rpbtn" id="openReport" title="주간 리포트 — 요일 · 시간대 · 많이 자란 아이">📊 주간 리포트<i class="dot" id="reportDot" hidden></i></button>
@@ -1266,6 +1273,12 @@
   </section>
 
   <section id="tab-dex" hidden>
+    <!-- 도감 · ⚔️ 상성표(typechart.js) -->
+    <div class="rm-switch" id="dxSwitch">
+      <button data-view="dex" class="on">📖 도감</button>
+      <button data-view="type">⚔️ 상성표</button>
+    </div>
+    <div id="dxDex">
     <div class="dexhead"><span class="t">도감</span><span class="c" id="dexCount"></span></div>
     <div class="tiers" id="dexTiers"></div>
     <div class="dexfilter">
@@ -1274,6 +1287,19 @@
       <button id="fGot">만난 것</button>
     </div>
     <div class="grid" id="grid"></div>
+    </div>
+    <div id="dxType" hidden>
+      <div class="dexhead"><span class="t">⚔️ 상성표</span><span class="c">18타입 · 배틀과 같은 상성</span></div>
+      <p class="tc-lead">막는 포켓몬의 타입을 하나나 둘 고르세요. 두 타입이면 배율을 곱합니다.</p>
+      <div class="tc-pick" id="tcPick"></div>
+      <div class="tc-calc" id="tcCalc"></div>
+      <div class="tc-wheel-wrap">
+        <div class="tc-wheel" id="tcWheel"></div>
+        <div class="tc-wheel-say" id="tcWheelSay"></div>
+        <div class="tc-wheel-key"><span class="s">━▶ 강하다(2배로 친다)</span><span class="w">━▶ 약하다(2배로 맞는다)</span><span class="z">┅ 안 맞는다</span></div>
+      </div>
+      <div class="tc-foot">특성(배짱 · 델타스트림 · 부유 등)과 날씨는 빼고 본 기본 상성입니다.</div>
+    </div>
   </section>
 </div>
 
@@ -1288,6 +1314,7 @@
 <script src="app.js"></script>
 <script src="moves.js"></script>
 <script src="raidfx.js"></script>
+<script src="typechart.js"></script>
 <script src="megacut.js"></script>
 <script src="battle.js"></script>
 <script src="gymart.js"></script>

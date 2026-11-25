@@ -11,7 +11,9 @@
  *
  * 처음 만들 때는 지금 로그 합계에서 시작한다 — 세이브의 lastTotal 과 같은 단위라 이어진다.
  *
- *   { v: 1, total, last, src: { claude: { acc: {total,in,out,cacheW,cacheR}, last: {…}, label } } }
+ *   { v: 1, total, last, src: { claude: { acc: {total,in,out,cacheW,cacheR,usd}, last: {…}, label } } }
+ *
+ * usd — 💸 API 정가로 친 값(price.js). 0.20.3 전에 만든 장부에는 없다 — 처음 볼 때 남은 로그 몫에서 시작한다.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -66,7 +68,7 @@ function update(dir, u) {
     const cur = partsOf(s);
     const e = book.src[s.id];
     if (!e) {
-      book.src[s.id] = { label: s.label, acc: { ...cur }, last: cur }; // 처음 보는 도구 — 남은 로그 전부
+      book.src[s.id] = { label: s.label, acc: { ...cur, usd: s.usd || 0 }, last: { ...cur, usd: s.usd || 0 } }; // 처음 보는 도구 — 남은 로그 전부
       changed = true;
       continue;
     }
@@ -75,14 +77,23 @@ function update(dir, u) {
       e.acc[k] += Math.max(0, cur[k] - e.last[k]);
       changed = true;
     }
-    e.last = cur;
+    // 💸 달러 — 옛 장부엔 없다. 처음이면 남은 로그 몫 그대로, 그다음부터 늘어난 만큼
+    const usd = s.usd || 0;
+    if (typeof e.acc.usd !== "number" || typeof e.last.usd !== "number") {
+      e.acc.usd = usd;
+      changed = true;
+    } else if (usd !== e.last.usd) {
+      e.acc.usd += Math.max(0, usd - e.last.usd);
+      changed = true;
+    }
+    e.last = { ...cur, usd };
     e.label = s.label;
   }
   // 로그가 다 지워져 이번에 안 보인 도구 — 기준점을 0으로. 새 로그가 생기면 처음부터 다시 더한다
   const seen = new Set((u.sources || []).map((s) => s.id));
   for (const [id, e] of Object.entries(book.src)) {
     if (seen.has(id) || !e.last.total) continue;
-    e.last = Object.fromEntries(PARTS.map((k) => [k, 0]));
+    e.last = { ...Object.fromEntries(PARTS.map((k) => [k, 0])), usd: 0 };
     changed = true;
   }
   if (changed) write();
@@ -95,9 +106,10 @@ function sources(u) {
   return Object.entries(book.src)
     .map(([id, e]) => {
       const s = live.get(id);
-      const { total, ...detail } = e.acc;
+      const { total, usd, ...detail } = e.acc;
       const hasParts = Object.values(detail).some((v) => v > 0); // 입력 · 출력을 나눠 주지 않는 도구도 있다
-      return { ...(s || {}), id, label: e.label, total, detail: hasParts ? detail : null };
+      // usd — 💸 장부 누적(달러). unpriced 는 지금 남은 로그에서 가격표가 없는 토큰 수
+      return { ...(s || {}), id, label: e.label, total, detail: hasParts ? detail : null, usd: usd || 0, unpriced: (s && s.unpriced) || 0 };
     })
     .filter((s) => s.total > 0)
     .sort((a, b) => b.total - a.total);

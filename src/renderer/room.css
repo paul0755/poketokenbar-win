@@ -310,6 +310,9 @@ body.rm-tags-on .rm-room:not([data-theme="hall"]) .rm-tag { opacity: 1; }
 .gd-rank .hd { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; font-size: 12px; }
 .gd-rank .hd span { margin-left: auto; font-size: 10.5px; color: var(--muted); }
 .gd-rank .hd span b { color: var(--accent); }
+/* 💸 길드 합계를 원화로(내 단가로 어림) — guild.js guildWon */
+.gd-rank .hd .gd-won { font-style: normal; margin-left: 5px; font-weight: 800; color: #7ee0a0; cursor: help; }
+.gd-rank .hd .gd-won i { font-style: normal; font-weight: 600; font-size: 9px; color: #8fcfa6; opacity: .85; }
 /* 막대 색 범례 — 주황 = 🔥 버닝타임(모두 같은 고정 시간), 파랑 = 그 밖 */
 .gd-rank .lg { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: -2px 0 6px; padding: 0 6px; font-size: 10px; color: var(--muted); }
 .gd-rank .lg i { display: inline-block; width: 14px; height: 6px; margin-right: 4px; vertical-align: 1px; border-radius: 99px; background: var(--blue); }

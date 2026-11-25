@@ -1,0 +1,62 @@
+/* ⚔️ 상성표 — typechart.js. 도감 탭 위의 바꾸기 단추는 room.css 의 .rm-switch 를 같이 쓴다 */
+.tc-lead { font-size: 10.5px; color: var(--dim); margin: 0 0 8px; line-height: 1.5; }
+
+/* 타입 고르기 — 색 칩 18개 */
+.tc-pick { display: flex; flex-wrap: wrap; gap: 4px; }
+.tc-pick button.ty { font: inherit; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 99px; border: 2px solid transparent; cursor: pointer; opacity: .55; }
+:where(.tc-pick button.ty) { color: var(--text); } /* 밝은 타입은 .ty.t-… 가 글자를 어둡게 */
+.tc-pick button.ty:hover { opacity: .85; }
+.tc-pick button.ty.on { opacity: 1; border-color: #fff; box-shadow: 0 0 0 1px #14151a inset; }
+.tc-pick .tc-clear { font: inherit; font-size: 10.5px; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--line); background: var(--card); color: var(--muted); cursor: pointer; }
+
+/* 계산 결과 */
+.tc-calc { margin: 9px 0 12px; padding: 9px 11px; background: var(--card2); border: 1px solid var(--line); border-radius: 11px; }
+.tc-sec { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 11px; font-weight: 800; margin: 2px 0 6px; }
+.tc-sec + .tc-row, .tc-row + .tc-row { margin-top: 4px; }
+.tc-row + .tc-sec, .tc-hint + .tc-sec { margin-top: 10px; }
+.tc-row { display: flex; align-items: flex-start; gap: 7px; }
+.tc-row .m { flex: 0 0 26px; font-size: 11px; font-weight: 800; padding-top: 1px; }
+.tc-row .cs { display: flex; flex-wrap: wrap; gap: 3px; }
+.tc-row.x4 .m { color: #ff6b6b; } .tc-row.x2 .m { color: #ffa94d; }
+.tc-row.h .m { color: #74c0fc; } .tc-row.q .m { color: #4dabf7; } .tc-row.z .m { color: var(--muted); }
+.tc-calc .ty, .tc-sec .ty { font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 99px; }
+.tc-hint { font-size: 10.5px; color: var(--dim); }
+
+/* 🎡 상성 바퀴 — 18타입 대표 포켓몬을 한 원에, 고른 타입의 화살표 */
+.tc-wheel-wrap { padding: 8px 8px 9px; background: radial-gradient(circle at 50% 45%, #1f3348, #152130 75%); border: 1px solid #2c4058; border-radius: 13px; }
+.tc-wheel { position: relative; width: 100%; aspect-ratio: 1; }
+.tc-wheel svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.tc-wheel path { fill: none; stroke-linecap: round; }
+.tc-wheel path.all { stroke: #8fc3ee; stroke-width: .35; opacity: .32; }
+.tc-wheel path.strong { stroke: #5fb2ef; stroke-width: 1.1; marker-end: url(#tcS); }
+.tc-wheel path.weak { stroke: #ff9f43; stroke-width: 1.1; marker-end: url(#tcW); }
+.tc-wheel path.none { stroke: #7d828d; stroke-width: .7; stroke-dasharray: .6 1.6; }
+#tcS path { fill: #5fb2ef; } #tcW path { fill: #ff9f43; }
+.tc-wn { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; cursor: pointer; z-index: 1; transition: opacity .15s; }
+.tc-wn .pic { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #22344acc; border: 2px solid #ffffff1f; }
+.tc-wn .pic img { width: 38px; height: 38px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 1px 1px #0008); }
+.tc-wn .pic b { font-size: 15px; font-weight: 900; color: #ffffffcc; }
+.tc-wn .ty { margin-top: -6px; font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 99px; box-shadow: 0 1px 3px #0007; white-space: nowrap; }
+.tc-wn:hover .pic { border-color: #ffffff66; }
+.tc-wn.dim { opacity: .3; }
+.tc-wn.sel { z-index: 2; }
+.tc-wn.sel .pic { width: 48px; height: 48px; border-color: #fff; box-shadow: 0 0 0 3px #ffffff33, 0 0 16px #ffffffaa; }
+.tc-wn.sel .pic img { width: 46px; height: 46px; }
+.tc-wn.s .pic { border-color: #5fb2ef; box-shadow: 0 0 10px #5fb2ef; }
+.tc-wn.w .pic { border-color: #ff9f43; box-shadow: 0 0 10px #ff9f43; }
+.tc-wn.z .pic { border-color: #7d828d; border-style: dashed; }
+.tc-mid { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; pointer-events: none; }
+.tc-mid b { font-size: 12.5px; font-weight: 800; }
+.tc-mid span { font-size: 10px; color: #9fb6cc; line-height: 1.45; }
+.tc-mid.on { padding: 7px 10px; border-radius: 11px; background: #152130e6; box-shadow: 0 0 0 1px #2c4058; }
+.tc-mid.on .ty { font-size: 12px; font-weight: 800; padding: 3px 12px; border-radius: 99px; color: var(--text); }
+.tc-mid .s { color: #7cc4f5; font-weight: 700; } .tc-mid .w { color: #ffb36b; font-weight: 700; } .tc-mid .me { color: #cfe3f7; font-size: 9.5px; }
+.tc-wheel-say { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; font-size: 11px; color: #cfe3f7; line-height: 1.45; text-align: center; }
+.tc-wheel-say .s { color: #9fd3f8; } .tc-wheel-say .w { color: #ffc28a; } .tc-wheel-say .z { color: #b7bcc6; }
+.tc-wheel-key { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 10px; margin-top: 7px; font-size: 9.5px; }
+.tc-wheel-key .s { color: #5fb2ef; } .tc-wheel-key .w { color: #ff9f43; } .tc-wheel-key .z { color: #8b909b; }
+.tc-foot { margin-top: 8px; font-size: 10px; color: var(--dim); line-height: 1.5; }
+
+/* 디지털 월드엔 포켓몬 타입이 없다 — 도감만 */
+body.world-digimon #dxSwitch, body.world-digimon #dxType { display: none !important; }
+body.world-digimon #dxDex { display: block !important; }
