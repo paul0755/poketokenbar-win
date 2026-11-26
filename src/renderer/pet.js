@@ -11,17 +11,19 @@ drawEgg(); // 초기값. 설정 크기가 오면 다시 그린다
 
 /**
  * 💎 가로로 넓은 메가 그림을 살짝 키운다(pet.html #pet.mega 의 --mgs).
- * 창이 정사각형이라 가로세로 3:1 인 메가보스만다는 폭에 묶여 키가 창의 3분의 1이 된다.
- * 비율 1.3 까지는 그대로, 2.3 이상이면 1.2배 — 그 사이는 고르게. 애니메이션이 캔버스를 거의 다 써서
- * 더 키우면 날개 끝이 많이 잘린다
+ * 넓은 메가가 떠 있으면 메인이 창을 그림 비율만큼 옆으로 넓혀 준다(index.js petWantW) — 그때는 키가 창 높이를
+ * 다 쓰므로 그대로 둔다. 창이 정사각형일 때(결투 중의 메가진화 · 아주 넓은 메가) 남는 만큼만:
+ * 그림이 창보다 넓은 비율 1.3 까지는 그대로, 2.3 이상이면 1.2배 — 더 키우면 날개 끝이 많이 잘린다
  */
 function megaFit() {
   const w = img.naturalWidth, h = img.naturalHeight;
-  const ar = img.classList.contains("mega") && w && h ? w / h : 0;
+  const box = (innerWidth - 6) / Math.max(1, innerHeight - 7); // 그림 칸의 가로세로 비율
+  const ar = img.classList.contains("mega") && w && h ? w / h / Math.max(1, box) : 0;
   const s = ar > 1.3 ? 1 + Math.min(1, (ar - 1.3) / 1.0) * 0.2 : 1;
   img.style.setProperty("--mgs", s.toFixed(3));
 }
 img.addEventListener("load", megaFit); // 결투의 메가진화(duel.js transform)도 그림이 바뀌며 여기로 온다
+addEventListener("resize", megaFit);
 
 window.ptb.onStats((s) => {
   // 설정에서 크기를 바꾸면 창은 메인이 줄이고, 그림은 여기서 맞춘다.

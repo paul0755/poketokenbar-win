@@ -2,7 +2,7 @@
 const { app, Tray, BrowserWindow, Menu, ipcMain, nativeImage, screen, Notification, shell, dialog, powerMonitor, globalShortcut } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
-const { pathToFileURL } = require("node:url");
+const { pathToFileURL, fileURLToPath } = require("node:url");
 const usage = require("./usage");
 const ledger = require("./ledger"); // 로그가 지워져도 줄지 않는 누적(tokens.json)
 /*
@@ -3572,6 +3572,7 @@ async function refresh(force = false) {
     sendNotifications(s);
     if (s.burning) notifyBurning(s.burning);
     push(win, s);
+    fitPetWidths(); // 💎 메가진화가 시작 · 끝났으면 그 펫 창을 넓히거나 좁힌다
     pushPets(s);
     try {
       applyTray(s);
@@ -4204,6 +4205,81 @@ let petBusy = false;
 
 const petW = () => save.petSize ?? 128;
 
+/*
+ * 💎 넓은 메가는 펫 창을 옆으로 넓힌다.
+ *
+ * 펫 창은 정사각형이라 3D 메가 그림(Showdown GIF)이 옆으로 넓으면 폭에 묶여 키가 줄었다 — 메가리자몽X(161x107)는
+ * 보통 메가의 3분의 2, 메가보만다(217x71)는 3분의 1. 그런 메가가 떠 있는 동안만 창 폭을 그림 비율만큼 넓혀
+ * 키가 창 높이를 다 쓰게 한다(높이는 그대로 petW). 아주 넓은 메가는 PET_WIDE_MAX 배에서 멈춘다.
+ * 투명 창은 크기를 바꾸면 내용이 다시 그려지지 않으므로(applySettings 의 petSize 참고) 폭이 바뀌면 창을 새로 만든다
+ */
+const PET_WIDE_MAX = 2.5;
+const gifDims = new Map(); // 파일 경로 → { w, h } — GIF 머리(논리 화면 크기)만 읽는다
+function gifSize(file) {
+  if (gifDims.has(file)) return gifDims.get(file);
+  let d = null;
+  try {
+    const fd = fs.openSync(file, "r");
+    const b = Buffer.alloc(10);
+    fs.readSync(fd, b, 0, 10, 0);
+    fs.closeSync(fd);
+    if (b.toString("latin1", 0, 3) === "GIF") d = { w: b.readUInt16LE(6), h: b.readUInt16LE(8) };
+  } catch {
+    /* 못 읽으면 정사각형 그대로 */
+  }
+  if (d && d.w > 0 && d.h > 0) gifDims.set(file, d);
+  return d && d.w > 0 && d.h > 0 ? d : null;
+}
+/** 이 아이의 펫 창 폭 — 넓은 메가 그림이 떠 있으면 넓게, 아니면 petW */
+function petWantW(id) {
+  const S = petW();
+  const m = lastStats && (lastStats.box || []).find((x) => x.id === id);
+  const u = m && m.mega && m.mega.petUrl;
+  if (!u) return S;
+  let d = null;
+  try {
+    d = gifSize(fileURLToPath(u));
+  } catch {
+    d = null;
+  }
+  if (!d) return S;
+  // pet.html #pet.mega 는 창에서 가로 6 · 세로 7px 을 남긴다. 창 높이를 다 쓰는 폭
+  const need = Math.round(((S - 7) * d.w) / d.h) + 6;
+  return need <= S + 6 ? S : Math.min(need, Math.round(S * PET_WIDE_MAX));
+}
+const petWidth = (rec) => (rec && rec.width) || petW();
+const recOfWin = (w) => [...pets.values()].find((r) => r.win === w);
+
+/** 넓어진 창이 화면 밖으로 나가지 않게 가둔다 */
+function clampPet(x, y, width) {
+  const area = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) }).workArea;
+  return {
+    x: Math.min(Math.max(area.x, Math.round(x)), area.x + area.width - width),
+    y: Math.min(Math.max(area.y, Math.round(y)), area.y + area.height - petW()),
+  };
+}
+
+/**
+ * 펫마다 창 폭을 맞춘다 — 메가진화가 시작 · 끝나면(버닝 타임 · 마스터) 그 펫 창을 새 폭으로 다시 만든다.
+ * 가운데를 그대로 두어 제자리에서 넓어지고 좁아진다. 싸우는 중 · 끄는 중인 펫은 건드리지 않는다(다음 갱신에)
+ */
+function fitPetWidths() {
+  for (const [id, rec] of [...pets]) {
+    if (rec.win.isDestroyed() || rec.dragging || (duel && duel.ids.includes(id))) continue;
+    const want = petWantW(id);
+    const now = petWidth(rec);
+    if (want === now) continue;
+    const p = rec.win.getPosition();
+    const shown = rec.win.isVisible();
+    petBusy = true;
+    destroyPet(id);
+    const nrec = createPet(id, 0, { x: p[0] + now / 2 - want / 2, y: p[1], width: want });
+    if (shown) nrec.win.showInactive();
+    else stopWander(id);
+    setTimeout(() => (petBusy = false), 250);
+  }
+}
+
 /**
  * 펫 창을 옮긴다. 위치만이 아니라 **크기까지 함께** 지정한다.
  *
@@ -4217,11 +4293,9 @@ const petW = () => save.petSize ?? 128;
  */
 function movePet(win, x, y) {
   if (!win || win.isDestroyed()) return;
-  const w = petW();
-  const area = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) }).workArea;
-  const nx = Math.min(Math.max(area.x, Math.round(x)), area.x + area.width - w);
-  const ny = Math.min(Math.max(area.y, Math.round(y)), area.y + area.height - w);
-  win.setBounds({ x: nx, y: ny, width: w, height: w });
+  const w = petWidth(recOfWin(win)); // 💎 넓은 메가면 옆으로 넓다. 높이는 늘 petW
+  const { x: nx, y: ny } = clampPet(x, y, w);
+  win.setBounds({ x: nx, y: ny, width: w, height: petW() });
   return { x: nx, y: ny };
 }
 
@@ -4253,7 +4327,7 @@ function petTargets() {
  * 여러 마리가 같은 좌표에 겹쳐 뜨면 한 마리처럼 보인다.
  * 저장된 자리를 기준으로 순서대로 비켜 놓는다.
  */
-function startPos(nth) {
+function startPos(nth, width = petW()) {
   // 저장된 자리가 속한 화면을 기준으로 한다. 주 모니터로 고정하면
   // 보조 모니터에 뒀던 펫이 매번 주 모니터로 끌려온다.
   const base0 = save.petPos || { x: 0, y: 0 };
@@ -4265,15 +4339,17 @@ function startPos(nth) {
   const want = { x: base.x - nth * (petW() + 12), y: base.y };
   // 크기를 키우면 전에 있던 자리가 화면 밖으로 밀려날 수 있다. 다시 가둔다.
   return {
-    x: Math.min(Math.max(area.x, want.x), area.x + area.width - petW()),
+    x: Math.min(Math.max(area.x, want.x), area.x + area.width - width),
     y: Math.min(Math.max(area.y, want.y), area.y + area.height - petW()),
   };
 }
 
-function createPet(id, nth) {
-  const pos = startPos(nth);
+/** at — { x, y, width }: 이 자리 · 폭으로(fitPetWidths). 없으면 startPos 와 petWantW */
+function createPet(id, nth, at = null) {
+  const width = at ? at.width : petWantW(id);
+  const pos = at ? clampPet(at.x, at.y, width) : startPos(nth, width);
   const w = new BrowserWindow({
-    width: petW(),
+    width,
     height: petW(),
     x: pos.x,
     y: pos.y,
@@ -4292,7 +4368,7 @@ function createPet(id, nth) {
       additionalArguments: ["--ptb-pet-id=" + id],
     },
   });
-  const rec = { win: w, target: null, selfPos: null, wanderTimer: null, stepTimer: null };
+  const rec = { win: w, width, target: null, selfPos: null, wanderTimer: null, stepTimer: null };
   pets.set(id, rec);
 
   w.setAlwaysOnTop(true, "screen-saver"); // 전체화면 위에도 뜨게
@@ -4341,7 +4417,7 @@ function startWander(id) {
     const dx = (Math.random() - 0.5) * cfg.range[0];
     const dy = (Math.random() - 0.5) * cfg.range[1];
     rec.target = {
-      x: Math.min(Math.max(area.x, Math.round(p[0] + dx)), area.x + area.width - petW()),
+      x: Math.min(Math.max(area.x, Math.round(p[0] + dx)), area.x + area.width - petWidth(rec)),
       y: Math.min(Math.max(area.y, Math.round(p[1] + dy)), area.y + area.height - petW()),
     };
   };
@@ -4424,6 +4500,7 @@ function syncPets() {
     }
   });
 
+  fitPetWidths(); // 💎 결투가 끝난 뒤 등 — 메가가 바뀐 펫의 창 폭
   // 창 조작으로 생긴 blur가 도착할 시간을 준 뒤 푼다
   setTimeout(() => (petBusy = false), 250);
 }
@@ -4650,15 +4727,16 @@ async function desktopBattle(idA, idB, level) {
     // 자리 — A 가 있던 화면에서, A 자리 근처에 나란히. 화면 밖으로 안 나가게 가둔다
     const w = petW();
     const gap = Math.round(w * 0.15);
+    const [wa, wb] = recs.map(petWidth); // 💎 넓은 메가 창은 옆으로 넓다
     const pa = recs[0].win.getPosition();
     const area = screen.getDisplayNearestPoint({ x: pa[0], y: pa[1] }).workArea;
-    const x0 = Math.min(Math.max(area.x, pa[0]), area.x + area.width - (2 * w + gap));
+    const x0 = Math.min(Math.max(area.x, pa[0]), area.x + area.width - (wa + gap + wb));
     const y0 = Math.min(Math.max(area.y, pa[1]), area.y + area.height - w);
     const f = r.fighters;
 
     // 서로 마주 본다 — 왼쪽(A)이 뒤집혀 오른쪽을 본다
     ids.forEach((id, i) => duelSend(id, { t: "start", flip: i === 0, name: f[i].name, level: f[i].level, hp: f[i].hp, max: f[i].maxHp }));
-    await duelWalk(recs, [{ x: x0, y: y0 }, { x: x0 + w + gap, y: y0 }]);
+    await duelWalk(recs, [{ x: x0, y: y0 }, { x: x0 + wa + gap, y: y0 }]);
     await wait(500);
 
     await playDuel(ids.map((id) => (m) => duelSend(id, m)), r);
@@ -5188,10 +5266,11 @@ async function wildBattle(petId) {
   try {
     stopWander(petId);
     const w = petW();
+    const wp = petWidth(rec); // 💎 내 펫 창은 넓은 메가면 옆으로 넓다(야생 창은 늘 정사각형)
     const gap = Math.round(w * 0.1);
     // 야생 옆에 선다. 왼쪽에 자리가 없으면 오른쪽에
-    const left = W.pos.x - w - gap >= W.area.x;
-    const to = { x: left ? W.pos.x - w - gap : W.pos.x + w + gap, y: W.pos.y };
+    const left = W.pos.x - wp - gap >= W.area.x;
+    const to = { x: left ? W.pos.x - wp - gap : W.pos.x + w + gap, y: W.pos.y };
     const f = r.fighters;
     const wildDuel = (m) => !W.win.isDestroyed() && W.win.webContents.send("duel", m);
     duelSend(petId, { t: "start", flip: left, name: f[0].name, level: f[0].level, hp: f[0].hp, max: f[0].maxHp });
@@ -5776,8 +5855,9 @@ app.whenReady().then(async () => {
      * 겹친 정도는 중심 사이 거리로 잰다 — 살짝 스친 걸로 싸움이 나면 펫을 옮기기가 겁난다.
      */
     const w = petW();
+    const cx = p[0] + petWidth(rec) / 2; // 💎 넓은 메가 창도 있어서 왼쪽 위가 아니라 가운데끼리 잰다
     // 야생 위에 놓았나 — 그러면 잡으려고 약하게 만든다
-    if (wildNow && !wildNow.busy && !wildNow.fleeing && Math.hypot(wildNow.pos.x - p[0], wildNow.pos.y - p[1]) < w * 0.6) {
+    if (wildNow && !wildNow.busy && !wildNow.fleeing && Math.hypot(wildNow.pos.x + w / 2 - cx, wildNow.pos.y - p[1]) < w * 0.6) {
       wildBattle(id).then((ok) => {
         if (!ok) startWander(id);
       });
@@ -5787,7 +5867,7 @@ app.whenReady().then(async () => {
     for (const [oid, o] of pets) {
       if (oid === id || o.win.isDestroyed() || !o.win.isVisible()) continue;
       const q = o.win.getPosition();
-      if (Math.hypot(q[0] - p[0], q[1] - p[1]) < w * 0.55) { other = oid; break; }
+      if (Math.hypot(q[0] + petWidth(o) / 2 - cx, q[1] - p[1]) < w * 0.55) { other = oid; break; }
     }
     if (other && world.isDigimon) {
       // 🦖 디지털 월드 — 바탕화면에서 겹치면 팝오버의 필드 배틀이 열리고 둘이 붙는다
