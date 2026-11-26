@@ -47,13 +47,28 @@ window.ptb.onStats((s) => {
    * 여러 마리가 떠 있으므로 전역 "펫 그림" 하나를 쓰면 전부 같은
    * 모습이 된다. 못 찾으면(막 놓아준 경우) 키우는 개체로 떨어진다.
    */
+  if (s.box) lastFull = s;
+  const mine = showSprite(s);
+  if (s.box) watchMoves(s, mine);
+});
+
+/**
+ * 맡은 아이의 그림을 띄운다 — 💎 메가면 3D 메가 그림과 .mega(창 크기에 맞춤), 아니면 도트 · 알.
+ * 결투가 끝날 때(duel.js clear)도 부른다. 결투가 .mega 를 떼고 그림을 바꿔(메가진화 · 변신) 두므로,
+ * 다음 갱신을 기다리면 그동안 메가 그림이 보통 칸(petSize 의 0.875)에 눌려 작아 보였다.
+ * 결투 중에는 손대지 않는다 — 메가진화한 그림이 갱신 한 번에 도트로 돌아가 .mega 크기로 늘어나 보였다
+ */
+let lastFull = null; // 박스까지 담긴 마지막 갱신
+function showSprite(s) {
   const mine = window.ptb.petId && (s.box || []).find((m) => m.id === window.ptb.petId);
+  if (duel.on) return mine; // 결투가 그림을 맡는다. 끝나면 onClear 가 다시 부른다
   // 💎 버닝 타임에 몰아 쓰면 메가스톤을 지닌 펫이 잠시 메가진화한다(메인이 petUrl 을 줄 때만)
   const megaUrl = mine && mine.mega && mine.mega.petUrl;
   const url = megaUrl || (mine
     ? mine.animUrl || mine.url
     : s.petAnimUrl || s.petStillUrl || s.animUrl || s.stillUrl);
-  if (!duel.on) { img.classList.toggle("mega", Boolean(megaUrl)); megaFit(); }
+  img.classList.toggle("mega", Boolean(megaUrl));
+  megaFit();
   if (url) {
     if (img.getAttribute("src") !== url) img.setAttribute("src", url);
     img.hidden = false;
@@ -65,8 +80,8 @@ window.ptb.onStats((s) => {
     img.hidden = true;
     egg.hidden = false;
   }
-  if (s.box) watchMoves(s, mine);
-});
+  return mine;
+}
 
 /* ---------------- 기술 쓰기 ----------------
    언제 쓰나 — 셋 다 이 창이 받는 갱신만 보고 정한다. 메인에 따로 타이머를 두면
@@ -208,4 +223,9 @@ window.ptb.request();
 
 /* ---------------- 바탕화면 결투 ----------------
    그리는 건 duel.js 가 한다(야생 포켓몬 창도 같이 쓴다). 여기서는 붙이기만 한다. */
-const duel = window.ptbDuel.attach({ img, body: document.getElementById("body"), flipClass: "left" });
+const duel = window.ptbDuel.attach({
+  img,
+  body: document.getElementById("body"),
+  flipClass: "left",
+  onClear: () => lastFull && showSprite(lastFull), // 💎 결투가 끝나면 바로 원래 모습(늘 메가면 메가 크기)으로
+});

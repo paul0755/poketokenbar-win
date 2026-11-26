@@ -53,7 +53,7 @@ function replay(el, cls) {
 
 const AIL_HUD = { paralysis: "마비", burn: "화상", poison: "독", sleep: "잠듦", freeze: "얼음", confusion: "혼란" };
 
-function attach({ img, body, flipClass }) {
+function attach({ img, body, flipClass, onClear }) {
   const duel = { on: false, hp: 0 };
   img.classList.add("duel-img");
   body.classList.add("duel-body");
@@ -114,6 +114,7 @@ function attach({ img, body, flipClass }) {
         document.body.classList.remove("duel");
         body.classList.remove("faint", "cheer");
         img.classList.remove("hit", "mega");
+        if (onClear) onClear(); // 펫 창 — 결투가 바꾼 그림(메가진화 · 변신)을 맡은 아이 모습으로 되돌린다
         break;
     }
   });
