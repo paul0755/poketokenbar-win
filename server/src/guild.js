@@ -344,13 +344,19 @@ export class Guild {
     else await this.store.put("meta", { ...cur, pubAt: now });
   }
 
-  /** 그 주 칸에 한 사람의 합계를 적는다. 같은 값이면 쓰지 않는다 */
-  async writeWeek(weekKey, id, trainer, u) {
+  /**
+   * 그 주 칸에 한 사람의 합계를 적는다. 같은 값이면 쓰지 않는다.
+   * mon — 그 주의 대표 포켓몬(명예의 전당 그림). 대표를 나중에 바꿔도 끝난 주의 그림은 그대로 남게 주마다 적어 둔다.
+   * 지난주를 마무리할 때(final)는 그 주에 이미 적힌 대표를 지킨다 — 월요일에 바꾼 대표가 지난주로 넘어가지 않게
+   */
+  async writeWeek(weekKey, id, trainer, u, rep, final = false) {
     const key = "wk:" + weekKey;
     const wk = (await this.store.get(key)) || { key: weekKey, rows: {} };
     const old = wk.rows[id];
-    if (old && old.week === u.week && old.trainer === trainer) return;
-    wk.rows[id] = { trainer, week: u.week, burn: u.burn, morning: u.morning, core: u.core, night: u.night, dawn: u.dawn, at: Date.now() };
+    const mon = (final && old && old.mon) || rep || (old && old.mon) || null;
+    const same = (a, b) => (a && a.dexId) === (b && b.dexId) && Boolean(a && a.shiny) === Boolean(b && b.shiny);
+    if (old && old.week === u.week && old.trainer === trainer && same(old.mon, mon)) return;
+    wk.rows[id] = { trainer, week: u.week, burn: u.burn, morning: u.morning, core: u.core, night: u.night, dawn: u.dawn, mon, at: Date.now() };
     await this.store.put(key, wk);
   }
 
@@ -366,9 +372,12 @@ export class Guild {
     // 이번 주는 서버 시각으로 정말 지금인 주만 받는다 — 끝난 주를 "이번 주"라고 보내 고치지 못하게
     const now = Date.now();
     if (!(u.weekStart <= now + 3_600_000 && now - u.weekStart < 7 * DAY_MS + 3_600_000)) return;
-    await this.writeWeek(u.weekKey, id, snap.trainer, u);
+    // 대표 — 방 사진의 첫 아이(앱이 길드 대표를 맨 앞에 둔다)
+    const r0 = (snap.mons || [])[0];
+    const rep = r0 ? { dexId: r0.dexId, shiny: Boolean(r0.shiny) } : null;
+    await this.writeWeek(u.weekKey, id, snap.trainer, u, rep);
     // 지난주는 바로 앞 주만, 그 주가 끝나기 전에 이미 길드원이었던 사람만 마무리한다
-    if (u.prev && u.prev.weekKey === shiftDay(u.weekKey, -7) && joined <= u.weekStart) await this.writeWeek(u.prev.weekKey, id, snap.trainer, u.prev);
+    if (u.prev && u.prev.weekKey === shiftDay(u.weekKey, -7) && joined <= u.weekStart) await this.writeWeek(u.prev.weekKey, id, snap.trainer, u.prev, rep, true);
     const keys = [...(await this.store.list({ prefix: "wk:" })).keys()].sort();
     if (keys.length > KEEP_WEEKS) await this.store.delete(keys.slice(0, keys.length - KEEP_WEEKS));
   }

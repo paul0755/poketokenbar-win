@@ -129,7 +129,13 @@
       $("gdHof").innerHTML = `<div class="hd"><b>🏛️ 명예의 전당</b></div><div class="sub">한 주가 끝나면 그 주의 1위와 칭호가 여기 남습니다. 월요일 0시에 주가 바뀝니다.</div>`;
       return;
     }
-    const pic = (id) => { const m = g.members.find((x) => x.id === id); const mon = m && m.room.mons[0]; return mon && mon.url ? `<img src="${esc(mon.url)}" alt="">` : ""; };
+    // 그 주의 대표(서버가 주마다 적어 둔 것). 옛 기록이라 없으면 지금 대표로
+    const pic = (wk, id) => {
+      const row = (wk.rows || []).find((x) => x.id === id);
+      const m = g.members.find((x) => x.id === id);
+      const u = (row && row.monUrl) || (m && m.room.mons[0] && m.room.mons[0].url);
+      return u ? `<img src="${esc(u)}" alt="">` : "";
+    };
     const wins = {};
     for (const wk of closed) { const t = titlesOf(wk)[0]; if (t && t.k === "week") wins[t.trainer] = (wins[t.trainer] || 0) + 1; }
     const tally = Object.entries(wins).sort((a, b) => b[1] - a[1]).map(([n, c]) => `<b>${esc(n)}</b> ${c}회`).join(" · ");
@@ -143,7 +149,7 @@
         const L = weekLabel(wk.key);
         return `<div class="wk">
           <div class="when">${L.name}<span>${L.range}</span></div>
-          <div class="pic">${top ? pic(top.id) : ""}</div>
+          <div class="pic">${top ? pic(wk, top.id) : ""}</div>
           <div class="win">${top ? `<b>👑 ${esc(top.trainer)}</b><span>${fmt(top.value)}</span>` : '<span>기록 없음</span>'}</div>
           <div class="chips">${ts.filter((t) => t.k !== "week").map((t) => `<span title="${t.name} ${fmt(t.value)}">${t.icon} ${esc(t.trainer)}</span>`).join("")}</div>
         </div>`;

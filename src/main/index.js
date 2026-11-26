@@ -1439,9 +1439,13 @@ async function guildView() {
     writeSave();
   }
   const me = r.members.find((m) => m.id === g.memberId);
-  // 주간 기록 — 그 주의 1위 포켓몬 그림은 지금 길드원 카드에서 가져온다(화면이 한다)
+  // 주간 기록 — 끝난 주마다 그 주의 대표 포켓몬(서버가 주마다 적어 둔 mon) 그림. 없는 주(옛 기록)는 화면이 지금 대표로 대신한다
+  const weeks = await Promise.all((r.weeks || []).map(async (wk) => (wk.key >= week ? wk : {
+    ...wk,
+    rows: await Promise.all((wk.rows || []).map(async (x) => (x.mon && x.mon.dexId ? { ...x, monUrl: await url(x.mon.dexId, Boolean(x.mon.shiny), "still") } : x))),
+  })));
   return {
-    ok: true, code: r.code, name: r.name, max: r.max, leader, members, weeks: r.weeks || [], thisWeek: week, medal, now: r.now,
+    ok: true, code: r.code, name: r.name, max: r.max, leader, members, weeks, thisWeek: week, medal, now: r.now,
     listed: Boolean(r.listed), intro: r.intro || "",
     goal: (r.goals || {})[week] || null, goalCoins, lastGoal, goalNew,
     hall: r.hall || { funds: {}, owned: [], theme: null, donors: {} }, hallItems: HALL.items, hallMarks: HALL.marks,
