@@ -37,15 +37,16 @@
 
   /* ---------------- 결투 · 교환 나누기 ---------------- */
 
-  const HINT = { gym: "관장 8명 · 배지 8개", battle: "친구와 같은 결투를 동시에", trade: "예전 교환 코드 받기" };
+  const HINT = { gym: "관장 8명 · 배지 8개", weekly: "매주 바뀌는 상대 8명 · 증표 8개", battle: "친구와 같은 결투를 동시에", trade: "예전 교환 코드 받기" };
   function setView(v) {
     for (const x of $("olSwitch").querySelectorAll("button")) x.classList.toggle("on", x.dataset.view === v);
-    $("olGym").hidden = v !== "gym";
+    $("olGym").hidden = v !== "gym" && v !== "weekly"; // 🏟️ 체육관 · 🎫 주간 도전은 같은 화면(gym.js 의 mode)
     $("olBattle").hidden = v !== "battle";
     $("olTrade").hidden = v !== "trade";
     $("olHint").textContent = HINT[v] || "";
-    if (v === "gym" && window.ptbGymOpen) window.ptbGymOpen();
+    if ((v === "gym" || v === "weekly") && window.ptbGymOpen) window.ptbGymOpen(v);
   }
+  window.ptbBattleView = setView;
   $("olSwitch").addEventListener("click", (e) => {
     const b = e.target.closest("button[data-view]");
     if (b) setView(b.dataset.view);

@@ -153,4 +153,33 @@ function roadOf(weekKey) {
   return stages;
 }
 
-module.exports = { GYMS, ROAD, PER_LEVEL, grownAt, leaderMon, challenge, roadOf, seeded };
+/* ---------------- 🎫 주간 도전 ---------------- */
+
+/*
+ * 스토리 배지 8개 뒤에 열린다. 매주(그 주 월요일 날짜로) weekly.json 의 상대 16명 중 8명이 나온다 —
+ * 같은 주에는 언제 켜도 같은 여덟. 순서 없이 아무나 골라 붙고, 이기면 그 주의 증표. 증표 8개면 그 주 챔피언 로드.
+ *
+ * 누가 몇 번째 자리(k)에 서느냐도 주마다 섞인다. 자리가 곧 세기 — 에이스 레벨 · 개체값 · 팀 수가 자리를 따른다.
+ * 앞 다섯 자리는 넷(앞 셋 + 에이스), 뒤 세 자리는 다섯 다 나온다. 팀 레벨은 에이스에서 두 칸씩 내려간다.
+ */
+const WEEKLY = require("./weekly.json");
+const WEEK_N = 8;
+const WEEK_ACE = [85, 86, 88, 89, 91, 92, 94, 95];
+const WEEK_IV = [22, 23, 24, 25, 26, 27, 28, 29];
+const WEEK_FULL = 5; // 이 자리부터 다섯 마리
+
+/** 그 주의 상대 여덟 — 자리(k) 순서대로(쉬운 쪽부터). 결투가 받는 모양(challenge 의 g)과 같다 */
+function weeklyOf(weekKey) {
+  const rng = seeded("weekly:" + weekKey);
+  return pickN(WEEKLY, WEEK_N, rng).map((w, k) => {
+    const lines = k >= WEEK_FULL ? w.lines : [...w.lines.slice(0, 3), w.lines[w.lines.length - 1]];
+    const ace = WEEK_ACE[k];
+    return {
+      id: w.id, base: w.id, k, weekly: true, name: w.name, title: w.title, type: w.type, typeName: w.typeName, token: w.token,
+      iv: WEEK_IV[k], intro: w.intro, win: w.win, lose: w.lose,
+      team: lines.map((line, i) => ({ line, lv: ace - (lines.length - 1 - i) * 2 })),
+    };
+  });
+}
+
+module.exports = { GYMS, ROAD, WEEKLY, PER_LEVEL, grownAt, leaderMon, challenge, roadOf, weeklyOf, seeded };

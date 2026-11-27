@@ -1120,9 +1120,10 @@
   </section>
 
   <section id="tab-battle" hidden>
-    <!-- 배틀 — 체육관 · 친구와 실시간 결투 · 교환 코드 받기. 방 탭처럼 안에서 나눈다(online.css · gym.css) -->
+    <!-- 배틀 — 체육관 · 주간 도전 · 친구와 실시간 결투 · 교환 코드 받기. 방 탭처럼 안에서 나눈다(online.css · gym.css) -->
     <div class="rm-switch" id="olSwitch">
       <button data-view="gym" class="on">🏟️ 체육관</button>
+      <button data-view="weekly">🎫 주간 도전</button>
       <button data-view="battle">⚔️ 결투</button>
       <button data-view="trade">🔁 교환</button>
       <span class="c" id="olHint">관장 8명 · 배지 8개</span>
@@ -1161,7 +1162,7 @@
     <!-- 체육관 — 관장 8명에게 차례로 도전해 배지를 모은다(gym.js) -->
     <div id="olGym">
       <div class="gycase">
-        <div class="gycap"><b>배지 케이스</b><span id="gyCount"></span><span class="gytries" id="gyTries"></span></div>
+        <div class="gycap"><b id="gyCaseT">배지 케이스</b><span id="gyCount"></span><span class="gytries" id="gyTries"></span></div>
         <div class="gybadges" id="gyBadges"></div>
         <button class="gyroad" id="gyRoad"></button>
       </div>
@@ -1173,9 +1174,7 @@
       </div>
       <div class="gynote" id="gyNote"></div>
       <button id="gyGo" class="olbtn wide">🏟️ 도전하기</button>
-      <div class="note oltip">레벨은 맞추지 않습니다 — 관장의 레벨만큼 키워서 오세요. 한 마리가 쓰러지면 다음 아이가 나오고, 이긴 아이는 깎인 체력 그대로 다음 상대와 싸웁니다.
-        지면 이번 주 도전 횟수가 하나 줄고(이기면 그대로), 월요일에 다시 찹니다. 배지를 처음 따면 🍬, 8개를 다 모으면 전설의 알.
-        <br>🏆 배지 8개 뒤에는 <b>챔피언 로드</b> — 매주 관장 셋의 재대결과 챔피언. 6마리까지 데려가고, 도전 횟수는 체육관과 따로입니다.</div>
+      <div class="note oltip" id="gyTip"></div>
     </div>
 
     <div id="olBattle" hidden>
