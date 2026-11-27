@@ -49,6 +49,9 @@
 .gycard.t-normal { background: linear-gradient(135deg, rgba(180, 172, 150, .18), transparent 65%), var(--card); }
 .gybadges button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .gystar { color: var(--accent); letter-spacing: 1px; }
+/* 🎫 는 노란 그림이라 노란 단추 위에서 묻힌다 — 짙은 칩에 얹는다 */
+.emo { font-style: normal; }
+.rm-switch button.on .emo, #gyGo .emo, .gystate.got .emo { display: inline-block; padding: 0 3px; border-radius: 6px; background: #2a2415; line-height: 1.35; }
 .gycard.t-champ { background: linear-gradient(135deg, rgba(255, 196, 64, .22), transparent 65%), var(--card); border-color: #6b5a1a; }
 
 /* 🏆 챔피언 로드 — 배지 케이스 아래 한 줄. 누르면 로드 카드 */

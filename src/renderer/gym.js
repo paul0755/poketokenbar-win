@@ -52,6 +52,10 @@
     const d = await window.ptb.gymList();
     if (!d) return;
     data = d;
+    // 🎫 주간 도전 칸은 체육관 배지 8개를 다 모은 사람에게만 보인다
+    const tab = $("olWeeklyTab");
+    if (tab) tab.hidden = !(d.weekly && d.weekly.open);
+    if (isWeekly() && !(d.weekly && d.weekly.open) && window.ptbBattleView) return window.ptbBattleView("gym");
     if (!sel || !valid(d, sel)) { sel = firstOpen(d); fitPicks(); }
     render();
   }
@@ -131,9 +135,9 @@
     const W = data.weekly;
     const b = $("gyRoad");
     if (!isWeekly()) {
-      b.hidden = !W;
-      if (!W) return;
-      b.className = "gyroad" + (W.open ? "" : " lock");
+      b.hidden = !W || !W.open; // 배지 8개 전에는 주간 도전 줄도 숨긴다
+      if (b.hidden) return;
+      b.className = "gyroad";
       const st = W.open ? `이번 주 증표 ${W.got} / ${W.total}` : "배지 8개를 모으면 열립니다";
       b.innerHTML = `${art().token(W.stages[0].id, W.got > 0, 26)}<b>주간 도전</b><span class="st">${esc(st)}</span><span class="rc">매주 바뀌는 상대 8명 ›</span>`;
       return;
@@ -197,7 +201,7 @@
     const stars = "★".repeat(1 + Math.floor(g.k / 2)) + "☆".repeat(3 - Math.floor(g.k / 2));
     const state = !W.open
       ? `<span class="gystate lock">🔒 체육관 배지 8개를 모두 모으면 열립니다</span>`
-      : g.got ? `<span class="gystate got">🎫 ${esc(g.token)} 획득</span>` : `<span class="gystate">도전할 수 있음 · 🍬${W.candy}</span>`;
+      : g.got ? `<span class="gystate got"><i class="emo">🎫</i> ${esc(g.token)} 획득</span>` : `<span class="gystate">도전할 수 있음 · 🍬${W.candy}</span>`;
     $("gyCard").className = "gycard t-" + g.type + (W.open ? "" : " lock");
     $("gyCard").innerHTML = `
       <div class="gyportrait">${art().portrait(g.id, 92)}</div>
@@ -288,7 +292,7 @@
       : !picks.length ? "함께 싸울 아이를 골라 주세요."
       : "";
     $("gyGo").disabled = Boolean(why) || busy || (arena() && arena().busy());
-    $("gyGo").textContent = !g ? "🎫 도전하기" : g.got ? "🎫 다시 도전하기 (보상 없음)" : `🎫 ${g.name}에게 도전`;
+    $("gyGo").innerHTML = '<i class="emo">🎫</i> ' + (!g ? "도전하기" : g.got ? "다시 도전하기 (보상 없음)" : `${esc(g.name)}에게 도전`);
     $("gyNote").className = "gynote" + (why ? " bad" : top && top < ace - 5 ? " warn" : "");
     $("gyNote").textContent = why || (top && top < ace - 5 ? `내 팀 최고 Lv.${top} — 상대 에이스는 Lv.${ace}입니다.` : "");
   }
@@ -448,7 +452,7 @@
     if (!r.win) return `${r.gym.name} 체육관에서 졌습니다. 이번 주 남은 도전 ${r.tries}번.`;
     if (!r.reward) return "이미 딴 배지라 보상은 없습니다.";
     let t = `${r.reward.badge}를 받았다! 사탕 ${r.reward.candy}개를 받았습니다.`;
-    if (r.reward.legend) t += " 배지 8개를 다 모았다 — 전설의 알이 박스에 들어왔습니다!";
+    if (r.reward.legend) t += " 배지 8개를 다 모았다 — 전설의 알이 박스에 들어왔습니다! 배틀 탭에 🎫 주간 도전이 열렸습니다.";
     if (window.toast) toast(r.reward.legend ? "🥚 배지 8개 — 전설의 알을 받았습니다!" : `🏅 ${r.reward.badge} 획득!`);
     return t;
   }
