@@ -115,6 +115,7 @@ export class Room {
       const changed = Boolean(me.team) && me.team !== team; // 방 안에서 포켓몬을 바꿨다
       me.team = team;
       me.name = String(msg.name || "").slice(0, 16);
+      me.title = /^[a-z0-9]{1,16}$/.test(msg.title || "") ? msg.title : ""; // 🎖️ 칭호 번호
       me.ready = false;
       ws.serializeAttachment(me);
       if (peer && peer.a.team) {
@@ -123,8 +124,8 @@ export class Room {
           peer.a.ready = false;
           peer.ws.serializeAttachment(peer.a);
         }
-        this.send(ws, { t: "peer", name: peer.a.name, team: peer.a.team });
-        this.send(peer.ws, { t: "peer", name: me.name, team: me.team, changed });
+        this.send(ws, { t: "peer", name: peer.a.name, title: peer.a.title || "", team: peer.a.team });
+        this.send(peer.ws, { t: "peer", name: me.name, title: me.title || "", team: me.team, changed });
       }
       return;
     }

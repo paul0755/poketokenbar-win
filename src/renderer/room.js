@@ -2662,6 +2662,8 @@
       `🏟️ <b>체육관 배지 진열장</b> — ${R0.badges ? `배지 ${R0.badges}/8${R0.champ ? ` · 🏆 챔피언 ${R0.champ}번 (금테 진열장)` : R0.badges >= 8 ? " · 챔피언 로드에서 챔피언이 되면 진열장이 금테가 된다" : ""}` : "배틀 탭 › 체육관에서 첫 배지를 따면 생긴다"}`,
     ].join("<br>");
 
+    renderTitles(s.titles);
+
     const pickable = (s.box || []).filter((m) => m.stageKey !== "egg");
     const inRoom = new Set(R0.mons);
     $("rmMonsCount").textContent = `${R0.mons.length}/${R0.max}`;
@@ -2721,8 +2723,36 @@
       weekTop: R0.weekTop || 0,
       badges: R0.badges || 0,
       champ: R0.champ || 0,
-      trainer: (s.friend && s.friend.trainer) || "나",
+      trainer: window.ptbTitled(s.titles && s.titles.on, (s.friend && s.friend.trainer) || "나"), // 🎖️ 단 칭호를 이름 앞에
     };
+  }
+
+  /* ---- 패널 탭 — 🎨 꾸미기 · 🐾 포켓몬 · 🎖️ 칭호 · 📜 기록. 한 번에 하나, 고른 탭은 이 PC 에 기억한다 ---- */
+  const PT_LS = "ptb.roomTab";
+  let titlesOpen = false; // 못 얻은 칭호 펼침
+  function ptab(name) {
+    if (!["deco", "mons", "titles", "rec"].includes(name)) name = "deco";
+    for (const b of document.querySelectorAll("#rmPTabs button")) b.classList.toggle("on", b.dataset.pt === name);
+    for (const el of document.querySelectorAll("#rmPanel .rm-pt")) el.hidden = el.dataset.pt !== name;
+    if (name !== "deco" && $("rmRoom").classList.contains("edit")) setEdit(false); // 가구 옮기기는 꾸미기 탭에서만
+    try { localStorage.setItem(PT_LS, name); } catch {}
+  }
+  try { ptab(localStorage.getItem(PT_LS) || "deco"); } catch { ptab("deco"); }
+
+  /** 🎖️ 칭호 — 얻은 것이 먼저(얻은 차례), 못 얻은 것은 조건과 지금 몇인지 */
+  function renderTitles(T) {
+    if (!T) return;
+    const got = T.list.filter((t) => t.got).sort((a, b) => a.got - b.got);
+    const not = T.list.filter((t) => !t.got);
+    const big = (n) => (n >= 1e8 ? `${Math.floor(n / 1e8)}억` : n.toLocaleString());
+    $("rmTitleN").textContent = `${got.length}/${T.list.length}`;
+    $("rmTitles").innerHTML = got.map((t) => `<button data-title="${t.id}" class="${T.on === t.id ? "on" : ""}" title="${T.on === t.id ? "다시 누르면 뗍니다" : "이름 앞에 달기"}"><span class="i">${t.icon}</span><span class="t">${esc(t.name)}<span>${T.on === t.id ? "달고 있음 · " : ""}${esc(t.desc)}</span></span></button>`).join("")
+      || '<span class="rm-rec">아직 얻은 칭호가 없습니다. 아래에서 조건을 보세요.</span>';
+    // 못 얻은 칭호 — 접어 둔다(길어서). 펼치면 조건과 지금 몇인지
+    $("rmTitleMore").hidden = !not.length;
+    $("rmTitleMore").textContent = titlesOpen ? "▾ 못 얻은 칭호 접기" : `▸ 못 얻은 칭호 ${not.length}개 보기`;
+    $("rmTitlesNot").hidden = !titlesOpen || !not.length;
+    $("rmTitlesNot").innerHTML = not.map((t) => `<button disabled title="${esc(t.desc)}"><span class="i">${t.icon}</span><span class="t">${esc(t.name)}<span>${esc(t.desc)} · ${big(t.now)}/${big(t.at)}</span></span></button>`).join("");
   }
 
   /* ================= 연결 ================= */
@@ -2816,6 +2846,13 @@
   window.addEventListener("pointerup", drop);
   window.addEventListener("pointercancel", drop);
 
+  // 내 방 이름판을 누르면 🎖️ 칭호 탭으로
+  $("rmRoom").addEventListener("click", (e) => {
+    if (!e.target.closest(".rm-plate") || $("rmRoom").classList.contains("edit")) return;
+    ptab("titles");
+    $("rmPTabs").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
   $("rmPanel").addEventListener("click", async (e) => {
     const b = e.target.closest("button");
     if (!b || b.disabled || !last) return;
@@ -2828,6 +2865,15 @@
       if (b.closest("#rmCoinThemes, #rmCoinFurni") && !sure(b, "정말 사기?")) return;
       b.disabled = true; // 연타로 두 번 사지 않게
       return done(await window.ptb.roomBuy(b.dataset.buyTheme ? { kind: "theme", id: b.dataset.buyTheme } : { kind: "furni", id: b.dataset.buyFurni }));
+    }
+    if (b.dataset.pt) return ptab(b.dataset.pt);
+    if (b.id === "rmTitleMore") { titlesOpen = !titlesOpen; return renderTitles(last.titles); }
+    if (b.dataset.title) {
+      const off = last.titles && last.titles.on === b.dataset.title;
+      const r = await window.ptb.titleSet(off ? null : b.dataset.title);
+      if (r && r.ok) toast(off ? "칭호를 뗐습니다" : `${window.ptbTitle(b.dataset.title)} — 이름 앞에 달았습니다`);
+      else done(r);
+      return;
     }
     if (b.dataset.mon) {
       const cur = last.room.mons;

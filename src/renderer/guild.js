@@ -75,7 +75,7 @@
     const rows = rk.ranked
       .map((r, i) => `<div class="row${r.m.me ? " me" : ""}">
           <span class="no">${i + 1}</span>
-          <span class="nm">${esc(r.m.trainer)}${rk.icons && rk.icons(r.m.id) ? ` <i class="tt" title="지난주 칭호">${rk.icons(r.m.id)}</i>` : ""}</span>
+          <span class="nm">${window.ptbTitleHtml(r.m.title)}${esc(r.m.trainer)}${rk.icons && rk.icons(r.m.id) ? ` <i class="tt" title="지난주 칭호">${rk.icons(r.m.id)}</i>` : ""}</span>
           <span class="bar"><i style="width:${Math.round((r.week / max) * 100)}%"></i><i class="b" style="width:${Math.round((r.burn / max) * 100)}%"></i></span>
           <span class="v">${fmt(r.week)}</span>
           <span class="sub">오늘 ${fmt(r.today)}${r.burn ? ` · 🔥 ${fmt(r.burn)}` : ""}</span>
@@ -247,7 +247,7 @@
     if (sel) {
       // 길드원의 방 — 이름표는 "친구의 핫삼"
       room.setEmpty(sel.me ? "내 방에 둔 포켓몬이 없습니다" : "이 길드원은 방에 포켓몬을 두지 않았습니다");
-      room.render({ ...sel.room, trainer: sel.trainer, mons: sel.room.mons.map((x) => ({ ...x, owner: sel.me ? null : sel.trainer })) });
+      room.render({ ...sel.room, trainer: window.ptbTitled(sel.title, sel.trainer), mons: sel.room.mons.map((x) => ({ ...x, owner: sel.me ? null : sel.trainer })) });
       $("gdVisit").innerHTML = `<button class="mini2" id="gdBack">← 길드 홀</button><span>${sel.me ? "내 방 — 길드원에게 이렇게 보입니다" : `${esc(sel.trainer)}의 방 · ${ago(sel.updated)} 올림`}</span>`;
     } else {
       // 길드 홀 — 길드원마다 대표 포켓몬 한 마리가 트레이너 이름표를 달고 모인다
@@ -280,7 +280,7 @@
         // 지난주 칭호를 이름표에 달고 다닌다 (👑🌙 예잔디)
         mons: g.members
           .filter((m) => m.room.mons[0])
-          .map((m) => ({ ...m.room.mons[0], id: "hall:" + m.id, owner: m.trainer, badge: (iconsOf(m.id) ? iconsOf(m.id) + " " : "") + m.trainer, me: m.me })),
+          .map((m) => ({ ...m.room.mons[0], id: "hall:" + m.id, owner: m.trainer, badge: (iconsOf(m.id) ? iconsOf(m.id) + " " : "") + (window.ptbTitleIcon(m.title) ? window.ptbTitleIcon(m.title) + " " : "") + m.trainer, me: m.me })), // 🎖️ 홀은 붐벼서 칭호 아이콘만
       });
       $("gdVisit").innerHTML = "<span>길드 홀 — 길드원마다 대표 포켓몬(그 사람 방의 첫 아이)이 모여 있습니다. 길드원을 누르면 그 방으로 갑니다</span>";
     }
@@ -290,7 +290,7 @@
         const pic = (m.room.mons[0] || {}).url;
         return `<div class="gd-m${sel && m.id === sel.id ? " on" : ""}" data-id="${esc(m.id)}">
           <div class="pic">${pic ? `<img src="${esc(pic)}" alt="">` : ""}</div>
-          <div class="t"><b>${esc(m.trainer)}</b>${m.leader ? ' <span class="ld">길드장</span>' : ""}${m.me ? ' <span class="me">나</span>' : ""}
+          <div class="t"><b>${window.ptbTitleHtml(m.title)}${esc(m.trainer)}</b>${m.leader ? ' <span class="ld">길드장</span>' : ""}${m.me ? ' <span class="me">나</span>' : ""}
             <span>도감 ${m.room.dex.seen} · 졸업 ${m.room.graduated} · ${m.room.wins}승${m.room.badges ? ` · 배지 ${m.room.badges}` : ""}${m.room.champ ? ` · 🏆${m.room.champ}` : ""} · ${ago(m.updated)}</span></div>
           <div class="acts">
             <button data-visit>방 구경</button>

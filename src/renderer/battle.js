@@ -210,7 +210,7 @@
 
     ws.onopen = () => {
       // 내 팀 코드를 보낸다. 친구가 이 코드로 같은 결투를 계산한다
-      ws.send(JSON.stringify({ t: "hello", name: (s.friend && s.friend.trainer) || "", team: live.myCode }));
+      ws.send(JSON.stringify({ t: "hello", name: (s.friend && s.friend.trainer) || "", title: (s.titles && s.titles.on) || "", team: live.myCode }));
     };
     ws.onmessage = async (e) => {
       let m;
@@ -224,7 +224,7 @@
         // 받은 코드는 메인이 검사한다 — 버전이 다르거나 말이 안 되면 여기서 끝난다
         const r = await window.ptb.friendInspect(m.team);
         live.peer = { team: m.team, name: m.name, ok: Boolean(r && r.ok && !r.self) };
-        if (r && r.ok) showFoe(r.url || null, `${m.name || r.trainer || "상대"}의 ${r.name}${r.shiny ? " ★" : ""}`);
+        if (r && r.ok) showFoe(r.url || null, `${window.ptbTitled(m.title, m.name || r.trainer || "상대")}의 ${r.name}${r.shiny ? " ★" : ""}`);
         else showFoe(null, "상대 팀을 읽지 못했습니다");
         // 누가 포켓몬을 바꾸면 서버가 양쪽 준비를 내린다 — 내 준비 표시도 내린다
         delete $("liveReady").dataset.on;
@@ -315,7 +315,7 @@
     if (!team || !team.ok) return liveState((team && team.reason) || "바꾸지 못했습니다", "bad");
     live.myCode = team.code;
     live.justChanged = live.peer ? team.name : null;
-    live.ws.send(JSON.stringify({ t: "hello", name: (last.friend && last.friend.trainer) || "", team: live.myCode }));
+    live.ws.send(JSON.stringify({ t: "hello", name: (last.friend && last.friend.trainer) || "", title: (last.titles && last.titles.on) || "", team: live.myCode }));
     delete $("liveReady").dataset.on;
     liveState(`${team.name}(으)로 바꿨습니다.` + (live.peer ? " 둘 다 다시 준비를 눌러 주세요." : " 상대를 기다리는 중…"));
   });

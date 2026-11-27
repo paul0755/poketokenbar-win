@@ -25,6 +25,20 @@ function toast(msg, kind = "") {
   toastTimer = setTimeout(() => (el.className = ""), 2800);
 }
 
+/*
+ * 🎖️ 칭호 — 번호 → "🗡️ 막타 장인". 표(titles.js DEFS)는 갱신 값 s.titles.list 에 실려 온다.
+ * 남의 칭호도 번호만 오고 이 표로 그린다 — 모르는 번호(더 새 버전의 칭호)는 안 보인다
+ */
+const titleDefs = new Map();
+window.ptbTitle = (id) => { const d = id && titleDefs.get(id); return d ? `${d.icon} ${d.name}` : ""; };
+/** 이름 앞에 붙일 HTML 딱지(뒤에 빈칸 포함). 칭호가 없으면 "" */
+// <em> — 목록의 ".t span"(작은 회색 줄) 같은 규칙에 걸리지 않게 span 을 쓰지 않는다
+window.ptbTitleHtml = (id) => { const t = window.ptbTitle(id); return t ? `<em class="ttl">${t}</em> ` : ""; };
+/** 아이콘만 — 붐비는 길드 홀 이름표 */
+window.ptbTitleIcon = (id) => { const d = id && titleDefs.get(id); return d ? d.icon : ""; };
+/** 글자로 — "[🗡️ 막타 장인] 이름" */
+window.ptbTitled = (id, name) => { const t = window.ptbTitle(id); return t ? `[${t}] ${name}` : name; };
+
 /* ---------------- 탭 ---------------- */
 
 function setTab(name) {
@@ -346,6 +360,7 @@ const BOX_SORT = {
 $("boxSort").value = BOX_SORT[boxView.sort] ? boxView.sort : "got";
 $("boxFavOnly").classList.toggle("on", Boolean(boxView.favOnly));
 $("boxLegOnly").classList.toggle("on", Boolean(boxView.legOnly));
+$("boxMegaOnly").classList.toggle("on", Boolean(boxView.megaOnly));
 $("boxSort").addEventListener("change", () => {
   boxView.sort = $("boxSort").value;
   saveBoxView();
@@ -363,6 +378,26 @@ $("boxLegOnly").addEventListener("click", () => {
   saveBoxView();
   if (lastStats) renderBox(lastStats);
 });
+// 💎 메가만 — 메가스톤을 지닌 아이(결투에서 메가진화 · 마스터면 늘 메가)
+const isMega = (m) => Boolean(m.mega && m.mega.id);
+$("boxMegaOnly").addEventListener("click", () => {
+  boxView.megaOnly = !boxView.megaOnly;
+  $("boxMegaOnly").classList.toggle("on", boxView.megaOnly);
+  saveBoxView();
+  if (lastStats) renderBox(lastStats);
+});
+/*
+ * 📌 맨 위 고정 — 고른 아이를 정렬과 상관없이 박스 맨 위에 세운다(즐겨찾기보다 위). 먼저 고정한 아이가 위.
+ * 보기 설정이라 정렬처럼 이 PC 에 기억한다. 놓아준 아이의 번호가 남아도 목록에 없으니 그냥 무시된다
+ */
+const pinRank = (id) => { const i = (boxView.pins || []).indexOf(id); return i < 0 ? 1e9 : i; };
+const togglePin = (id) => {
+  const pins = (boxView.pins || []).filter((x) => x !== id);
+  if (pins.length === (boxView.pins || []).length) pins.push(id);
+  boxView.pins = pins;
+  saveBoxView();
+  if (lastStats) renderBox(lastStats);
+};
 
 /*
  * ✨ 강화 화면 — 박스 위 "✨ 강화" 버튼. 상세를 하나하나 열어 강화를 찾지 않게, 같은 라인이 둘 이상인 아이만
@@ -439,15 +474,18 @@ function renderBox(s) {
   const favN = all.filter((m) => m.fav).length;
   $("boxCount").textContent = all.length + "마리";
   const legN = all.filter((m) => m.legend).length;
-  $("boxFavN").textContent = [favN ? `♥ ${favN}마리` : "", legN ? `⭐ ${legN}마리` : ""].filter(Boolean).join(" · ");
+  const megaN = all.filter(isMega).length;
+  $("boxFavN").textContent = [favN ? `♥ ${favN}마리` : "", legN ? `⭐ ${legN}마리` : "", megaN ? `💎 ${megaN}마리` : ""].filter(Boolean).join(" · ");
   // ⭐ 전설만 — 전설이 없으면 숨긴다(켜 둔 채 전설이 떠났으면 보여서 끌 수 있게)
   $("boxLegOnly").hidden = !legN && !boxView.legOnly;
   $("boxLegOnly").classList.toggle("on", Boolean(boxView.legOnly));
+  $("boxMegaOnly").hidden = !megaN && !boxView.megaOnly; // 💎 메가만 — 전설만과 같은 규칙
+  $("boxMegaOnly").classList.toggle("on", Boolean(boxView.megaOnly));
   const cmp = BOX_SORT[$("boxSort").value] || BOX_SORT.got;
   const list = all
     .map((m, i) => ({ ...m, _i: i }))
-    .filter((m) => (!boxView.favOnly || m.fav) && (!boxView.legOnly || m.legend))
-    .sort((a, b) => b.fav - a.fav || cmp(a, b) || a._i - b._i);
+    .filter((m) => (!boxView.favOnly || m.fav) && (!boxView.legOnly || m.legend) && (!boxView.megaOnly || isMega(m)))
+    .sort((a, b) => pinRank(a.id) - pinRank(b.id) || b.fav - a.fav || cmp(a, b) || a._i - b._i);
   // 이미 다 떠 있으면 모두 띄우기, 숨겨 두었으면 모두 내리기는 누를 게 없다.
   // 아무도 안 골랐어도 키우는 아이는 떠 있으니(petTargets) 내리기는 "보이는가"로만 정한다
   $("petAllOn").disabled = !list.length || (s.petVisible !== false && list.every((m) => m.isPet));
@@ -455,7 +493,8 @@ function renderBox(s) {
   if (!list.length)
     return void ($("boxList").innerHTML = `<div class="note">${
       !all.length ? "아직 없습니다."
-        : boxView.legOnly && boxView.favOnly ? "즐겨찾기한 전설이 없습니다."
+        : [boxView.favOnly, boxView.legOnly, boxView.megaOnly].filter(Boolean).length > 1 ? "고른 조건에 모두 맞는 아이가 없습니다."
+        : boxView.megaOnly ? "메가스톤을 지닌 아이가 없습니다. 상세에서 💎 메가스톤을 지니게 하면 여기 모입니다."
         : boxView.legOnly ? "전설의 포켓몬이 없습니다. 상점의 🥚 전설의 알이나 레이드 조각으로 데려올 수 있습니다."
         : boxView.favOnly ? "즐겨찾기한 아이가 없습니다. 그림 왼쪽 위의 ♥ 를 누르면 즐겨찾기합니다." : "아직 없습니다."
     }</div>`);
@@ -479,8 +518,8 @@ function renderBox(s) {
       const p = m.profile;
       const lv = p ? `Lv.${p.level} · ` : m.lv ? `Lv.${m.lv} · ` : ""; // 🦖 디지몬은 프로필 없이 레벨만
       return `
-        <div class="bx ${m.active ? "act" : ""} ${m.fav ? "fv" : ""}" data-id="${m.id}">
-          <div class="pic"><button class="fav ${m.fav ? "on" : ""}" data-fav="${m.id}" title="${m.fav ? "즐겨찾기 풀기" : "즐겨찾기 — 위쪽에 모으고, 놓아주기 · 팔기를 막습니다"}">${m.fav ? "♥" : "♡"}</button>${m.mega && m.mega.perm && m.mega.petUrl ? `<img class="mega" src="${m.mega.petUrl}" alt="">` : m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50, m.single, m.egg)}</div>
+        <div class="bx ${m.active ? "act" : ""} ${m.fav ? "fv" : ""} ${pinRank(m.id) < 1e9 ? "pn" : ""}" data-id="${m.id}">
+          <div class="pic"><button class="pin ${pinRank(m.id) < 1e9 ? "on" : ""}" data-pin="${m.id}" title="${pinRank(m.id) < 1e9 ? "고정 풀기" : "맨 위에 고정 — 정렬과 상관없이 박스 맨 위에 둡니다"}">📌</button><button class="fav ${m.fav ? "on" : ""}" data-fav="${m.id}" title="${m.fav ? "즐겨찾기 풀기" : "즐겨찾기 — 위쪽에 모으고, 놓아주기 · 팔기를 막습니다"}">${m.fav ? "♥" : "♡"}</button>${m.mega && m.mega.perm && m.mega.petUrl ? `<img class="mega" src="${m.mega.petUrl}" alt="">` : m.url ? `<img src="${m.url}" alt="">` : window.eggSvg(50, m.single, m.egg)}</div>
           <div class="info" title="눌러서 상세 보기">
             <div class="nm">${m.name}${m.shiny ? " ★" : ""}${tags}</div>
             <div class="sub">${lv}${m.stars ? "★".repeat(m.stars) + " " : ""}${m.stage}${m.nature ? " · " + m.nature : ""}</div>
@@ -734,6 +773,9 @@ $("boxList").addEventListener("click", async (e) => {
     if (lastStats) renderBox(lastStats);
     return;
   }
+
+  const pn = e.target.closest("button[data-pin]");
+  if (pn) return togglePin(pn.dataset.pin);
 
   const fv = e.target.closest("button[data-fav]");
   if (fv) {
@@ -1337,6 +1379,12 @@ $("wdCards").addEventListener("click", async (e) => {
 
 window.ptb.onStats((s) => {
   lastStats = s;
+  if (s.titles) {
+    for (const d of s.titles.list) titleDefs.set(d.id, d);
+    // 🎖️ 방금 얻은 칭호 — 여럿이면(이 기능을 처음 켰을 때) 한 번에
+    const fr = (s.titles.fresh || []).map((id) => titleDefs.get(id)).filter(Boolean);
+    if (fr.length) toast(fr.length === 1 ? `🎖️ 새 칭호 — ${fr[0].icon} ${fr[0].name}! 방 탭에서 이름 앞에 달 수 있습니다` : `🎖️ 칭호 ${fr.length}개를 얻었습니다! 방 탭 › 🎖️ 칭호에서 하나를 골라 이름 앞에 달아 보세요`);
+  }
   renderWorld(s.world);
   // 🌏 세계 — 디지털 월드면 포켓몬 세계에만 있는 탭 · 버튼을 감춘다(index.html 의 body.world-digimon)
   document.body.classList.toggle("world-digimon", Boolean(s.world && s.world.id === "digimon"));

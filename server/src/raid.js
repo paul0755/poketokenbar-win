@@ -92,7 +92,7 @@ async function current(g) {
 async function partyOf(g, meId, ids = null) {
   const list = (await g.members()).filter((m) => m.id !== meId && m.snap && m.snap.team).sort((a, b) => a.joined - b.joined || (a.id < b.id ? -1 : 1));
   const pick = ids ? ids.map((id) => list.find((m) => m.id === id)).filter(Boolean) : list;
-  return pick.map((m) => ({ id: m.id, trainer: m.snap.trainer, team: m.snap.team, bench: m.snap.bench || [] }));
+  return pick.map((m) => ({ id: m.id, trainer: m.snap.trainer, title: m.snap.title || "", team: m.snap.team, bench: m.snap.bench || [] }));
 }
 
 /** 화면에 보일 레이드 */
@@ -103,7 +103,7 @@ function publicRaid(st, now = Date.now()) {
     done: st.done, tries: TRIES, day, cleared: st.cleared,
     rows: Object.entries(st.rows).map(([id, r]) => {
       const t = (st.tries || {})[r.k];
-      return { id, trainer: r.trainer, d: r.d, h: r.h || 0, sd: (r.s || {})[st.stage] || 0, n: t && t.day === day ? t.n : 0 };
+      return { id, trainer: r.trainer, title: r.title || "", d: r.d, h: r.h || 0, sd: (r.s || {})[st.stage] || 0, n: t && t.day === day ? t.n : 0 };
     })
       .sort((a, b) => b.d - a.d),
     rewards: st.rewards.filter((x) => x.done && !x.skipped).map(({ id, n, stage }) => ({ id, n, stage })),
@@ -154,6 +154,7 @@ export async function raidAction(g, action, me, body) {
   const day = raidDay(now);
   const row = st.rows[me.id] || (st.rows[me.id] = { trainer: me.snap.trainer, d: 0, s: {} });
   row.trainer = me.snap.trainer;
+  row.title = me.snap.title || ""; // 🎖️
   // 하루 몇 번은 확인된 지갑으로 센다 — 길드를 나갔다 다시 들어오면 길드원 번호가 바뀌어 새로 세어지지 않게
   row.k = me.wallet ? "w:" + me.wallet : "m:" + me.id;
   st.tries = st.tries || {};
@@ -200,7 +201,7 @@ export async function raidAction(g, action, me, body) {
       if (n <= 0) continue;
       const m = id === me.id ? me : members.get(id);
       const r = st.rows[id] || (st.rows[id] = { trainer: m ? m.snap.trainer : "", d: 0, s: {} });
-      if (m) r.trainer = m.snap.trainer;
+      if (m) { r.trainer = m.snap.trainer; r.title = m.snap.title || ""; }
       r.d += n;
       if (id !== me.id) r.h = (r.h || 0) + n; // 남의 도전에서 도운 몫
       r.s[st.stage] = (r.s[st.stage] || 0) + n;

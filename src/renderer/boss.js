@@ -104,7 +104,7 @@
     const want = new Map();
     const m = myMons().find((x) => x.id === pick);
     if (m) want.set("m:" + m.id, { url: m.animUrl || m.url, tag: `나 · ${m.name}`, me: true });
-    for (const x of (view && view.members) || []) want.set("g:" + x.id, { url: x.url, tag: `${x.trainer} · ${x.name}`, me: false });
+    for (const x of (view && view.members) || []) want.set("g:" + x.id, { url: x.url, tag: `${window.ptbTitled(x.title, x.trainer)} · ${x.name}`, me: false });
     for (const [k, a] of actors) if (!want.has(k)) { a.el.remove(); actors.delete(k); }
     for (const [k, w] of want) {
       if (actors.has(k)) continue;
@@ -220,7 +220,7 @@
           const me = rd.mine && x.id === rd.mine.id;
           const help = x.h ? ` <i>도움 ${bars(x.h)}</i>` : "";
           const pcs = got(x.id) ? ` · 🧩${got(x.id)}` : "";
-          return `<div class="r${me ? " me" : ""}"><span class="no">${i + 1}</span><span class="nm">${esc(x.trainer)}</span><span class="v">${bars(x.d)}칸${help}${pcs}</span></div>`;
+          return `<div class="r${me ? " me" : ""}"><span class="no">${i + 1}</span><span class="nm">${window.ptbTitleHtml(x.title)}${esc(x.trainer)}</span><span class="v">${bars(x.d)}칸${help}${pcs}</span></div>`;
         }).join("")
       : `<div class="sub">아직 아무도 도전하지 않았습니다</div>`);
   }

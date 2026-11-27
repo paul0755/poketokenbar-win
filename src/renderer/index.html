@@ -446,6 +446,8 @@
     background: var(--card); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
   }
   .dexfilter button.on { color: var(--accent); border-color: #4a3a16; }
+  /* 🎖️ 칭호 딱지 — 이름 앞(길드원 목록 · 순위 · 레이드). app.js ptbTitleHtml */
+  .ttl { font-style: normal; display: inline-block; padding: 0 5px; margin-right: 1px; border-radius: 5px; font-size: .86em; font-weight: 700; line-height: 1.45; color: #ffe08a; background: #3a2f12; border: 1px solid #5a4a1c; white-space: nowrap; vertical-align: 1px; }
   /* ---------- 박스 ---------- */
   .boxall { margin-left: auto; display: flex; gap: 5px; }
   .boxall button {
@@ -490,21 +492,33 @@
   .bx .fav.on { color: #ff4f86; text-shadow: 0 0 6px rgba(255, 79, 134, .55); }
   .bx.fv { border-color: #5a2a3c; }
   .bx.fv.act { border-color: var(--accent); }
-  .boxbar { display: flex; align-items: center; gap: 6px; margin: 0 0 9px; }
-  .boxsort { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--dim); }
+  .boxbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0 0 9px; } /* 칩이 늘면 줄을 넘긴다 */
+  .boxsort { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--dim); white-space: nowrap; }
   .boxsort select {
     padding: 4px 6px; font: inherit; font-size: 10.5px; color: var(--text);
     background: var(--card); border: 1px solid var(--line); border-radius: 8px; cursor: pointer;
   }
   .boxchip {
     padding: 4px 9px; font: inherit; font-size: 10.5px; color: var(--muted); cursor: pointer;
-    background: var(--card); border: 1px solid var(--line); border-radius: 99px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 99px; white-space: nowrap;
   }
   .boxchip:hover { color: var(--text); }
   .boxchip.on { color: #fff; background: #c43a6a; border-color: #c43a6a; }
   /* ⭐ 전설만 — 별이 노란색이라 노란 바탕에 묻힌다. 진한 호박색 바탕 · 금테 · 금색 글자로 */
   .boxchip.leg.on { color: #ffe08a; background: #5c4300; border-color: #ffd54a; box-shadow: 0 0 0 1px rgba(255, 213, 74, .25); }
+  /* 💎 메가만 — 메가 그림의 분홍빛 */
+  .boxchip.mg.on { color: #ffe6ff; background: #5a2a6a; border-color: #e7a6ff; box-shadow: 0 0 0 1px rgba(231, 166, 255, .25); }
   .boxfavn { margin-left: auto; font-size: 10px; color: var(--dim); }
+  /* 📌 맨 위 고정 — 그림 오른쪽 위. 누른 순서대로 박스 맨 위(즐겨찾기보다 위)에 선다 */
+  .bx .pin {
+    position: absolute; top: -4px; right: -5px; z-index: 1; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
+    background: rgba(20, 22, 30, .55); font-size: 11px; line-height: 20px; cursor: pointer;
+    filter: grayscale(1); opacity: .55; transition: transform .12s, opacity .12s, filter .12s;
+  }
+  .bx .pin:hover { opacity: 1; transform: scale(1.15); }
+  .bx .pin.on { filter: none; opacity: 1; }
+  .bx.pn { border-color: #3d5f8a; box-shadow: inset 3px 0 0 #5b9bd5; }
+  .bx.pn.act { border-color: var(--accent); }
   .bx .pic img { width: 50px; height: 50px; object-fit: contain; image-rendering: pixelated; }
   .bx .pic img.mega { image-rendering: auto; filter: drop-shadow(0 0 2px rgba(255,190,255,.8)); } /* 💎 마스터 메가 — Showdown 3D 그림 */
   .bx .info { flex: 1; min-width: 0; }
@@ -918,6 +932,7 @@
       </label>
       <button id="boxFavOnly" class="boxchip" title="즐겨찾기한 아이만 보기">♥ 즐겨찾기만</button>
       <button id="boxLegOnly" class="boxchip leg" title="전설의 포켓몬만 보기" hidden>⭐ 전설만</button>
+      <button id="boxMegaOnly" class="boxchip mg" title="메가스톤을 지닌 아이만 보기" hidden>💎 메가만</button>
       <span class="boxfavn" id="boxFavN"></span>
     </div>
     <div id="boxList"></div>
@@ -939,6 +954,14 @@
     </div>
     <div class="rm-grads" id="rmGrads" hidden></div>
     <div class="rm-panel" id="rmPanel">
+      <!-- 패널 탭 — 한 번에 하나만. 고른 탭은 이 PC 에 기억한다(room.js ptab) -->
+      <div class="rm-ptabs" id="rmPTabs">
+        <button data-pt="deco" class="on">🎨 꾸미기</button>
+        <button data-pt="mons">🐾 <span class="mw">포켓몬</span> <span class="n" id="rmMonsCount"></span></button>
+        <button data-pt="titles">🎖️ 칭호 <span class="n" id="rmTitleN"></span></button>
+        <button data-pt="rec">📜 기록</button>
+      </div>
+      <div class="rm-pt" data-pt="deco">
       <div class="rm-tools">
         <button data-tool="edit" id="rmEdit">✋ 가구 옮기기</button>
         <button data-tool="reset" id="rmReset" hidden>↺ 처음 자리로</button>
@@ -952,10 +975,21 @@
       <div class="rm-coin-note" id="rmCoinNote"></div>
       <div class="rm-chips" id="rmCoinThemes"></div>
       <div class="rm-furni" id="rmCoinFurni"></div>
-      <h5>방에 둘 <span class="mw">포켓몬</span> <span id="rmMonsCount"></span></h5>
+      </div>
+      <div class="rm-pt" data-pt="mons" hidden>
+      <h5>방에 둘 <span class="mw">포켓몬</span> — 눌러서 넣고 빼기</h5>
       <div class="rm-chips" id="rmMons"></div>
+      </div>
+      <div class="rm-pt" data-pt="titles" hidden>
+      <h5>얻은 칭호 하나를 골라 이름 앞에 단다 — 길드 · 방 이름표 · 레이드 · 실시간 결투에 보인다</h5>
+      <div class="rm-titles" id="rmTitles"></div>
+      <button class="rm-more" id="rmTitleMore" hidden></button>
+      <div class="rm-titles" id="rmTitlesNot" hidden></div>
+      </div>
+      <div class="rm-pt" data-pt="rec" hidden>
       <h5>키운 기록 — 사지 않아도 저절로 생긴다</h5>
       <div class="rm-rec" id="rmRec"></div>
+      </div>
     </div>
     </div>
 

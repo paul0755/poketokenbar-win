@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld("ptb", {
   petAll: (on) => ipcRenderer.invoke("pet-all", on), // 박스 › 모두 띄우기(true) · 모두 내리기(false)
   release: (id) => ipcRenderer.invoke("release", id),
   boxFav: (id) => ipcRenderer.invoke("box-fav", id),
+  titleSet: (id) => ipcRenderer.invoke("title-set", id), // 🎖️ 칭호 달기 · 떼기(null)
   // 결투 · 나무열매. 결과(사건 목록·보상)를 받아야 하므로 invoke
   battle: (a) => ipcRenderer.invoke("battle", a),
   feedBerry: (a) => ipcRenderer.invoke("feed-berry", a),

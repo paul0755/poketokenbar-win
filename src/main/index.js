@@ -27,6 +27,7 @@ const wild = require("./wild");
 const friend = require("./friend");
 const raidbattle = require("./raidbattle");
 const room = require("./room");
+const titles = require("./titles"); // 🎖️ 칭호
 const HALL = require("./hall.json"); // 길드 홀 꾸미기 카탈로그 — 서버와 같은 파일
 const burning = require("./burning");
 const gym = require("./gym");
@@ -1103,6 +1104,36 @@ const dexCount = () => ({
   total: dexSpecies().length,
 });
 
+/*
+ * 🎖️ 칭호 — 조건에 쓸 숫자들(titles.js DEFS 의 n). 레이드 막타 · 방 꾸미기만 따로 세고 나머지는 세이브에 이미 있다.
+ * 박스에 있는 아이로 세는 것(색다른 · 전설 · 메가)도 한 번 얻으면 놓아줘도 칭호는 남는다
+ */
+function titleCtx() {
+  const bx = save.box || [];
+  if (save.decoN == null) { decoTick(); save.decoN--; } // 처음 — 가진 가구 수에서 시작
+  return {
+    lastHits: save.lastHits || 0,
+    deco: save.decoN || 0,
+    badges: (save.badges || []).length,
+    champ: (save.champion || {}).clears || 0,
+    dex: dexCount().seen,
+    grads: (save.graduated || []).length,
+    wins: ((save.friendRecord || {}).w || 0) + bx.reduce((a, m) => a + ((m.record || {}).w || 0), 0),
+    weekTop: (save.weekTop || []).length,
+    shiny: bx.filter((m) => m.shiny && !isEggMon(m)).length,
+    legend: bx.filter((m) => !isEggMon(m) && (poke.LINES[m.line] || {}).legendary).length,
+    mega: world.isDigimon ? 0 : bx.filter((m) => mega.stoneForm(m.hold)).length,
+    tokens: lastTotal || 0,
+  };
+}
+/** 칭호 보기 — 새로 넘긴 조건이 있으면 이때 준다(fresh: 화면이 "새 칭호" 알림을 띄운다) */
+function titleView() {
+  const ctx = titleCtx();
+  const fresh = titles.award(save, ctx);
+  if (fresh.length) writeSave();
+  return { ...titles.view(save, ctx), fresh };
+}
+
 /** 내 방 사진. 서버가 꼴을 다시 본다(guild.js cleanSnap) */
 function guildSnap() {
   const st = roomState();
@@ -1137,6 +1168,7 @@ function guildSnap() {
     badges: (save.badges || []).length, // 체육관 배지 수 — 길드원 목록 · 방의 배지 진열장
     champ: (save.champion || {}).clears || 0, // 챔피언 횟수
     walletId: (save.wallet && save.wallet.id) || "", // 길드 주간 코인 보상을 넣을 곳
+    title: titles.worn(save), // 🎖️ 달고 있는 칭호(번호만 — 받은 쪽이 titles.js 표로 그린다)
   };
 }
 
@@ -1420,6 +1452,7 @@ async function guildView() {
       me: m.id === g.memberId,
       leader: m.id === r.leader,
       trainer: s.trainer,
+      title: s.title || "", // 🎖️
       updated: m.updated,
       canBattle: Boolean(s.team) && m.id !== g.memberId,
       usage: s.usage || null, // 공개를 끈 사람은 null
@@ -1570,6 +1603,7 @@ async function raidFinish(L) {
   const sum = Object.values(credit).reduce((x, y) => x + y, 0);
   if (r.defeated && sum < L.s.start) credit[L.g.memberId] = (credit[L.g.memberId] || 0) + (L.s.start - sum);
   const h = await guildCall(`/${L.g.code}/raid/hit`, { memberId: L.g.memberId, key: L.g.key, credit });
+  if (h.ok && h.cleared) { save.lastHits = (save.lastHits || 0) + 1; writeSave(); } // 🎖️ 이 도전이 단계를 끝냈다 — 막타
   refresh(true);
   if (!h.ok) return h;
   return { ok: true, dealt: h.dealt, mine: credit[L.g.memberId] || 0, cleared: h.cleared, again: Boolean(L.s.again), triesLeft: L.s.triesLeft, stage: L.s.stage, raid: await raidOut(h.raid) };
@@ -1678,7 +1712,7 @@ async function raidView() {
   const others = v.members.filter((m) => !m.me && m.canBattle).map((m) => {
     // 레이드는 레벨 높은 아이부터 나간다 — 미리 보기도 방에 보이는 아이 중 가장 높은 아이로(후보 코드는 길드 보기에 없다)
     const x = [...m.room.mons].sort((a, b) => ((b.profile && b.profile.level) || 0) - ((a.profile && a.profile.level) || 0))[0];
-    return { id: m.id, trainer: m.trainer, name: x ? x.name : "", url: x ? x.animUrl || x.url : null };
+    return { id: m.id, trainer: m.trainer, title: m.title, name: x ? x.name : "", url: x ? x.animUrl || x.url : null };
   });
   return { ok: true, raid: v.raid, members: others, walletOk: v.walletOk, lineup: RAID_LINEUP, name: v.name };
 }
@@ -2076,6 +2110,18 @@ async function roomGrads() {
   })));
 }
 
+/*
+ * 🎖️ 방 꾸미기 횟수 — 배경 · 가구를 사거나, 배경을 바꾸거나, 가구를 놓고 치우고 옮길 때마다 하나.
+ * 이 기능 전에 꾸민 것도 치려고 처음 셀 때 가진 배경 · 가구 수에서 시작한다
+ */
+function decoTick() {
+  if (save.decoN == null) {
+    const r = save.room || {};
+    save.decoN = (r.owned || []).length + (r.coin || []).length + Math.max(0, (r.themes || []).length - 1);
+  }
+  save.decoN++;
+}
+
 /** 배경·가구를 산다. 사탕은 상점과 같은 지갑에서 나간다. 코인 꾸미기는 코인 지갑으로(coinBuy) */
 function roomBuy(kind, id) {
   if (room.isCoin(id)) return coinBuy(kind, id);
@@ -2091,6 +2137,7 @@ function roomBuy(kind, id) {
   save.candySpent = (save.candySpent ?? 0) + cost;
   have.push(id);
   if (kind === "theme") r.theme = id; // 산 배경은 바로 바른다
+  decoTick();
   writeSave();
   refresh(true);
   pushShop();
@@ -2168,6 +2215,7 @@ async function coinBuy(kind, id) {
   }
   decoFrom(r);
   if (kind === "theme") save.room.theme = id; // 산 배경은 바로 바른다
+  decoTick();
   writeSave();
   refresh(true);
   return { ok: true, message: `${kind === "theme" ? `${it.name} 배경으로 바꿨습니다` : `${battle.josa(it.name, "을를")} 방에 놓았습니다`} (🪙${r.balance} 남음)` };
@@ -2198,6 +2246,7 @@ function roomSet(patch = {}) {
     const ok = (id) => { const m = box.find(save.box, id); return m && !isEggMon(m); };
     r.mons = [...new Set(patch.mons.map(String))].filter(ok).slice(0, room.MAX_MONS);
   }
+  if (patch.theme != null || patch.toggle != null || patch.pos) decoTick(); // 🎖️ 방 꾸미기 한 번
   writeSave();
   refresh(true);
   return { ok: true };
@@ -3336,6 +3385,7 @@ async function buildStats() {
     tree: await buildTree(act, eff),
     limits: limits.summarize(u, Date.now(), save.limits || {}, save.quotaFiles || {}),
     box: boxList,
+    titles: titleView(), // 🎖️ 칭호 — 얻은 것 · 못 얻은 것 · 달고 있는 것 · 방금 얻은 것
     berries: berryBag(),
     stones: stoneCount(),
     shades: shadeCount(),
@@ -5605,6 +5655,11 @@ app.whenReady().then(async () => {
    * 즐겨찾기 — 박스 위쪽에 모이고(정렬은 화면이 한다), 놓아주기 · 상점에 팔기 · 몰에 올리기를 막는다.
    * 아끼는 아이를 "정말?" 한 번 더 눌러 잃는 일이 없게
    */
+  ipcMain.handle("title-set", (_e, id) => {
+    const r = titles.wear(save, id == null ? null : String(id));
+    if (r.ok) { writeSave(); refresh(true); }
+    return r;
+  });
   ipcMain.handle("box-fav", (_e, id) => {
     const m = box.find(save.box, id);
     if (!m) return { ok: false, reason: "없는 아이" };

@@ -157,6 +157,8 @@ function cleanPos(p) {
   return Object.fromEntries(Object.entries(p).filter(([id, v]) => ID.test(id) && ok(v)).slice(0, 24));
 }
 
+export const TITLE_ID = /^[a-z0-9]{1,16}$/; // 🎖️ 칭호는 번호만 오간다 — 아무 글자나 이름 앞에 달 수 없게
+
 export function cleanSnap(m) {
   if (!m || typeof m !== "object") return null;
   const trainer = str(m.trainer, 16);
@@ -192,6 +194,7 @@ export function cleanSnap(m) {
     weekTop: int(m.weekTop, 0, 10000) ?? 0, // 주간 1위를 몇 번 했나 — 방의 메달 액자
     badges: int(m.badges, 0, 8) ?? 0, // 체육관 배지 수 — 방의 배지 진열장 · 길드원 목록
     champ: int(m.champ, 0, 100000) ?? 0, // 챔피언 로드에서 챔피언이 된 횟수
+    title: typeof m.title === "string" && TITLE_ID.test(m.title) ? m.title : "", // 🎖️ 칭호 번호 — 그림 · 이름은 앱의 titles.js 표
   };
 }
 
